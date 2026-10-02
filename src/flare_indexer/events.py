@@ -1,7 +1,11 @@
+import numbers
+
 import numpy as np
 import pandas as pd
 from pathlib import Path
 from dataclasses import dataclass
+
+from .classifier import validate_goes_class_column
 
 
 # A simple container that holds the details of one flare event
@@ -34,11 +38,11 @@ def _parse_prediction_window(value) -> pd.Timedelta:
     if isinstance(value, bool):
         raise ValueError(f"prediction_window must be a number of hours or a duration, got {value!r}")
     try:
-        if isinstance(value, (int, float, np.integer, np.floating)):
+        if isinstance(value, numbers.Real):
             window = pd.Timedelta(hours=float(value))
         else:
             window = pd.Timedelta(value)
-    except (ValueError, TypeError) as exc:
+    except (ValueError, TypeError, OverflowError) as exc:
         raise ValueError(
             f"prediction_window must be a number of hours or a duration (e.g. 24, '24h', "
             f"'23h59min59s'), got {value!r}: {exc}"
@@ -214,6 +218,7 @@ class EventMatcher:
         df["peak_time"] = _combine_date_and_hhmm(df, "date", "peak_time", path)
         df["start_time"] = _combine_date_and_hhmm(df, "date", "start_time", path)
         df["end_time"] = _combine_date_and_hhmm(df, "date", "end_time", path)
+        validate_goes_class_column(df["goes_class"], path)
 
         return df.sort_values("peak_time").reset_index(drop=True)
 
@@ -222,6 +227,7 @@ class EventMatcher:
         df["start_time"] = _parse_full_timestamp_column(df, "start_time", path)
         df["peak_time"] = _parse_full_timestamp_column(df, "peak_time", path)
         df["end_time"] = _parse_full_timestamp_column(df, "end_time", path)
+        validate_goes_class_column(df["goes_class"], path)
 
         return df.sort_values("peak_time").reset_index(drop=True)
 

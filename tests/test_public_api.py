@@ -5,6 +5,7 @@ def test_public_names_are_accessible():
     expected = {
         "FlareClassifier",
         "FluxConverter",
+        "InvalidGOESClassError",
         "FlareEvent",
         "EventMatcher",
         "EventReducer",

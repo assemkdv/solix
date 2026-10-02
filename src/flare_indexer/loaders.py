@@ -5,6 +5,7 @@ from typing import Iterable, Union
 
 import pandas as pd
 
+from .classifier import validate_goes_class_column
 from .events import _normalize_active_region
 
 # Matches filenames like "HMI.m2010.12.21_21.00.00.jpg", regardless of how
@@ -234,6 +235,8 @@ def adapt_goes_catalog(
             f"GOES catalog at {input_path} is missing required column(s): "
             f"{', '.join(sorted(missing))}"
         )
+
+    validate_goes_class_column(df["goes_class"], input_path, column="goes_class")
 
     adapted = pd.DataFrame({
         "start_time": pd.to_datetime(df["start_time"]),

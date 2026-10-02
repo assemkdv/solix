@@ -1,4 +1,4 @@
-from .classifier import FlareClassifier, FluxConverter
+from .classifier import FlareClassifier, FluxConverter, InvalidGOESClassError
 from .events import EventMatcher, FlareEvent
 from .reducers import EventReducer, MaxFluxReducer
 from .labelers import LabelAssigner, BinaryThresholdLabeler, RegressionLabeler
@@ -10,6 +10,7 @@ from .loaders import build_image_index_from_filenames, adapt_goes_catalog, Image
 __all__ = [
     "FlareClassifier",
     "FluxConverter",
+    "InvalidGOESClassError",
     "FlareEvent",
     "EventMatcher",
     "EventReducer",

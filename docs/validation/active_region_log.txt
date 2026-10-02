@@ -1,0 +1,12 @@
+Downloading https://raw.githubusercontent.com/chetrajpandey/arpatch-sfp/main/data_process/data_labeling/data_labels/train.csv -> scripts/.cache/ar_train.csv
+Downloading https://raw.githubusercontent.com/chetrajpandey/arpatch-sfp/main/data_process/data_labeling/data_labels/val.csv -> scripts/.cache/ar_val.csv
+Downloading https://raw.githubusercontent.com/chetrajpandey/arpatch-sfp/main/data_process/data_labeling/data_labels/test.csv -> scripts/.cache/ar_test.csv
+Downloading https://raw.githubusercontent.com/chetrajpandey/arpatch-sfp/main/data_process/data_labeling/allharp2noaa.csv -> scripts/.cache/allharp2noaa.csv
+Using cached download: scripts/.cache/goes_flares_integrated.csv
+Published AR patches: 294286 from 3702 HARPs, 2010-05-01 05:00:00 -> 2019-03-10 20:00:00
+  max patches at one timestamp: 21
+HARP-keyed catalog: {'goes_flares': 14401, 'flares_without_noaa_region': 2343, 'flares_with_noaa_but_no_harp': 108, 'flare_harp_pairs': 12026, 'distinct_flares_mapped': 11950, 'max_noaa_regions_per_harp': 6, 'max_harps_per_noaa_region': 2}
+flare_indexer forward (t, t+24h]: 284184/294286 agree (96.567%), positives 7831 vs published 10315
+legacy look-back rule [t-24h, t]: 294286/294286 agree (100.000%), positives 10315 vs published 10315
+Runtime: 99.4s
+Summary written to: docs/validation/active_region_summary.json

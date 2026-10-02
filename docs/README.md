@@ -4,6 +4,7 @@
 |---|---|
 | **Learn to use the package, step by step (main guide)** | **[researcher_manual.md](researcher_manual.md)** |
 | **Understand how the code works inside** | **[architecture/system_design.md](architecture/system_design.md)** |
+| **Look up any public class, function or method** | **[api_reference.md](api_reference.md)** |
 | **Prepare for the supervisor meeting** | **[meeting_walkthrough.md](meeting_walkthrough.md)** |
 | Install and label a dataset in ten minutes | [getting_started.md](getting_started.md) |
 | Look up an input column, parameter, window rule, output column or error (compact reference) | [user_guide.md](user_guide.md) |
@@ -14,7 +15,8 @@
 
 Runnable examples with synthetic data are in [`../examples`](../examples).
 
-Examples in `researcher_manual.md` and `architecture/system_design.md` run
+Examples in `researcher_manual.md`, `api_reference.md` and
+`architecture/system_design.md` run
 against the synthetic files in [`fixtures/`](fixtures/); their recorded
 output is checked by `python scripts/check_doc_examples.py` (also part of
 the test suite).

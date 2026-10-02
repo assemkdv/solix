@@ -10,6 +10,7 @@ ready-to-train table of image/sequence -> label pairs.
 
 - **[Researcher manual](docs/researcher_manual.md)** — how to install and use the package, with verified examples
 - **[System design](docs/architecture/system_design.md)** — how the code works inside, with a traced example
+- **[API reference](docs/api_reference.md)** — every public class, function and method, with verified examples
 - **[Meeting walkthrough](docs/meeting_walkthrough.md)** — what is done, what is open, and a demo command
 
 More:

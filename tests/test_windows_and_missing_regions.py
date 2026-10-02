@@ -80,6 +80,7 @@ def test_invalid_prediction_window_raises(window):
 # ── missing_active_region policy ─────────────────────────────────────────
 
 
+@pytest.mark.filterwarnings("ignore:.*flare\\(s\\) in the catalog:UserWarning")
 def test_missing_active_region_default_labels_negative_and_warns(multi_region_index, ar_catalog):
     builder = DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy(), target="active_region")
     with pytest.warns(UserWarning, match="1 image\\(s\\) have a missing active_region"):
@@ -100,6 +101,7 @@ def test_missing_active_region_drop_removes_rows(multi_region_index, ar_catalog)
     assert result["label"].tolist() == [1, 0]
 
 
+@pytest.mark.filterwarnings("ignore:.*flare\\(s\\) in the catalog:UserWarning")
 def test_missing_active_region_error_raises(multi_region_index, ar_catalog):
     builder = DatasetBuilder(
         prediction_window=24, strategy=BinaryThresholdStrategy(), target="active_region",
@@ -140,36 +142,56 @@ def _ar_sequence_index(tmp_path):
     )
 
 
-@pytest.mark.parametrize("mode_kwargs", [
-    {"sequence_length": 2},
-    {"cadence": "1h", "observation_window": "2h", "sliding_window": "1h"},
-])
-def test_missing_active_region_policies_for_sequences(tmp_path, ar_catalog, mode_kwargs):
+@pytest.mark.filterwarnings("ignore:.*flare\\(s\\) in the catalog:UserWarning")
+def test_missing_active_region_policies_for_row_based_sequences(tmp_path, ar_catalog):
+    # Region 100 has 00, 01, 03 (02 has no region). Without cadence_minutes,
+    # row-based sequences take consecutive rows of the region, as in
+    # full-disk mode, so (01, 03) is a sequence.
     index_path = _ar_sequence_index(tmp_path)
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        default = DatasetBuilder(
-            prediction_window=24, strategy=BinaryThresholdStrategy(), target="active_region", **mode_kwargs,
-        ).build(index_path, ar_catalog)
-    assert len(default) == 3
-    assert default["active_region"].iloc[0] == "100"
-    assert default["active_region"].iloc[1:].isna().all()
+    kwargs = dict(prediction_window=24, strategy=BinaryThresholdStrategy(), target="active_region", sequence_length=2)
+
+    with pytest.warns(UserWarning, match="0 sequence\\(s\\) built only from such images"):
+        default = DatasetBuilder(**kwargs).build(index_path, ar_catalog)
+    assert default["active_region"].tolist() == ["100", "100"]
+    assert [ts[-1].hour for ts in default["timestamps"]] == [1, 3]
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        dropped = DatasetBuilder(
-            prediction_window=24, strategy=BinaryThresholdStrategy(), target="active_region",
-            missing_active_region="drop", **mode_kwargs,
-        ).build(index_path, ar_catalog)
-    assert dropped["active_region"].tolist() == ["100"]
+        dropped = DatasetBuilder(missing_active_region="drop", **kwargs).build(index_path, ar_catalog)
+    assert dropped.equals(default)
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        with pytest.raises(ValueError, match="2 sequence\\(s\\) have a missing active_region"):
-            DatasetBuilder(
-                prediction_window=24, strategy=BinaryThresholdStrategy(), target="active_region",
-                missing_active_region="error", **mode_kwargs,
-            ).build(index_path, ar_catalog)
+        with pytest.raises(ValueError, match="1 image\\(s\\) .* have a missing active_region"):
+            DatasetBuilder(missing_active_region="error", **kwargs).build(index_path, ar_catalog)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        strict = DatasetBuilder(cadence_minutes=60, **kwargs).build(index_path, ar_catalog)
+    assert [ts[-1].hour for ts in strict["timestamps"]] == [1]
+
+
+def test_missing_active_region_group_is_labeled_negative(tmp_path, ar_catalog):
+    index_path = _write(
+        tmp_path / "index.csv",
+        "timestamp,active_region\n"
+        "2024-01-01 00:00:00,\n"
+        "2024-01-01 01:00:00,\n"
+        "2024-01-01 02:00:00,100\n",
+    )
+    kwargs = dict(prediction_window=24, strategy=BinaryThresholdStrategy(), target="active_region",
+                  cadence="1h", observation_window="2h", sliding_window="1h")
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        result = DatasetBuilder(**kwargs).build(index_path, ar_catalog)
+    assert len(result) == 1
+    assert pd.isna(result.iloc[0]["active_region"])
+    assert result.iloc[0]["label"] == 0  # the M2.0 of region 100 is never matched
+    assert any("1 sequence(s) built only from such images" in str(w.message) for w in caught)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        assert DatasetBuilder(missing_active_region="drop", **kwargs).build(index_path, ar_catalog).empty
 
 
 # ── include_metadata ─────────────────────────────────────────────────────
@@ -221,3 +243,50 @@ def test_include_metadata_empty_index_keeps_columns(tmp_path, ar_catalog):
         ).build(index_path, ar_catalog)
     assert list(result.columns) == ["timestamp", "active_region", "label", "image_path"]
     assert result.empty
+
+
+# ── review follow-ups ────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("window", [float("inf"), float("nan")])
+def test_non_finite_prediction_window_raises(window):
+    with pytest.raises(ValueError, match="prediction_window"):
+        DatasetBuilder(prediction_window=window, strategy=BinaryThresholdStrategy())
+
+
+def test_prediction_window_attribute_keeps_given_value():
+    assert DatasetBuilder(prediction_window="23h59min59s", strategy=BinaryThresholdStrategy()).prediction_window == "23h59min59s"
+
+
+def test_missing_region_warning_points_at_caller(multi_region_index, ar_catalog):
+    builder = DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy(), target="active_region")
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        builder.build(multi_region_index, ar_catalog)
+    assert len(caught) == 2
+    assert all(w.filename == __file__ for w in caught)
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"include_metadata": True},
+    {"include_metadata": True, "target": "active_region"},
+    {"sequence_length": 2},
+    {"sequence_length": 2, "target": "active_region"},
+    {"cadence": "1h", "observation_window": "2h", "sliding_window": "1h"},
+    {"cadence": "1h", "observation_window": "2h", "sliding_window": "1h", "target": "active_region"},
+])
+def test_index_column_named_like_an_output_column_raises(tmp_path, ar_catalog, kwargs):
+    index_path = _write(
+        tmp_path / "index.csv",
+        "timestamp,active_region,label\n2024-01-01 00:00:00,100,x\n2024-01-01 01:00:00,100,y\n",
+    )
+    with pytest.raises(ValueError, match="would overwrite output column"):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy(), **kwargs).build(index_path, ar_catalog)
+
+
+def test_label_column_in_index_is_fine_without_metadata(tmp_path, ar_catalog):
+    index_path = _write(tmp_path / "index.csv", "timestamp,label\n2024-01-01 00:00:00,x\n")
+    result = DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy()).build(index_path, ar_catalog)
+    assert result["label"].tolist() == [1]

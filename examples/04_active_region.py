@@ -7,15 +7,13 @@ NOAA active region. This example shows:
 1. two regions observed at the same time get different labels;
 2. what happens to a patch with an unknown region (missing_active_region);
 3. catalog flares with no region can never be matched (a warning says so);
-4. how to build AR sequences today: one region at a time.
+4. sequences are built separately for each region.
 
 Run:  python examples/04_active_region.py
 """
 
 import warnings
 from pathlib import Path
-
-import pandas as pd
 
 import flare_indexer as fidx
 
@@ -60,21 +58,19 @@ def main():
     except ValueError as exc:
         print(f"  ValueError: {str(exc)[:110]}...")
 
-    print("\n3) Sequences: the builder needs unique timestamps, so split by region first.")
-    index = pd.read_csv(INDEX, dtype={"active_region": "string"})
-    for region, rows in index.dropna(subset=["active_region"]).groupby("active_region"):
-        region_index = OUTPUT / f"04_index_region_{region}.csv"
-        rows.to_csv(region_index, index=False)
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            sequences = fidx.DatasetBuilder(
-                prediction_window=24, strategy=fidx.BinaryThresholdStrategy("M"),
-                target="active_region", event_time="start", interval_mode="right_closed",
-                cadence="6h", observation_window="12h", sliding_window="6h",
-            ).build(region_index, CATALOG)
-        print(f"\n  region {region}:")
-        print(sequences[["sequence_start", "sequence_end", "active_region", "label"]].to_string(index=False))
-
+    print("\n3) Sequences are built per region: two regions share timestamps, and the")
+    print("   unknown patch never joins a region's sequence (it is dropped here).")
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        sequences, report = fidx.DatasetBuilder(
+            prediction_window=24, strategy=fidx.BinaryThresholdStrategy("M"),
+            target="active_region", event_time="start", interval_mode="right_closed",
+            missing_active_region="drop",
+            cadence="6h", observation_window="12h", sliding_window="6h",
+        ).build(INDEX, CATALOG, return_report=True)
+    print(sequences[["sequence_start", "sequence_end", "active_region", "label"]].head(8).to_string(index=False))
+    print(f"   ... {len(sequences)} sequences from {report.region_count} regions, "
+          f"{report.skipped_sequences} skipped for missing images")
 
 if __name__ == "__main__":
     main()

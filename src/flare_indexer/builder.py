@@ -39,6 +39,12 @@ class SequenceBuildReport:
         candidate start timestamps that were skipped.
     missing_timestamps : up to the first `_MAX_SEQUENCE_REPORT_SAMPLES`
         specific timestamps that were missing and caused a skip.
+    skipped_sequence_regions : target="active_region" only -- the region
+        of each entry in skipped_sequence_starts (None for the group of
+        images without a region); empty for full-disk builds.
+    region_count : target="active_region" only -- how many region groups
+        sequences were built for (the missing-region group counts as one);
+        None for full-disk builds.
     """
 
     inferred_source_cadence: pd.Timedelta
@@ -51,6 +57,8 @@ class SequenceBuildReport:
     skipped_sequences: int
     skipped_sequence_starts: list = field(default_factory=list)
     missing_timestamps: list = field(default_factory=list)
+    skipped_sequence_regions: list = field(default_factory=list)
+    region_count: int | None = None
 
 
 def _parse_duration(value, name: str) -> pd.Timedelta:
@@ -128,9 +136,11 @@ class DatasetBuilder:
     target : str
         "full_disk" (default) matches any flare in the window, preserving
         original behavior. "active_region" matches only flares from the
-        specific active region each image (or, for sequences, each image in
-        the sequence) is assigned to (requires an active_region column in
-        the image index).
+        specific active region each image is assigned to (requires an
+        active_region column in the image index). In sequence modes the
+        index is first grouped by region and each region's sequences are
+        built from that region's images only, so several regions may be
+        observed at the same timestamps; see "Active-region sequences".
     event_time : str
         Which of a flare's timestamps EventMatcher checks against the
         prediction window: "peak" (default, preserves original behavior)
@@ -141,12 +151,14 @@ class DatasetBuilder:
         [t, t + prediction_window), or "right_closed" for
         (t, t + prediction_window]. See EventMatcher.query.
     missing_active_region : str
-        Only used when target="active_region". What to do with an image
-        (or sequence) whose image-side active_region is missing:
-        "negative" (default, preserves original behavior) labels it as if
-        no flare occurred -- and emits a UserWarning with the count, since
-        such a label is "unknown", not a confirmed negative; "drop" leaves
-        it out of the output; "error" raises ValueError.
+        Only used when target="active_region". What to do with images
+        whose image-side active_region is missing:
+        "negative" (default, preserves original behavior) labels them as
+        if no flare occurred and emits a UserWarning with the count, since
+        such a label is unknown, not a confirmed negative; "drop" leaves
+        them out of the output; "error" raises ValueError. In sequence
+        modes such images never join a region's sequence; with "negative"
+        they form one extra group whose sequences get active_region=None.
     include_metadata : bool
         Single-image mode only. False (default, preserves original
         behavior) returns just (timestamp, label) -- or, for
@@ -198,6 +210,19 @@ class DatasetBuilder:
         to the current one. Required in time-based mode. Must be an exact
         multiple of `cadence`.
 
+    Active-region sequences
+    ----------------------------------------------------------------------
+    With target="active_region", sequences are built per region: rows
+    are grouped by normalized active_region, and the ordering/uniqueness
+    checks, cadence_minutes, and the time-based grid apply within each
+    region. Duplicate timestamps within one region raise ValueError;
+    the same timestamp in different regions is fine. In time-based mode
+    the source cadence is inferred from all image timestamps, `start`
+    must be an image time somewhere in the index, and every region uses
+    the grid start + k * sliding_window (or, without `start`, a grid
+    beginning at the region's own first image). Output rows are sorted
+    by sequence_start, then active_region (missing region last).
+
     Sequence mode selection
     ----------------------------------------------------------------------
     Supplying any of start/cadence/observation_window/sliding_window
@@ -238,7 +263,7 @@ class DatasetBuilder:
         missing_active_region="negative",
         include_metadata=False,
     ):
-        _parse_prediction_window(prediction_window)
+        parsed_prediction_window = _parse_prediction_window(prediction_window)
         if missing_active_region not in VALID_MISSING_ACTIVE_REGION_POLICIES:
             raise ValueError(
                 f"missing_active_region must be one of {sorted(VALID_MISSING_ACTIVE_REGION_POLICIES)}, "
@@ -270,6 +295,7 @@ class DatasetBuilder:
             )
 
         self.prediction_window = prediction_window
+        self._window = parsed_prediction_window
         self.strategy = strategy
         self.target = target
         self.event_time = event_time
@@ -347,8 +373,11 @@ class DatasetBuilder:
         present in the image index (e.g. an image path or ID column),
         preserving that column's values for each image in the sequence.
         Timestamps must be sorted ascending and contain no duplicates in
-        this mode. Fewer rows than sequence_length produces an empty
-        result with the same (sequence-mode) columns.
+        this mode (within each region when target="active_region").
+        An image-index column whose name equals an output column (e.g.
+        "label") raises ValueError instead of overwriting it. Fewer rows
+        than sequence_length produces an empty result with the same
+        (sequence-mode) columns.
 
         In time-based mode (see the class docstring), returns the same
         sequence-mode schema as row-based sequences, built instead from an
@@ -392,7 +421,7 @@ class DatasetBuilder:
                 "active_region (required when target='active_region')"
             )
 
-        index_df = index_df.copy()
+        index_df = index_df.reset_index(drop=True)
         index_df["timestamp"] = pd.to_datetime(index_df["timestamp"])
 
         matcher = EventMatcher(event_catalog_path)
@@ -408,19 +437,21 @@ class DatasetBuilder:
 
         if self.sequence_length == 1:
             if self.target == "active_region":
-                return self._build_single_image_active_region(index_df, matcher)
-            return self._build_single_image(index_df, matcher)
+                return self._build_single_image_active_region(index_df, matcher, image_index_path)
+            return self._build_single_image(index_df, matcher, image_index_path)
 
-        self._validate_sequence_timestamps(index_df["timestamp"], image_index_path)
         if self.target == "active_region":
             return self._build_sequences_active_region(index_df, matcher, image_index_path)
-        return self._build_sequences(index_df, matcher)
+        self._validate_sequence_timestamps(index_df["timestamp"], image_index_path)
+        return self._build_sequences(index_df, matcher, image_index_path)
 
-    def _build_single_image(self, index_df: pd.DataFrame, matcher: EventMatcher) -> pd.DataFrame:
+    def _build_single_image(self, index_df: pd.DataFrame, matcher: EventMatcher, path: Path) -> pd.DataFrame:
+        if self.include_metadata:
+            extra_columns = _extra_columns(index_df, ("timestamp",), ("label",), path)
         records = []
         for ts in index_df["timestamp"]:
             flares = matcher.query(
-                ts, self.prediction_window,
+                ts, self._window,
                 event_time=self.event_time, interval_mode=self.interval_mode,
             )
             label = self.strategy.label(flares)
@@ -432,13 +463,17 @@ class DatasetBuilder:
         else:
             result = pd.DataFrame(records)
         if self.include_metadata:
-            extra_columns = [c for c in index_df.columns if c != "timestamp"]
             for col in extra_columns:
                 result[col] = index_df[col].to_numpy()
         return result
 
-    def _build_single_image_active_region(self, index_df: pd.DataFrame, matcher: EventMatcher) -> pd.DataFrame:
-        extra_columns = [c for c in index_df.columns if c not in ("timestamp", "active_region")]
+    def _build_single_image_active_region(
+        self, index_df: pd.DataFrame, matcher: EventMatcher, path: Path,
+    ) -> pd.DataFrame:
+        if self.include_metadata:
+            extra_columns = _extra_columns(index_df, ("timestamp", "active_region"), ("label",), path)
+        else:
+            extra_columns = []
         if self.include_metadata:
             columns = ["timestamp", "active_region", "label"] + extra_columns
         else:
@@ -459,7 +494,7 @@ class DatasetBuilder:
                 flares = []
             else:
                 flares = matcher.query(
-                    ts, self.prediction_window, active_region=active_region,
+                    ts, self._window, active_region=active_region,
                     event_time=self.event_time, interval_mode=self.interval_mode,
                 )
             label = self.strategy.label(flares)
@@ -508,20 +543,23 @@ class DatasetBuilder:
                 stacklevel=3,
             )
 
-    def _validate_sequence_timestamps(self, timestamps: pd.Series, path: Path) -> None:
+    def _validate_sequence_timestamps(self, timestamps: pd.Series, path: Path, group: str | None = None) -> None:
         if not timestamps.is_monotonic_increasing:
+            within = f" within {group}" if group else ""
             raise ValueError(
                 f"Image index at {path} must have timestamps sorted in ascending "
-                "order to build sequences."
+                f"order{within} to build sequences."
             )
-        self._validate_unique_timestamps(timestamps, path)
+        self._validate_unique_timestamps(timestamps, path, group)
 
-    def _validate_unique_timestamps(self, timestamps: pd.Series, path: Path) -> None:
+    def _validate_unique_timestamps(self, timestamps: pd.Series, path: Path, group: str | None = None) -> None:
         duplicated = timestamps[timestamps.duplicated()]
         if not duplicated.empty:
-            dupe_list = ", ".join(str(t) for t in duplicated.unique())
+            dupe_list = ", ".join(str(t) for t in duplicated.unique()[:10])
+            more = ", ..." if duplicated.nunique() > 10 else ""
+            within = f" within {group}" if group else ""
             raise ValueError(
-                f"Image index at {path} contains duplicate timestamp(s): {dupe_list}"
+                f"Image index at {path} contains duplicate timestamp(s){within}: {dupe_list}{more}"
             )
 
     def _sequence_violates_cadence(self, window_timestamps: list) -> bool:
@@ -533,9 +571,9 @@ class DatasetBuilder:
                 return True
         return False
 
-    def _build_sequences(self, index_df: pd.DataFrame, matcher: EventMatcher) -> pd.DataFrame:
+    def _build_sequences(self, index_df: pd.DataFrame, matcher: EventMatcher, path: Path) -> pd.DataFrame:
         timestamps = index_df["timestamp"].tolist()
-        extra_columns = [c for c in index_df.columns if c != "timestamp"]
+        extra_columns = _extra_columns(index_df, ("timestamp",), _SEQUENCE_OUTPUT_COLUMNS, path)
         n = len(timestamps)
         length = self.sequence_length
 
@@ -549,7 +587,7 @@ class DatasetBuilder:
             if not self._sequence_violates_cadence(window):
                 sequence_end = window[-1]
                 flares = matcher.query(
-                    sequence_end, self.prediction_window,
+                    sequence_end, self._window,
                     event_time=self.event_time, interval_mode=self.interval_mode,
                 )
                 label = self.strategy.label(flares)
@@ -571,111 +609,110 @@ class DatasetBuilder:
             return pd.DataFrame(columns=columns)
         return pd.DataFrame(records)[columns]
 
-    def _sequence_active_region(self, window_active_regions: list, path: Path, descriptor: str) -> str | None:
-        normalized = [_normalize_active_region(v) for v in window_active_regions]
-        distinct_non_missing = {v for v in normalized if v is not None}
+    # ── Active-region sequences: one group of images per region ──────────
 
-        if len(distinct_non_missing) > 1:
+    def _region_groups(self, index_df: pd.DataFrame, path: Path) -> list[tuple[str | None, pd.DataFrame]]:
+        """
+        Split the image index into one group per normalized active region,
+        in order of first appearance. Rows without a region never join a
+        region's group; missing_active_region decides what happens to them:
+        "error" raises, "drop" leaves them out, "negative" puts them in one
+        extra group (key None) whose sequences are labeled as if no flare
+        occurred -- the closest equivalent of the pre-grouping behavior.
+        """
+        regions = index_df["active_region"].map(_normalize_active_region)
+        missing = regions.isna()
+        if missing.any() and self.missing_active_region == "error":
+            examples = ", ".join(
+                f"row {i} ({index_df['timestamp'].iloc[i]})" for i in index_df.index[missing][:5]
+            )
             raise ValueError(
-                f"Image index at {path} contains a sequence ({descriptor}) "
-                f"with mixed active_region values: {sorted(distinct_non_missing)}. "
-                "A sequence must refer to a single active region."
+                f"{int(missing.sum())} image(s) in {path} have a missing active_region "
+                f"(e.g. {examples}{', ...' if missing.sum() > 5 else ''}). They cannot be assigned "
+                "to any region's sequence. Fill in active_region, or pass "
+                "missing_active_region='drop' or 'negative' to DatasetBuilder."
             )
 
-        if None in normalized:
-            # A missing active_region on any row must not silently match
-            # anything, even if every other row agrees on a region --
-            # consistent with the single-image missing-AR behavior.
-            return None
+        groups = [
+            (region, index_df.loc[rows.index])
+            for region, rows in regions[~missing].groupby(regions[~missing], sort=False)
+        ]
+        if missing.any() and self.missing_active_region == "negative":
+            groups.append((None, index_df.loc[missing]))
+        return groups
 
-        return next(iter(distinct_non_missing))
+    def _warn_missing_region_sequences(self, index_df: pd.DataFrame, missing_sequences: int) -> None:
+        if self.missing_active_region != "negative":
+            return
+        missing_rows = int(index_df["active_region"].map(_normalize_active_region).isna().sum())
+        if not missing_rows:
+            return
+        warnings.warn(
+            f"{missing_rows} image(s) have a missing active_region. They are not part of any "
+            f"region's sequence; {missing_sequences} sequence(s) built only from such images were "
+            "labeled as if no flare occurred. Such labels are unknown, not confirmed negatives. "
+            "Pass missing_active_region='drop' to leave them out, or 'error' to stop.",
+            UserWarning,
+            stacklevel=4,
+        )
+
+    @staticmethod
+    def _group_name(region: str | None) -> str:
+        return "rows with a missing active_region" if region is None else f"active_region {region}"
+
+    def _query_region(self, matcher: EventMatcher, reference_time, region: str | None) -> list:
+        if region is None:
+            # Never fall back to full-disk matching for an unknown region.
+            return []
+        return matcher.query(
+            reference_time, self._window, active_region=region,
+            event_time=self.event_time, interval_mode=self.interval_mode,
+        )
 
     def _build_sequences_active_region(self, index_df: pd.DataFrame, matcher: EventMatcher, path: Path) -> pd.DataFrame:
-        timestamps = index_df["timestamp"].tolist()
-        active_regions = index_df["active_region"].tolist()
-        extra_columns = [c for c in index_df.columns if c not in ("timestamp", "active_region")]
-        n = len(timestamps)
+        extra_columns = _extra_columns(index_df, ("timestamp", "active_region"), _SEQUENCE_OUTPUT_COLUMNS, path)
+        columns = ["sequence_start", "sequence_end", "timestamps", "n_images", "active_region", "label"] + extra_columns
         length = self.sequence_length
 
-        columns = ["sequence_start", "sequence_end", "timestamps", "n_images", "active_region", "label"] + extra_columns
-
         records = []
-        missing_sequences = []
-        start = 0
-        while start + length <= n:
-            window = timestamps[start:start + length]
+        missing_sequences = 0
+        for region, rows in self._region_groups(index_df, path):
+            group_name = self._group_name(region)
+            self._validate_sequence_timestamps(rows["timestamp"], path, group_name)
+            timestamps = rows["timestamp"].tolist()
+            start = 0
+            while start + length <= len(timestamps):
+                window = timestamps[start:start + length]
+                if not self._sequence_violates_cadence(window):
+                    flares = self._query_region(matcher, window[-1], region)
+                    missing_sequences += region is None
+                    record = {
+                        "sequence_start": window[0],
+                        "sequence_end": window[-1],
+                        "timestamps": list(window),
+                        "n_images": len(window),
+                        "active_region": region,
+                        "label": self.strategy.label(flares),
+                    }
+                    for col in extra_columns:
+                        record[col] = rows[col].iloc[start:start + length].tolist()
+                    records.append(record)
+                start += self.stride
 
-            if not self._sequence_violates_cadence(window):
-                active_region = self._sequence_active_region(
-                    active_regions[start:start + length], path, f"rows {start}:{start + length}"
-                )
-                sequence_end = window[-1]
-                if active_region is None:
-                    missing_sequences.append(f"rows {start}:{start + length}")
-                    if self.missing_active_region == "drop":
-                        start += self.stride
-                        continue
-                    flares = []
-                else:
-                    flares = matcher.query(
-                        sequence_end, self.prediction_window, active_region=active_region,
-                        event_time=self.event_time, interval_mode=self.interval_mode,
-                    )
-                label = self.strategy.label(flares)
-
-                record = {
-                    "sequence_start": window[0],
-                    "sequence_end": sequence_end,
-                    "timestamps": list(window),
-                    "n_images": len(window),
-                    "active_region": active_region,
-                    "label": label,
-                }
-                for col in extra_columns:
-                    record[col] = index_df[col].iloc[start:start + length].tolist()
-                records.append(record)
-
-            start += self.stride
-
-        self._report_missing_active_regions(missing_sequences, "sequence(s)")
-
-        if not records:
-            return pd.DataFrame(columns=columns)
-        return pd.DataFrame(records)[columns]
+        self._warn_missing_region_sequences(index_df, missing_sequences)
+        return _sequence_frame(records, columns)
 
     # ── Time-based sequence mode ─────────────────────────────────────────
 
-    def _time_based_candidates(self, index_df: pd.DataFrame, path: Path) -> tuple[list, SequenceBuildReport]:
+    def _grid_candidates(self, ts_to_position: dict, first_start: pd.Timestamp, max_ts: pd.Timestamp):
         """
-        Shared candidate-generation for time-based sequence mode, used by
-        both the full-disk and active-region builders below.
-
-        Returns (emitted, report) where `emitted` is a list of
-        (window_timestamps, row_positions) for each candidate that had
-        every required timestamp present -- row_positions are positions
-        into index_df, suitable for .iloc, used to fetch extra columns
-        (and, for active-region mode, the active_region column) for
-        exactly those rows.
+        Walk candidate starts first_start, first_start + sliding_window, ...
+        while the last required image (start + observation_window - cadence)
+        is not after max_ts. Returns (emitted, total, skipped_starts,
+        missing_timestamps): emitted is a list of (window_timestamps,
+        row_positions) for candidates with every grid time present;
+        skipped samples are capped at _MAX_SEQUENCE_REPORT_SAMPLES.
         """
-        timestamps = index_df["timestamp"]
-        self._validate_unique_timestamps(timestamps, path)
-
-        inferred_cadence = _infer_source_cadence(timestamps)
-        _validate_requested_cadence(self.cadence, inferred_cadence)
-
-        ts_to_position = {ts: i for i, ts in enumerate(timestamps)}
-        max_ts = timestamps.max()
-
-        if self.start is not None:
-            effective_start = self.start
-            if effective_start not in ts_to_position:
-                raise ValueError(
-                    f"start={effective_start} has no exact matching image timestamp in "
-                    f"the image index at {path}."
-                )
-        else:
-            effective_start = timestamps.min()
-
         offsets = [i * self.cadence for i in range(self.number_of_images)]
 
         emitted = []
@@ -683,7 +720,7 @@ class DatasetBuilder:
         skipped_starts = []
         missing_timestamps = []
 
-        candidate_start = effective_start
+        candidate_start = first_start
         while candidate_start + offsets[-1] <= max_ts:
             total_candidates += 1
             required_timestamps = [candidate_start + offset for offset in offsets]
@@ -707,15 +744,47 @@ class DatasetBuilder:
 
             candidate_start = candidate_start + self.sliding_window
 
+        return emitted, total_candidates, skipped_starts, missing_timestamps
+
+    def _validated_start(self, timestamps: pd.Series, path: Path) -> pd.Timestamp:
+        if self.start is None:
+            return timestamps.min()
+        if not (timestamps == self.start).any():
+            raise ValueError(
+                f"start={self.start} has no exact matching image timestamp in "
+                f"the image index at {path}."
+            )
+        return self.start
+
+    def _time_based_candidates(self, index_df: pd.DataFrame, path: Path) -> tuple[list, SequenceBuildReport]:
+        """
+        Full-disk candidate generation: one grid over the whole index.
+
+        Returns (emitted, report) where `emitted` is a list of
+        (window_timestamps, row_positions) -- row_positions are positions
+        into index_df, suitable for .iloc, used to fetch extra columns.
+        """
+        timestamps = index_df["timestamp"]
+        self._validate_unique_timestamps(timestamps, path)
+
+        inferred_cadence = _infer_source_cadence(timestamps)
+        _validate_requested_cadence(self.cadence, inferred_cadence)
+
+        effective_start = self._validated_start(timestamps, path)
+        ts_to_position = {ts: i for i, ts in enumerate(timestamps)}
+        emitted, total, skipped_starts, missing_timestamps = self._grid_candidates(
+            ts_to_position, effective_start, timestamps.max(),
+        )
+
         report = SequenceBuildReport(
             inferred_source_cadence=inferred_cadence,
             requested_cadence=self.cadence,
             observation_window=self.observation_window,
             sliding_window=self.sliding_window,
             effective_start=effective_start,
-            total_candidate_sequences=total_candidates,
+            total_candidate_sequences=total,
             emitted_sequences=len(emitted),
-            skipped_sequences=total_candidates - len(emitted),
+            skipped_sequences=total - len(emitted),
             skipped_sequence_starts=skipped_starts,
             missing_timestamps=missing_timestamps,
         )
@@ -724,15 +793,15 @@ class DatasetBuilder:
     def _build_time_based_sequences(
         self, index_df: pd.DataFrame, matcher: EventMatcher, path: Path,
     ) -> tuple[pd.DataFrame, SequenceBuildReport]:
+        extra_columns = _extra_columns(index_df, ("timestamp",), _SEQUENCE_OUTPUT_COLUMNS, path)
         candidates, report = self._time_based_candidates(index_df, path)
-        extra_columns = [c for c in index_df.columns if c != "timestamp"]
         columns = ["sequence_start", "sequence_end", "timestamps", "n_images", "label"] + extra_columns
 
         records = []
         for window_timestamps, positions in candidates:
             sequence_end = window_timestamps[-1]
             flares = matcher.query(
-                sequence_end, self.prediction_window,
+                sequence_end, self._window,
                 event_time=self.event_time, interval_mode=self.interval_mode,
             )
             label = self.strategy.label(flares)
@@ -755,44 +824,105 @@ class DatasetBuilder:
     def _build_time_based_sequences_active_region(
         self, index_df: pd.DataFrame, matcher: EventMatcher, path: Path,
     ) -> tuple[pd.DataFrame, SequenceBuildReport]:
-        candidates, report = self._time_based_candidates(index_df, path)
-        extra_columns = [c for c in index_df.columns if c not in ("timestamp", "active_region")]
+        """
+        One timestamp grid per region. The source cadence is inferred from
+        all image timestamps (the instrument cadence), and an explicit
+        `start` must be an image time somewhere in the index. Each region's
+        grid begins at its first image time, or -- when `start` is given --
+        at the first grid point start + k * sliding_window (k >= 0) that is
+        not before the region's first image, so all regions share one grid.
+        """
+        extra_columns = _extra_columns(index_df, ("timestamp", "active_region"), _SEQUENCE_OUTPUT_COLUMNS, path)
         columns = ["sequence_start", "sequence_end", "timestamps", "n_images", "active_region", "label"] + extra_columns
 
+        groups = self._region_groups(index_df, path)
+        for region, rows in groups:
+            self._validate_unique_timestamps(rows["timestamp"], path, self._group_name(region))
+
+        inferred_cadence = _infer_source_cadence(index_df["timestamp"])
+        _validate_requested_cadence(self.cadence, inferred_cadence)
+        effective_start = self._validated_start(index_df["timestamp"], path)
+
         records = []
-        missing_sequences = []
-        for window_timestamps, positions in candidates:
-            window_active_regions = index_df["active_region"].iloc[positions].tolist()
-            active_region = self._sequence_active_region(
-                window_active_regions, path, f"starting at {window_timestamps[0]}"
-            )
-            sequence_end = window_timestamps[-1]
-            if active_region is None:
-                missing_sequences.append(f"starting at {window_timestamps[0]}")
-                if self.missing_active_region == "drop":
+        missing_sequences = 0
+        total = 0
+        skipped_starts, skipped_regions, missing_timestamps = [], [], []
+        for region, rows in groups:
+            first, last = rows["timestamp"].min(), rows["timestamp"].max()
+            if self.start is not None:
+                if last < self.start:
                     continue
-                flares = []
-            else:
-                flares = matcher.query(
-                    sequence_end, self.prediction_window, active_region=active_region,
-                    event_time=self.event_time, interval_mode=self.interval_mode,
-                )
-            label = self.strategy.label(flares)
+                steps = max(0, -(-(first - self.start) // self.sliding_window))  # ceiling division
+                first = self.start + steps * self.sliding_window
+            ts_to_position = dict(zip(rows["timestamp"], rows.index))
+            emitted, group_total, group_skipped, group_missing = self._grid_candidates(ts_to_position, first, last)
 
-            record = {
-                "sequence_start": window_timestamps[0],
-                "sequence_end": sequence_end,
-                "timestamps": list(window_timestamps),
-                "n_images": len(window_timestamps),
-                "active_region": active_region,
-                "label": label,
-            }
-            for col in extra_columns:
-                record[col] = index_df[col].iloc[positions].tolist()
-            records.append(record)
+            total += group_total
+            room = _MAX_SEQUENCE_REPORT_SAMPLES - len(skipped_starts)
+            skipped_starts += group_skipped[:room]
+            skipped_regions += [region] * len(group_skipped[:room])
+            missing_timestamps += group_missing[:_MAX_SEQUENCE_REPORT_SAMPLES - len(missing_timestamps)]
 
-        self._report_missing_active_regions(missing_sequences, "sequence(s)")
+            for window_timestamps, positions in emitted:
+                flares = self._query_region(matcher, window_timestamps[-1], region)
+                missing_sequences += region is None
+                record = {
+                    "sequence_start": window_timestamps[0],
+                    "sequence_end": window_timestamps[-1],
+                    "timestamps": list(window_timestamps),
+                    "n_images": len(window_timestamps),
+                    "active_region": region,
+                    "label": self.strategy.label(flares),
+                }
+                for col in extra_columns:
+                    record[col] = index_df[col].iloc[positions].tolist()
+                records.append(record)
 
-        if not records:
-            return pd.DataFrame(columns=columns), report
-        return pd.DataFrame(records)[columns], report
+        self._warn_missing_region_sequences(index_df, missing_sequences)
+
+        report = SequenceBuildReport(
+            inferred_source_cadence=inferred_cadence,
+            requested_cadence=self.cadence,
+            observation_window=self.observation_window,
+            sliding_window=self.sliding_window,
+            effective_start=effective_start,
+            total_candidate_sequences=total,
+            emitted_sequences=len(records),
+            skipped_sequences=total - len(records),
+            skipped_sequence_starts=skipped_starts,
+            missing_timestamps=missing_timestamps,
+            skipped_sequence_regions=skipped_regions,
+            region_count=len(groups),
+        )
+        return _sequence_frame(records, columns), report
+
+
+_SEQUENCE_OUTPUT_COLUMNS = ("sequence_start", "sequence_end", "timestamps", "n_images", "label")
+
+
+def _extra_columns(index_df: pd.DataFrame, excluded: tuple, reserved: tuple, path: Path) -> list:
+    """
+    Image-index columns copied into the output, refusing names that would
+    overwrite a column the builder itself produces (e.g. an index column
+    called "label").
+    """
+    extra = [c for c in index_df.columns if c not in excluded]
+    clashes = [c for c in extra if c in reserved]
+    if clashes:
+        raise ValueError(
+            f"Image index at {path} has column(s) {clashes} that would overwrite output column(s) of "
+            "the same name. Rename them before building."
+        )
+    return extra
+
+
+def _sequence_frame(records: list, columns: list) -> pd.DataFrame:
+    """Active-region sequence output, ordered by sequence_start, then region (missing region last)."""
+    if not records:
+        return pd.DataFrame(columns=columns)
+    frame = pd.DataFrame(records)[columns]
+    order = sorted(
+        range(len(records)),
+        key=lambda i: (records[i]["sequence_start"], records[i]["active_region"] is None, records[i]["active_region"] or ""),
+    )
+    return frame.iloc[order].reset_index(drop=True)

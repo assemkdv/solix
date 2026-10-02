@@ -477,7 +477,8 @@ def test_active_region_image_side_values_normalize_to_match_catalog(tmp_path):
     )
 
     builder = DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy(), target="active_region")
-    result = builder.build(index_path, catalog_path)
+    with pytest.warns(UserWarning, match="missing active_region"):
+        result = builder.build(index_path, catalog_path)
 
     assert result["label"].tolist()[0] == 1
 
@@ -496,7 +497,8 @@ def test_active_region_missing_image_side_value_matches_nothing(tmp_path):
     )
 
     builder = DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy(), target="active_region")
-    result = builder.build(index_path, catalog_path)
+    with pytest.warns(UserWarning, match="missing active_region"):
+        result = builder.build(index_path, catalog_path)
 
     # First image has a real matching region -> catches the X1.0 flare ->
     # label 1. Second image's active_region is missing -> must not silently
@@ -648,7 +650,10 @@ def test_active_region_sequence_max_flare_strategy_uses_only_matching_region(tmp
     assert result.iloc[0]["label"] == 5.1e-5
 
 
-def test_active_region_sequence_mixed_active_regions_raises(tmp_path):
+def test_active_region_sequence_regions_are_never_mixed(tmp_path):
+    # Rows are grouped by region before sequences are built, so a region
+    # change in the index never produces a mixed sequence (this used to
+    # raise ValueError before grouping existed).
     catalog_path = _write_valid_catalog(tmp_path)
     index_path = tmp_path / "index.csv"
     index_path.write_text(
@@ -662,17 +667,14 @@ def test_active_region_sequence_mixed_active_regions_raises(tmp_path):
         prediction_window=24,
         strategy=BinaryThresholdStrategy(),
         target="active_region",
-        sequence_length=3,
+        sequence_length=2,
         stride=1,
-        cadence_minutes=12,
+        cadence_minutes=24,
     )
+    result = builder.build(index_path, catalog_path)
 
-    with pytest.raises(ValueError) as excinfo:
-        builder.build(index_path, catalog_path)
-
-    message = str(excinfo.value)
-    assert "mixed" in message.lower()
-    assert "active_region" in message
+    assert result["active_region"].tolist() == ["3559"]
+    assert result.iloc[0]["timestamps"] == [pd.Timestamp("2024-01-01T08:00:00"), pd.Timestamp("2024-01-01T08:24:00")]
 
 
 def test_active_region_sequence_missing_active_region_matches_nothing(tmp_path):
@@ -697,13 +699,13 @@ def test_active_region_sequence_missing_active_region_matches_nothing(tmp_path):
         stride=1,
         cadence_minutes=12,
     )
-    result = builder.build(index_path, catalog_path)
+    with pytest.warns(UserWarning, match="1 image\\(s\\) have a missing active_region"):
+        result = builder.build(index_path, catalog_path)
 
-    # One row in the sequence has a missing active_region -- the whole
-    # sequence must match nothing, even though the other two rows agree on
-    # region 3559 and a matching X1.0 flare from that region is present.
-    assert result.iloc[0]["active_region"] is None
-    assert result.iloc[0]["label"] == 0
+    # The row without a region is not part of region 3559's sequence, so
+    # region 3559 has only two images (24 min apart) and no 3-image
+    # sequence; the unknown row alone cannot form one either.
+    assert result.empty
 
 
 def test_active_region_sequence_requires_active_region_column(tmp_path):

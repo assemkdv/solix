@@ -141,7 +141,8 @@ missing a required column for the mode you're using.
 
 **Sequence mode** (`sequence_length > 1`) additionally requires
 `timestamp` values to be sorted ascending with no duplicates — both raise
-a clear `ValueError` naming the file.
+a clear `ValueError` naming the file. With `target="active_region"` these
+checks apply within each region, so several regions may share timestamps.
 
 ## Window semantics
 
@@ -200,12 +201,14 @@ parameter.
 - **`target="full_disk"`** (default) — any flare in the time window
   counts, regardless of which part of the sun it came from.
 - **`target="active_region"`** — only flares attributed to the *same*
-  active region as the image (or, for a sequence, the region shared by
-  every image in it) count. A flare from a different region is ignored
-  even if it's stronger; a flare with no recorded active region never
-  matches. If the image-side active region is missing, the image (or
-  sequence) matches nothing — it never silently falls back to full-disk
-  matching.
+  active region as the image count. Sequences are built separately for
+  each region from that region's images only. A flare from a different
+  region is ignored even if it's stronger; a flare with no recorded active
+  region never matches (a `UserWarning` reports how many the catalog
+  has). An image without a region never matches anything and never joins
+  a region's sequence; `missing_active_region` (`"negative"` default with
+  a warning, `"drop"`, `"error"`) decides what happens to it. It never
+  silently falls back to full-disk matching.
 
 Active region values are normalized before comparison (`3559`, `3559.0`,
 and `"3559"` are all treated as the same region), on both the catalog side
@@ -742,10 +745,11 @@ print(result[["sequence_start", "sequence_end", "n_images", "active_region", "la
 ```
 Every image in the sequence agrees on active region `3559`, so that
 region's M5.1 flare (peaking at 03:00, exactly the sequence's reference
-time) is matched; region `9999`'s X9.0 is still excluded. If the images
-disagreed on active region, `build()` would raise `ValueError` instead of
-silently guessing; if any image's active region were missing, the
-sequence would match nothing.
+time) is matched; region `9999`'s X9.0 is still excluded. Rows are
+grouped by region before sequences are built, so an index with several
+regions (even at the same timestamps) gives each region its own
+sequences; an image without a region is never part of a region's
+sequence.
 
 ## Real-world data (HMI image lists + integrated GOES catalogs)
 

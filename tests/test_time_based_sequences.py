@@ -707,7 +707,9 @@ def test_active_region_time_based_basic(tmp_path):
     assert result.iloc[0]["label"] == 1
 
 
-def test_active_region_time_based_mixed_regions_raises(tmp_path):
+def test_active_region_time_based_regions_are_grouped(tmp_path):
+    # Grouped by region: region 3559 lacks 02:00 (that image is 9999's),
+    # so its only 6-hour candidate is skipped; 9999 has a single image.
     timestamps = _hourly("2024-01-01T00:00:00", 6)
     index_path = _write_index(
         tmp_path, timestamps, active_regions=["3559", "3559", "9999", "3559", "3559", "3559"]
@@ -718,11 +720,12 @@ def test_active_region_time_based_mixed_regions_raises(tmp_path):
         prediction_window=24, strategy=BinaryThresholdStrategy(), target="active_region",
         cadence="1h", observation_window="6h", sliding_window="6h",
     )
-    with pytest.raises(ValueError) as excinfo:
-        builder.build(index_path, catalog_path)
-    message = str(excinfo.value)
-    assert "mixed" in message.lower()
-    assert "active_region" in message
+    result, report = builder.build(index_path, catalog_path, return_report=True)
+    assert result.empty
+    assert report.region_count == 2
+    assert report.skipped_sequences == 1
+    assert report.skipped_sequence_regions == ["3559"]
+    assert report.missing_timestamps == [pd.Timestamp("2024-01-01T02:00:00")]
 
 
 def test_active_region_time_based_missing_active_region_matches_nothing(tmp_path):
@@ -736,11 +739,12 @@ def test_active_region_time_based_missing_active_region_matches_nothing(tmp_path
         prediction_window=1, strategy=BinaryThresholdStrategy(), target="active_region",
         cadence="1h", observation_window="6h", sliding_window="6h",
     )
-    result = builder.build(index_path, catalog_path)
+    with pytest.warns(UserWarning, match="missing active_region"):
+        result = builder.build(index_path, catalog_path)
 
-    assert len(result) == 1
-    assert result.iloc[0]["active_region"] is None
-    assert result.iloc[0]["label"] == 0
+    # The 02:00 image has no region, so region 3559's grid is incomplete
+    # and its sequence is skipped -- never labeled from the X1.0 flare.
+    assert result.empty
 
 
 def test_active_region_time_based_with_report(tmp_path):

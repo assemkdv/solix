@@ -4,6 +4,15 @@ time from each image (or each sequence of images), checks whether a flare
 occurred within a configurable prediction window, and produces a
 ready-to-train table of image/sequence -> label pairs.
 
+## Documentation
+
+- [Getting started](docs/getting_started.md) and runnable [examples](examples/) with synthetic data
+- [User guide](docs/user_guide.md): input/output schemas, parameters, window boundaries, errors
+- [Active-region workflow](docs/active_region_workflow.md)
+- [Architecture](docs/architecture/architecture.md) (editable `.drawio` + vector PDF)
+- Real-data validation: [full disk](docs/validation/full_disk.md), [active region](docs/validation/active_region.md)
+- [Open decisions](docs/decisions.md) that need a scientific sign-off
+
 ## Installation
 
 Not yet published to PyPI. Install from source:
@@ -164,6 +173,14 @@ existing code is unaffected.
 There is no lead-time / gap in either mode — the window starts
 immediately at (or just after) the reference timestamp.
 
+`prediction_window` may also be a pandas duration instead of hours, e.g.
+`prediction_window="23h59min59s"`. With `event_time="start"` and
+`interval_mode="right_closed"` this reproduces the legacy full-disk labels
+exactly (63,649 of 63,649 on the 2010–2018 data); with `24` it differs on
+the 6 images whose flare starts exactly 24 hours later. See
+[docs/validation/full_disk.md](docs/validation/full_disk.md) and
+[docs/decisions.md](docs/decisions.md).
+
 ```python
 from flare_indexer import DatasetBuilder, BinaryThresholdStrategy
 
@@ -219,9 +236,13 @@ sequence generation" below. The two are mutually exclusive per
 | Mode | Columns |
 |---|---|
 | Single-image, full-disk (`sequence_length=1, target="full_disk"`) | `timestamp, label` |
-| Single-image, active-region (`sequence_length=1, target="active_region"`) | `timestamp, label` |
+| Single-image, active-region (`sequence_length=1, target="active_region"`) | `timestamp, label` (with `include_metadata=True`: `timestamp, active_region, label, <other index columns>`) |
 | Sequence, full-disk (`sequence_length>1, target="full_disk"`) | `sequence_start, sequence_end, timestamps, n_images, label` |
 | Sequence, active-region (`sequence_length>1, target="active_region"`) | `sequence_start, sequence_end, timestamps, n_images, active_region, label` |
+
+In single-image mode, `include_metadata=True` appends every other
+image-index column (e.g. `image_path`) to the output; the default keeps
+the original two-column schema.
 
 In sequence mode, any extra image-index column (e.g. `image_path`) is
 preserved as a list-valued column holding that field for every image in

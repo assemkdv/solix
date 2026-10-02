@@ -1,12 +1,18 @@
-Downloading https://raw.githubusercontent.com/chetrajpandey/arpatch-sfp/main/data_process/data_labeling/data_labels/train.csv -> scripts/.cache/ar_train.csv
-Downloading https://raw.githubusercontent.com/chetrajpandey/arpatch-sfp/main/data_process/data_labeling/data_labels/val.csv -> scripts/.cache/ar_val.csv
-Downloading https://raw.githubusercontent.com/chetrajpandey/arpatch-sfp/main/data_process/data_labeling/data_labels/test.csv -> scripts/.cache/ar_test.csv
-Downloading https://raw.githubusercontent.com/chetrajpandey/arpatch-sfp/main/data_process/data_labeling/allharp2noaa.csv -> scripts/.cache/allharp2noaa.csv
+Using cached download: scripts/.cache/ar_m90_to_90_Fold1_test.csv
+Using cached download: scripts/.cache/ar_m90_to_90_Fold2_test.csv
+Using cached download: scripts/.cache/ar_m90_to_90_Fold3_test.csv
+Using cached download: scripts/.cache/ar_m90_to_90_Fold4_test.csv
+Using cached download: scripts/.cache/allharp2noaa.csv
 Using cached download: scripts/.cache/goes_flares_integrated.csv
-Published AR patches: 294286 from 3702 HARPs, 2010-05-01 05:00:00 -> 2019-03-10 20:00:00
-  max patches at one timestamp: 21
-HARP-keyed catalog: {'goes_flares': 14401, 'flares_without_noaa_region': 2343, 'flares_with_noaa_but_no_harp': 108, 'flare_harp_pairs': 12026, 'distinct_flares_mapped': 11950, 'max_noaa_regions_per_harp': 6, 'max_harps_per_noaa_region': 2}
-flare_indexer forward (t, t+24h]: 284184/294286 agree (96.567%), positives 7831 vs published 10315
-legacy look-back rule [t-24h, t]: 294286/294286 agree (100.000%), positives 10315 vs published 10315
-Runtime: 99.4s
+Published AR patches: 511421 rows from 4 file(s), 3889 HARPs, 2010-05-01 00:00:00 -> 2019-03-11 10:00:00
+  duplicate (harpnumber, timestamp) rows across files: 0
+  max patches at one timestamp: 22
+HARP-keyed catalog: {'goes_flares': 14401, 'goes_m_or_x_flares': 792, 'flares_without_noaa_region': 2343, 'm_or_x_flares_without_noaa_region': 33, 'flares_with_noaa_but_no_harp': 108, 'flare_harp_pairs': 12026, 'distinct_flares_mapped': 11950, 'max_noaa_regions_per_harp': 6, 'max_harps_per_noaa_region': 2, 'first_flare_start': '2010-05-01 01:34:00', 'last_flare_start': '2018-12-15 13:49:00'}
+Legacy look-back rule [t - 1 day, t] (step3_labeling.py):
+  label: 511421/511421 agree (100.000%)
+  goes_class string: 511421/511421 agree (100.000%)
+  rows where the alphabetical max class differs from the numeric max: 0
+flare_indexer forward (t, t+24h]:
+  label: 499009/511421 agree (97.573%)
+Runtime: 134.0s
 Summary written to: docs/validation/active_region_summary.json

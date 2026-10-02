@@ -26,9 +26,14 @@ Rules by mode:
 
 - **Single image:** no ordering or uniqueness requirement; output rows
   are in input order, one per input row (duplicates give duplicate rows).
-- **Row-based sequences:** timestamps must be sorted ascending and unique.
-- **Time-based sequences:** timestamps must be unique (order does not
-  matter).
+- **Row-based sequences:** timestamps must be sorted ascending and unique
+  (within each region when `target="active_region"`).
+- **Time-based sequences:** timestamps must be unique (within each region
+  for `target="active_region"`; order does not matter).
+- With `include_metadata=True` or in sequence modes, an index column must
+  not be named like an output column (`label`, `sequence_start`,
+  `sequence_end`, `timestamps`, `n_images`); this raises `ValueError`
+  instead of silently overwriting the label.
 
 ### 1.2 Flare catalog (CSV)
 
@@ -52,10 +57,22 @@ flare that crosses midnight is represented incorrectly in this schema;
 use the full-timestamp schema for such catalogs. If a file has the
 columns of both schemas, the legacy schema is used.
 
-`class` must be a GOES class: a letter `A, B, C, M, X` followed by an
-optional number (`M`, `M2`, `M2.3`). It is converted to peak X-ray flux in
-W/m² (`A=1e-8, B=1e-7, C=1e-6, M=1e-5, X=1e-4`, times the number), and all
+`class` must be a GOES class: a letter `A, B, C, M, X` (any case) followed
+by an optional positive number (`M`, `M2`, `M2.3`, `X10`); surrounding
+spaces are ignored. It is converted to peak X-ray flux in W/m²
+(`A=1e-8, B=1e-7, C=1e-6, M=1e-5, X=1e-4`, times the number), and all
 comparisons are numeric, never alphabetical.
+
+Every class is checked when the catalog is loaded (`EventMatcher`,
+`DatasetBuilder.build`, `adapt_goes_catalog`). Missing values (blank,
+NaN) and malformed values (`Q2.0`, `M2.3.4`, `M0`, `2.3`) raise one
+`InvalidGOESClassError` that counts all bad rows and names the first five
+by file line. They are not dropped, not treated as "no flare" and not
+given a default class, because each of those choices would silently
+decide whether a flare of unknown size crosses the threshold. Clean or
+remove such rows explicitly before labeling. `InvalidGOESClassError` is
+a `ValueError` (and, for backward compatibility, also a `KeyError` and
+`IndexError`).
 
 ### 1.3 Converting real-world inputs
 
@@ -184,7 +201,14 @@ the label is computed from `t+10h`.
 
 `build(..., return_report=True)` returns a `SequenceBuildReport` with the
 inferred cadence, candidate/emitted/skipped counts, and the first 50
-skipped starts and missing timestamps.
+skipped starts and missing timestamps. In active-region mode it also has
+`region_count` and `skipped_sequence_regions` (the region of each listed
+skipped start).
+
+### 5.3 Active-region sequences
+
+With `target="active_region"`, the index is grouped by region first and
+each region's sequences are built from its own images only (§6.2).
 
 ---
 
@@ -200,18 +224,27 @@ NOAA number or, if both files use it, a HARP number.
 
 ### 6.2 Sequences
 
-All images in an AR sequence must have the same region; otherwise
-`ValueError`. The builder currently requires **unique timestamps** in
-sequence mode, so an index with several regions at the same time must be
-split into one file per region first (shown in
-`examples/04_active_region.py`).
+Rows are grouped by normalized region before sequences are built, so
+several regions may be observed at the same timestamps and a sequence
+never mixes regions. Within each region:
+
+- row-based mode needs sorted, unique timestamps and takes consecutive
+  rows of that region (`cadence_minutes` skips sequences with gaps);
+- time-based mode needs unique timestamps; the source cadence is inferred
+  from all images; without `start` each region's grid begins at its first
+  image, with `start` all regions share the grid `start + k·sliding_window`;
+- a missing frame only affects its own region.
+
+Output rows are sorted by `sequence_start`, then `active_region`
+(missing region last). Images without a region never join a region's
+sequence (§6.3).
 
 ### 6.3 Missing active regions – two different cases
 
 | Case | What happens | Why it matters |
 |---|---|---|
-| Image has no `active_region` | Controlled by `missing_active_region`: `"negative"` (default) → label as if no flare, and emit a `UserWarning` with the count; `"drop"` → leave the image/sequence out; `"error"` → `ValueError`. | The true label is unknown. Counting it as negative can put real flaring patches in the negative class. |
-| Catalog flare has no `active_region` | It never matches any image. A `UserWarning` reports how many such flares the catalog has. | A region that produced such a flare is labeled negative for it. In `goes_flares_integrated.csv`, 2,343 of 14,401 flares (33 of 792 M/X flares) have no NOAA region. |
+| Image has no `active_region` | Controlled by `missing_active_region`: `"negative"` (default) → label as if no flare, and emit a `UserWarning` with the count; `"drop"` → leave it out; `"error"` → `ValueError`. In sequence modes such images never join a region's sequence; with `"negative"` they form one separate group (`active_region` = missing) whose sequences are labeled as if no flare occurred. | The true label is unknown, so a 0 may be a false negative. Whether any particular row is affected cannot be told from the data. |
+| Catalog flare has no `active_region` | It never matches any image. A `UserWarning` reports how many such flares the catalog has. | If the flare came from a region in the dataset, that region's images may get 0 where 1 would be correct (a possible false negative). In `goes_flares_integrated.csv`, 2,343 of 14,401 flares (33 of 792 M/X flares) have no NOAA region. |
 
 Neither case ever falls back to full-disk matching.
 
@@ -239,27 +272,44 @@ DataFrame with these columns.
 | Image missing from a time-based sequence grid | Sequence skipped, listed in `SequenceBuildReport`. |
 | Gap inside a row-based sequence | Skipped only if `cadence_minutes` is set; otherwise the gap is silently included. |
 | Non-image path in an HMI file list | `strict=True`: `ValueError`; `strict=False`: excluded and counted in `ImageIndexReport`. |
-| Two images with the same timestamp | Loader: per `duplicate_policy`. Builder sequence modes: `ValueError`. Single-image mode: both kept. |
-| Flare with an invalid class such as `Q2.0` or a blank class | Not validated when the catalog is loaded; labeling fails with a bare `KeyError`/`TypeError` when that flare falls in a window. (Known gap.) |
+| Two images with the same timestamp | Loader: per `duplicate_policy`. Full-disk sequence modes: `ValueError`. Active-region sequence modes: allowed in different regions, `ValueError` within one region. Single-image mode: both kept. |
+| Flare with a missing or invalid class (`""`, NaN, `Q2.0`, `M0`) | `InvalidGOESClassError` when the catalog is loaded, listing the bad lines (§1.2). |
+| Time the catalog may not cover | Labeled from whatever the catalog contains, i.e. 0 if it lists no flare (§8.1). |
 | Flare that crosses midnight | Correct in the full-timestamp schema; wrong in the HHMM schema. |
 | Different time scales | Not converted. HMI SHARP filenames are in TAI, GOES times in UTC (TAI − UTC = 34–37 s in 2010–2018), which only matters for flares within seconds of a window edge. |
+
+### 8.1 Catalog coverage
+
+A flare catalog lists flares; it does not say during which periods flares
+were observed and recorded. If an image's window falls (partly) outside
+the catalog's real coverage, the package still labels it from the flares
+the catalog lists, so a 0 there can be a false negative. The package does
+**not** infer coverage from the first or last recorded flare: a long
+period without flares (for example near solar minimum) looks the same as
+a period that was not covered. To exclude uncovered periods, filter the
+image index yourself using coverage dates documented for the catalog.
+Built-in coverage checks would need such explicit dates (decision D4 in
+[decisions.md](decisions.md)).
 
 ---
 
 ## 9. Errors and warnings
 
-All input problems raise `ValueError` with the file path and the offending
-column or value, except the GOES class gap noted above and
-`DatasetBuildingPipeline` components without `reduce`/`assign`
-(`TypeError`). Common messages:
+All input problems raise `ValueError` (or its subclass
+`InvalidGOESClassError`) with the file path and the offending column or
+value, except `DatasetBuildingPipeline` components without
+`reduce`/`assign` (`TypeError`). Common messages:
 
 | Message starts with | Cause | Fix |
 |---|---|---|
 | `Flare catalog at … is missing required column(s)` | Neither catalog schema matched. | Rename columns or use `adapt_goes_catalog`. |
 | `Image index at … is missing required column: timestamp` / `active_region` | Missing column. | Add it; `active_region` is only needed for AR mode. |
 | `… must have timestamps sorted in ascending order` | Row-based sequences on unsorted data. | Sort by `timestamp`. |
-| `… contains duplicate timestamp(s)` | Sequence mode with repeated times (often several AR patches). | Deduplicate or split per region. |
-| `… with mixed active_region values` | One sequence spans two regions. | Split per region. |
+| `… contains duplicate timestamp(s)` | Full-disk sequence mode with repeated times. | Deduplicate, or use `target="active_region"` if the rows are different regions. |
+| `… duplicate timestamp(s) within active_region …` | One region has two images at the same time. | Deduplicate that region. |
+| `… within rows with a missing active_region` | Several unknown-region patches at one time in sequence mode. | `missing_active_region="drop"` or fill in regions. |
+| `… missing or invalid GOES class value(s) …` | Blank or malformed `class` values in the catalog. | Fix or remove those rows. |
+| `… would overwrite output column(s) …` | An index column is named like an output column (e.g. `label`). | Rename it. |
 | `cadence … is smaller than / not an exact multiple of the inferred source cadence` | Requested sampling incompatible with the data. | Choose a multiple of the source cadence. |
 | `start=… has no exact matching image timestamp` | `start` is not an image time. | Use an existing time. |
 | `… have a missing active_region` (`ValueError` or `UserWarning`) | Images without a region (§6.3). | Fill the region, or choose `"drop"`. |

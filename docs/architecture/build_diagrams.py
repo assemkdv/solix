@@ -81,7 +81,7 @@ def page_overview() -> Page:
         Box("idx", 540, 110, 200, 90, "Image index CSV\ntimestamp [, active_region]\n[, image_path, ...]\n(or written by hand)", "input"),
         Box("cat", 540, 400, 200, 90, "Flare catalog CSV\nstart_time, peak_time,\nend_time, class, active_region\n(or HHMM scraper schema)", "input"),
         Box("builder", 770, 100, 370, 120, "builder.DatasetBuilder\n__init__: validate parameters; choose mode (single image,\nrow-based or time-based sequences) and target\nbuild(index, catalog): read and check the index, loop over\nreference times t, collect records", "core", True),
-        Box("matcher", 770, 290, 370, 110, "events.EventMatcher\nload catalog, detect schema, sort; cached sorted view\nquery(t, prediction_window, active_region,\nevent_time, interval_mode) -> list[FlareEvent]", "core", True),
+        Box("matcher", 770, 290, 370, 110, "events.EventMatcher\nload catalog, detect schema, validate GOES classes, sort\nquery(t, prediction_window, active_region,\nevent_time, interval_mode) -> list[FlareEvent]", "core", True),
         Box("strategy", 770, 470, 180, 130, "Strategy\nlabel(flares)\nBinaryThreshold-\nStrategy(\"M\")\nMaxFlareStrategy()\nDatasetBuilding-\nPipeline", "strategy", True),
         Box("reducer", 980, 470, 160, 60, "MaxFluxReducer\nflares -> max flux", "strategy"),
         Box("labeler", 980, 560, 160, 60, "BinaryThresholdLabeler\n/ RegressionLabeler", "strategy"),
@@ -107,7 +107,7 @@ def page_build_flow() -> Page:
     b += [
         Box("read", 40, 100, 250, 60, "pd.read_csv(image_index)\nempty file -> ValueError", "core"),
         Box("cols", 40, 190, 250, 70, "require timestamp; require\nactive_region if\ntarget=\"active_region\"", "decision"),
-        Box("em", 40, 290, 250, 60, "EventMatcher(catalog)\n(schema check, sort by peak)", "core"),
+        Box("em", 40, 290, 250, 60, "EventMatcher(catalog)\nschema + GOES class check, sort", "core"),
         Box("warn", 40, 380, 250, 70, "AR mode: warn if catalog\nflares have no active_region", "decision"),
         Box("mode", 330, 250, 180, 90, "Which mode?\ntime-based params?\nsequence_length > 1?", "decision", True),
         Box("single", 560, 100, 270, 110, "Single image\n_build_single_image[_active_region]\none record per index row\nt = image time", "core", True),
@@ -116,10 +116,11 @@ def page_build_flow() -> Page:
         Box("query", 880, 240, 250, 110, "For every reference t:\nmatcher.query(t,\nprediction_window,\nactive_region, event_time,\ninterval_mode)", "core", True),
         Box("label", 880, 400, 250, 60, "strategy.label(flares) -> label", "strategy"),
         Box("df", 880, 500, 250, 60, "pd.DataFrame(records)[columns]", "output"),
-        Box("ar", 40, 600, 790, 120, "target=\"active_region\" variants of every mode\n"
+        Box("ar", 40, 600, 790, 140, "target=\"active_region\" variants of every mode\n"
             "normalize region (13600 / 13600.0 / \"13600\" -> \"13600\"); query only that region's flares\n"
-            "image region missing -> missing_active_region: \"negative\" (+UserWarning) / \"drop\" / \"error\"\n"
-            "sequence with two different regions -> ValueError; any missing region in a sequence -> treated as missing",
+            "sequences: group rows by region first (_region_groups); checks and grids run per region\n"
+            "image region missing -> missing_active_region: \"negative\" (+UserWarning, own group) / \"drop\" / \"error\"\n"
+            "time-based: source cadence from all images; one grid per region; report.region_count",
             "decision", True),
     ]
     p.edges += [
@@ -211,7 +212,7 @@ def page_sequences() -> Page:
         b.append(Box(gid, x, 362 + j * 38, min(4 * cell + 76, 1140 - x), 30, text, kind))
     b += [
         Box("rules", 60, 570, 560, 180,
-            "Rules (builder._time_based_candidates)\n"
+            "Rules (builder._grid_candidates and its callers)\n"
             "cadence >= inferred cadence and an exact multiple of it\n"
             "observation_window, sliding_window: multiples of cadence\n"
             "start (optional) must be an existing image time\n"
@@ -219,9 +220,12 @@ def page_sequences() -> Page:
             "missing grid time -> skip; never interpolate or substitute\n"
             "return_report=True -> SequenceBuildReport (counts, first 50 skips)",
             "note", True),
-        Box("out", 650, 570, 480, 110,
+        Box("out", 650, 570, 480, 90,
             "Output row per emitted sequence\nsequence_start, sequence_end, timestamps (list), n_images,\n"
             "[active_region], label, + every other index column as a list", "output", True),
+        Box("arseq", 650, 675, 480, 75,
+            "target=\"active_region\": all of the above runs per region;\n"
+            "regions may share timestamps; a gap affects only its own region", "decision", True),
     ]
     return p
 
@@ -237,7 +241,7 @@ def page_active_region() -> Page:
         Box("policy", 880, 90, 250, 130, "missing_active_region\n\"negative\" (default): label as no\nflare + UserWarning\n\"drop\": leave out\n\"error\": ValueError", "decision", True),
         Box("query", 600, 260, 230, 90, "EventMatcher.query(t, w,\nactive_region=region)\ncandidates in window, then\nfilter catalog region == region", "core"),
         Box("catmiss", 880, 260, 250, 90, "Catalog flare without region:\nnever matches any patch\n(UserWarning with count)", "decision"),
-        Box("seq", 40, 260, 510, 90, "Sequences: all images must share one region (mixed -> ValueError);\nany missing region in the sequence -> treated as missing.\nSequence modes need unique timestamps -> split the index per region first.", "note"),
+        Box("seq", 40, 260, 510, 90, "Sequences: rows grouped by region first; each region's sequences\nuse only its images; unique timestamps required within a region.\nRows without a region never join a region's sequence.", "note"),
         Box("label", 600, 400, 230, 60, "strategy.label(flares)", "strategy"),
         Box("mapping", 40, 400, 510, 150,
             "Region keys in the lab data\n"
@@ -245,15 +249,15 @@ def page_active_region() -> Page:
             "flare: goes_flares_integrated.csv -> NOAA number (e.g. 11153)\n"
             "allharp2noaa.csv: many-to-many (<= 6 NOAA per HARP, <= 2 HARP per NOAA)\n"
             "-> build a HARP-keyed catalog (scripts/validate_active_region.py)", "input", True),
-        Box("facts", 600, 500, 530, 160,
-            "Real-data facts (lab catalog + published arpatch-sfp labels)\n"
+        Box("facts", 600, 500, 530, 230,
+            "Published-label facts (lab catalog + arpatch-sfp folds)\n"
             "- 2,343 of 14,401 flares have no NOAA region (33 of 792 M/X)\n"
             "- 108 flares have a NOAA region with no HARP\n"
-            "- 294,286 published patches; up to 21 at one timestamp\n"
-            "- published labels = look-back [t-24h, t]: 100 % agreement\n"
-            "- package forward (t, t+24h]: 96.567 % agreement\n"
-            "- 286 patches after the last catalog flare (2018-12-29)\n"
-            "All three gaps turn possible positives into negatives.", "decision", True),
+            "- 511,421 published patches (-90..90 folds); up to 22 per timestamp\n"
+            "- look-back [t-1 day, t] reproduces label + goes_class: 100 %\n"
+            "- package forward (t, t+24h]: 97.573 % label agreement\n"
+            "- catalog coverage is not stated in the catalog\n"
+            "Each gap can cause false negatives; affected rows are unknown.", "decision", True),
     ]
     p.edges += [
         Edge("patch", "norm"), Edge("norm", "missing_q"),
@@ -268,7 +272,7 @@ def page_modules() -> Page:
              "src/flare_indexer/* (public API re-exported from __init__.py); arrows point from user to dependency")
     b = p.boxes
     b += [
-        Box("init", 460, 90, 250, 60, "__init__.py\npublic API (18 names)", "output"),
+        Box("init", 460, 90, 250, 60, "__init__.py\npublic API (19 names)", "output"),
         Box("builder", 60, 200, 250, 80, "builder.py\nDatasetBuilder, SequenceBuildReport", "core"),
         Box("pipeline", 360, 200, 250, 80, "pipeline.py\nDatasetBuildingPipeline,\nPipelineResult", "core"),
         Box("strategies", 640, 200, 220, 80, "strategies.py\nBinaryThresholdStrategy,\nMaxFlareStrategy", "strategy"),
@@ -276,7 +280,7 @@ def page_modules() -> Page:
         Box("events", 160, 360, 300, 80, "events.py\nEventMatcher, FlareEvent,\n_parse_prediction_window,\n_normalize_active_region", "core"),
         Box("labelers", 560, 360, 200, 70, "labelers.py\nBinaryThresholdLabeler,\nRegressionLabeler", "strategy"),
         Box("reducers", 800, 360, 200, 70, "reducers.py\nMaxFluxReducer", "strategy"),
-        Box("classifier", 640, 500, 280, 70, "classifier.py\nFluxConverter, FlareClassifier", "core"),
+        Box("classifier", 640, 500, 280, 70, "classifier.py\nFluxConverter, FlareClassifier,\nInvalidGOESClassError, parse_goes_class", "core"),
         Box("deps", 160, 500, 300, 60, "pandas, numpy (only runtime deps)", "band"),
         Box("scripts", 40, 620, 520, 120,
             "Scripts, examples, committed results\n"
@@ -288,13 +292,14 @@ def page_modules() -> Page:
             "tests/ (pytest, CI on Python 3.10-3.13)\n"
             "unit: events, builder, loaders, strategies, pipeline, ...\n"
             "test_windows_and_missing_regions.py: duration windows, AR policy\n"
+            "test_active_region_grouping.py, test_goes_class_validation.py\n"
             "test_examples.py: every example runs; sample data regenerates", "output", True),
     ]
     p.edges += [
         Edge("init", "builder"), Edge("init", "pipeline"), Edge("init", "strategies"), Edge("init", "loaders"),
         Edge("builder", "events"), Edge("pipeline", "events"), Edge("loaders", "events"),
         Edge("strategies", "labelers"), Edge("strategies", "reducers"),
-        Edge("labelers", "classifier"), Edge("reducers", "classifier"), Edge("events", "deps", dashed=True),
+        Edge("labelers", "classifier"), Edge("reducers", "classifier"), Edge("events", "classifier", "validates classes", dashed=True), Edge("events", "deps", dashed=True),
     ]
     return p
 

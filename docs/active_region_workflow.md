@@ -76,46 +76,67 @@ be told apart.
 
 ## 4. Sequences of AR patches
 
-Sequence modes need unique timestamps, and real AR data has many patches
-per timestamp (up to 21 in the published files). Build sequences one
-region at a time:
+Real AR data has many patches per timestamp (up to 22 in the published
+files). `DatasetBuilder` groups the index by region before building
+sequences, so no splitting is needed:
 
 ```python
-for harp, rows in index.groupby("active_region"):
-    rows.to_csv(f"index_{harp}.csv", index=False)
-    seqs = fidx.DatasetBuilder(
-        prediction_window=24, strategy=fidx.BinaryThresholdStrategy("M"),
-        target="active_region", event_time="start", interval_mode="right_closed",
-        cadence="1h", observation_window="6h", sliding_window="1h",
-    ).build(f"index_{harp}.csv", "ar_catalog.csv")
+seqs, report = fidx.DatasetBuilder(
+    prediction_window=24, strategy=fidx.BinaryThresholdStrategy("M"),
+    target="active_region", event_time="start", interval_mode="right_closed",
+    missing_active_region="drop",
+    cadence="1h", observation_window="6h", sliding_window="1h",
+).build("ar_index.csv", "ar_catalog.csv", return_report=True)
+print(report.region_count, report.emitted_sequences, report.skipped_sequences)
 ```
 
-Grouping by region inside `DatasetBuilder` is a planned improvement.
+Rules (same for row-based and time-based modes unless noted):
 
-## 5. Missing regions – what can silently go wrong
+- A sequence only contains images of one region. Different regions may
+  share timestamps.
+- Within a region, timestamps must be unique (else `ValueError` naming the
+  region); row-based mode also needs them sorted within the region.
+- A missing frame affects only its own region: row-based mode skips the
+  sequence only if `cadence_minutes` is set (otherwise neighboring rows of
+  that region are used, as in full-disk mode); time-based mode always
+  skips an incomplete grid and records it in
+  `report.skipped_sequence_starts` / `skipped_sequence_regions`.
+- Time-based mode infers the source cadence from all timestamps. Without
+  `start`, each region's grid starts at its first image; with `start`, all
+  regions use the grid `start + k·sliding_window`.
+- Output is sorted by `sequence_start`, then `active_region`.
 
-1. **Patch without a region.** Its label is unknown. The default
-   (`missing_active_region="negative"`) labels it 0 and warns; `"drop"`
-   removes it; `"error"` stops. Previously it was labeled 0 silently.
-2. **Flare without a region.** It can never match a patch, so the patch
-   that produced it gets 0 for that flare. In the lab catalog: 2,343 of
-   14,401 flares, including 33 M/X flares, plus 108 flares whose NOAA
-   region has no HARP. The package warns once per build.
-3. **Time after the catalog ends.** Treated as "no flare". 286 published
-   patches are after the last catalog flare.
+## 5. Missing information – what can go wrong
 
-In all three cases the error goes in one direction: positives become
-negatives. Models trained on such labels look worse on recall, and
-evaluation on such labels can over- or under-state skill.
+All three cases below can produce **false negatives** (a 0 where the true
+label would be 1). None of them proves that any particular row is
+positive, and their effect on model training or skill scores is not
+known in advance.
+
+1. **Patch without a region.** Its label is unknown. It never matches a
+   flare and never joins a region's sequence. Default
+   (`missing_active_region="negative"`): labeled 0 with a warning;
+   `"drop"`: removed; `"error"`: stop. In sequence modes, with the default
+   such patches form one separate group (several unknown patches at the
+   same time raise `ValueError`; use `"drop"`).
+2. **Flare without a region.** It cannot be assigned to a patch. In the lab
+   catalog: 2,343 of 14,401 flares (33 of 792 M/X), plus 108 flares whose
+   NOAA region has no HARP. The package warns once per build.
+3. **Times the catalog may not cover.** A catalog lists flares, not its
+   observation periods, so the package cannot tell "no flare" from "not
+   covered". It does not guess coverage from the first or last recorded
+   flare. See [decisions.md](decisions.md) D4.
+
 See [decisions.md](decisions.md) D3, D4 and D6.
 
-## 6. Status of real AR validation
+## 6. Status
 
-- **Done:** the package labels the 294,286 published arpatch-sfp patches
-  using the HARP-keyed catalog ([validation/active_region.md](validation/active_region.md)).
-- **Blocked:** the published labels use a **look-back** window
-  `[t−24h, t]`; the package looks forward. Agreement is 96.567 % forward
-  vs. 100 % for the re-implemented look-back rule. Needs decision D2.
-- **Missing:** the unfiltered SHARP patch table (`meta_data_updated.csv`
-  used by `step2_data_filtering.py`) – needed to validate labels before
-  the legacy width/longitude filters and for location-based assignment.
+- **Reproduction of the published labels: done.** All 511,421 rows of
+  the published `-90_to_90` fold files are reproduced exactly (label and
+  class string) by the legacy look-back rule `[t − 1 day, t]`. The
+  package's forward window agrees on 97.573 %. Details, sources and
+  commands: [validation/active_region.md](validation/active_region.md).
+- **Validation of the complete original patch dataset: not possible
+  yet.** The unfiltered SHARP patch table (`meta_data_updated.csv`, read
+  by `step2_data_filtering.py`) is not public.
+- **Open:** which window direction is intended (decision D2).

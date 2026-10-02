@@ -1,54 +1,172 @@
 {
   "inputs": {
-    "labels": [
+    "arpatch_sfp_commit": "ee20210dd6c6aa0396f1f4b8575ad05e9d0142b6",
+    "label_files": [
       {
-        "source": "https://raw.githubusercontent.com/chetrajpandey/arpatch-sfp/main/data_process/data_labeling/data_labels/train.csv",
-        "sha256": "65b8f6ec324cd536938e97ed41f30ca48cb7a3fe7f10d09d08b2906361951856"
+        "source": "https://raw.githubusercontent.com/chetrajpandey/arpatch-sfp/ee20210dd6c6aa0396f1f4b8575ad05e9d0142b6/data_process/data_labeling/data_labels/-90_to_90/Fold1_test.csv",
+        "sha256": "65a1d7d886716f3f0f59cead2e2ca46721fe1a3580f941a007dfb7dc95248a67",
+        "rows": 120047,
+        "positives": 2646,
+        "harps": 950,
+        "first_timestamp": "2011-01-02 22:00:00",
+        "last_timestamp": "2019-03-11 10:00:00",
+        "harp_start_months": [
+          1,
+          2,
+          3
+        ],
+        "lon_fwt_range": [
+          -89.714,
+          89.757
+        ],
+        "duplicate_harp_timestamp_rows": 0
       },
       {
-        "source": "https://raw.githubusercontent.com/chetrajpandey/arpatch-sfp/main/data_process/data_labeling/data_labels/val.csv",
-        "sha256": "104e56deb78aab08d54e5c10eb136055d64accc4d0720d5923bea00fe27e5ee6"
+        "source": "https://raw.githubusercontent.com/chetrajpandey/arpatch-sfp/ee20210dd6c6aa0396f1f4b8575ad05e9d0142b6/data_process/data_labeling/data_labels/-90_to_90/Fold2_test.csv",
+        "sha256": "46535fa33d022b3bfaa29578e8dce85a9bb97f3b90f94fc45370f266b7c33f4d",
+        "rows": 130961,
+        "positives": 2193,
+        "harps": 1010,
+        "first_timestamp": "2010-05-01 00:00:00",
+        "last_timestamp": "2018-06-30 18:00:00",
+        "harp_start_months": [
+          4,
+          5,
+          6
+        ],
+        "lon_fwt_range": [
+          -88.815,
+          88.806
+        ],
+        "duplicate_harp_timestamp_rows": 0
       },
       {
-        "source": "https://raw.githubusercontent.com/chetrajpandey/arpatch-sfp/main/data_process/data_labeling/data_labels/test.csv",
-        "sha256": "760e327104f3435678c06ec45ffa89c00632154e5af67845c8424dfcc3868b0c"
+        "source": "https://raw.githubusercontent.com/chetrajpandey/arpatch-sfp/ee20210dd6c6aa0396f1f4b8575ad05e9d0142b6/data_process/data_labeling/data_labels/-90_to_90/Fold3_test.csv",
+        "sha256": "104e56deb78aab08d54e5c10eb136055d64accc4d0720d5923bea00fe27e5ee6",
+        "rows": 127450,
+        "positives": 2378,
+        "harps": 956,
+        "first_timestamp": "2010-07-01 02:00:00",
+        "last_timestamp": "2018-10-04 05:00:00",
+        "harp_start_months": [
+          7,
+          8,
+          9
+        ],
+        "lon_fwt_range": [
+          -89.753,
+          89.713
+        ],
+        "duplicate_harp_timestamp_rows": 0
+      },
+      {
+        "source": "https://raw.githubusercontent.com/chetrajpandey/arpatch-sfp/ee20210dd6c6aa0396f1f4b8575ad05e9d0142b6/data_process/data_labeling/data_labels/-90_to_90/Fold4_test.csv",
+        "sha256": "760e327104f3435678c06ec45ffa89c00632154e5af67845c8424dfcc3868b0c",
+        "rows": 132963,
+        "positives": 3098,
+        "harps": 973,
+        "first_timestamp": "2010-10-04 10:00:00",
+        "last_timestamp": "2019-01-07 03:00:00",
+        "harp_start_months": [
+          10,
+          11,
+          12
+        ],
+        "lon_fwt_range": [
+          -89.44,
+          89.007
+        ],
+        "duplicate_harp_timestamp_rows": 0
       }
     ],
     "harp_map": {
-      "source": "https://raw.githubusercontent.com/chetrajpandey/arpatch-sfp/main/data_process/data_labeling/allharp2noaa.csv",
+      "source": "https://raw.githubusercontent.com/chetrajpandey/arpatch-sfp/ee20210dd6c6aa0396f1f4b8575ad05e9d0142b6/data_process/data_labeling/allharp2noaa.csv",
       "sha256": "575c40caf42e29cc4ca877b46f2662116ab39b7c07510d4067338e22b16416b7"
     },
     "event_catalog": {
-      "source": "https://raw.githubusercontent.com/chetrajpandey/arpatch-sfp/main/data_process/data_labeling/goes_flares_integrated.csv",
+      "source": "https://raw.githubusercontent.com/chetrajpandey/arpatch-sfp/ee20210dd6c6aa0396f1f4b8575ad05e9d0142b6/data_process/data_labeling/goes_flares_integrated.csv",
       "sha256": "2a1c76ff6ba508fede2add75bc7d4a96a61283d676cc360ae13d5aa1d56dcf48"
     }
   },
-  "patches": 294286,
-  "harps": 3702,
+  "patches": 511421,
+  "harps": 3889,
+  "duplicate_rows_across_files": 0,
   "published_positives": 10315,
+  "published_no_flare_rows": {
+    "FQ": 421927,
+    "blank": 0
+  },
   "catalog": {
     "goes_flares": 14401,
+    "goes_m_or_x_flares": 792,
     "flares_without_noaa_region": 2343,
+    "m_or_x_flares_without_noaa_region": 33,
     "flares_with_noaa_but_no_harp": 108,
     "flare_harp_pairs": 12026,
     "distinct_flares_mapped": 11950,
     "max_noaa_regions_per_harp": 6,
-    "max_harps_per_noaa_region": 2
+    "max_harps_per_noaa_region": 2,
+    "first_flare_start": "2010-05-01 01:34:00",
+    "last_flare_start": "2018-12-15 13:49:00"
+  },
+  "legacy_lookback": {
+    "rule": "same HARP, start_time in [t - 1 day, t]; goes_class = alphabetical max; label = goes_class >= 'M1.0'",
+    "label": {
+      "agree": 511421,
+      "total": 511421,
+      "disagree": 0
+    },
+    "goes_class": {
+      "agree": 511421,
+      "total": 511421,
+      "disagree": 0
+    },
+    "positives": 10315,
+    "alphabetical_vs_numeric_max_differences": 0
   },
   "flare_indexer_forward": {
     "settings": "target=active_region, event_time=start, (t, t+24h], M threshold",
-    "agreement": 284184,
-    "total": 294286,
-    "positives": 7831,
-    "generated_1_published_0": 3809,
+    "label": {
+      "agree": 499009,
+      "total": 511421,
+      "disagree": 12412
+    },
+    "positives": 10141,
+    "generated_1_published_0": 6119,
     "generated_0_published_1": 6293
   },
-  "legacy_rule_lookback": {
-    "settings": "same HARP, start_time in [t-24h, t], M threshold (step3_labeling.py)",
-    "agreement": 294286,
-    "total": 294286,
-    "positives": 10315,
-    "generated_1_published_0": 0,
-    "generated_0_published_1": 0
-  }
+  "per_file": [
+    {
+      "source": "https://raw.githubusercontent.com/chetrajpandey/arpatch-sfp/ee20210dd6c6aa0396f1f4b8575ad05e9d0142b6/data_process/data_labeling/data_labels/-90_to_90/Fold1_test.csv",
+      "rows": 120047,
+      "lookback_label_agree": 120047,
+      "lookback_goes_class_agree": 120047,
+      "forward_label_agree": 116804,
+      "forward_positives": 2673
+    },
+    {
+      "source": "https://raw.githubusercontent.com/chetrajpandey/arpatch-sfp/ee20210dd6c6aa0396f1f4b8575ad05e9d0142b6/data_process/data_labeling/data_labels/-90_to_90/Fold2_test.csv",
+      "rows": 130961,
+      "lookback_label_agree": 130961,
+      "lookback_goes_class_agree": 130961,
+      "forward_label_agree": 127945,
+      "forward_positives": 2145
+    },
+    {
+      "source": "https://raw.githubusercontent.com/chetrajpandey/arpatch-sfp/ee20210dd6c6aa0396f1f4b8575ad05e9d0142b6/data_process/data_labeling/data_labels/-90_to_90/Fold3_test.csv",
+      "rows": 127450,
+      "lookback_label_agree": 127450,
+      "lookback_goes_class_agree": 127450,
+      "forward_label_agree": 124725,
+      "forward_positives": 2319
+    },
+    {
+      "source": "https://raw.githubusercontent.com/chetrajpandey/arpatch-sfp/ee20210dd6c6aa0396f1f4b8575ad05e9d0142b6/data_process/data_labeling/data_labels/-90_to_90/Fold4_test.csv",
+      "rows": 132963,
+      "lookback_label_agree": 132963,
+      "lookback_goes_class_agree": 132963,
+      "forward_label_agree": 129535,
+      "forward_positives": 3004
+    }
+  ]
 }

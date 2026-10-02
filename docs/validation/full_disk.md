@@ -70,9 +70,15 @@ Positive labels per year (24h window): 2010 0/562, 2011 1,237/6,528,
 
 - This validates **agreement with the legacy implementation**, not the
   physical correctness of the catalog.
-- The catalog's last flare starts 2018-12-29 13:16. For 58 images the
-  window extends past that point; they are labeled from whatever the
-  catalog contains (decision [D4](../decisions.md#d4-catalog-coverage)).
+- The catalog does not state its observation coverage. Its latest
+  recorded flare starts 2018-12-29 13:16; 58 images have windows ending
+  after that time (34 images are later than it). They are labeled from
+  the flares the catalog lists. That latest flare is not taken as the end
+  of coverage – near solar minimum a long flare-free period is plausible –
+  so whether these 0 labels reflect quiet Sun or missing coverage is
+  unknown (decision [D4](../decisions.md#d4-catalog-coverage)).
+- Both the package and the legacy script read the same catalog, so
+  agreement says nothing about flares missing from it.
 - Times are compared as given; no TAI/UTC conversion.
 
 ## Reproduce

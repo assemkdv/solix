@@ -10,23 +10,23 @@ script rather than the outputs, then run
 | Page | Shows |
 |---|---|
 | 1 Overview | Inputs, loaders, `DatasetBuilder`, `EventMatcher`, strategy chain, outputs |
-| 2 build() flow | Validation steps, mode dispatch, per-reference-time loop, AR variants |
+| 2 build() flow | Validation steps, mode dispatch, per-region grouping, per-reference-time loop |
 | 3 Time windows | `[t, t+w)`, `(t, t+w]`, `(t, t+23:59:59]`, and the AR look-back window |
-| 4 Sequences | Row-based vs. time-based construction, skipped candidates |
-| 5 Active regions | Region normalization, missing-region policy, HARP/NOAA mapping, real-data facts |
+| 4 Sequences | Row-based vs. time-based construction, skipped candidates, per-region grids |
+| 5 Active regions | Region normalization and grouping, missing-region policy, HARP/NOAA mapping, real-data facts |
 | 6 Modules and tests | Module dependencies, scripts, examples, tests |
 
 ## Modules
 
 | Module | Responsibility | Public names |
 |---|---|---|
-| `classifier.py` | GOES class string → flux (W/m²) | `FluxConverter`, `FlareClassifier` |
-| `events.py` | Load/validate catalog (two schemas), window query | `EventMatcher`, `FlareEvent` |
+| `classifier.py` | GOES class parsing/validation, class → flux (W/m²) | `FluxConverter`, `FlareClassifier`, `InvalidGOESClassError` |
+| `events.py` | Load/validate catalog (two schemas, GOES classes), window query | `EventMatcher`, `FlareEvent` |
 | `reducers.py` | Flares → one value | `EventReducer` (protocol), `MaxFluxReducer` |
 | `labelers.py` | Value → label | `LabelAssigner` (protocol), `BinaryThresholdLabeler`, `RegressionLabeler` |
 | `strategies.py` | Ready-made reducer + labeler pairs | `BinaryThresholdStrategy`, `MaxFlareStrategy` |
 | `pipeline.py` | Stage-by-stage, inspectable labeling | `DatasetBuildingPipeline`, `PipelineResult` |
-| `builder.py` | Image index → labeled table; sequences; AR policy | `DatasetBuilder`, `SequenceBuildReport` |
+| `builder.py` | Image index → labeled table; sequences (grouped by region in AR mode); missing-region policy | `DatasetBuilder`, `SequenceBuildReport` |
 | `loaders.py` | Real-world input conversion | `build_image_index_from_filenames`, `adapt_goes_catalog`, `ImageIndexReport` |
 
 ## Design notes
@@ -46,8 +46,10 @@ script rather than the outputs, then run
 
 ## Known limitations
 
-- Sequence modes require unique timestamps, so multi-region AR indexes
-  must be split per region before building sequences.
 - Windows only look forward from the reference time.
-- GOES classes are not validated when the catalog is loaded.
-- No time-scale conversion (TAI vs UTC) and no catalog-coverage check.
+- No time-scale conversion (TAI vs UTC).
+- No catalog-coverage check: a catalog does not state its coverage, and
+  the package does not infer it from recorded flares.
+- In AR sequence modes with the default `missing_active_region="negative"`,
+  several unknown-region patches at the same time raise `ValueError`
+  (use `"drop"`).

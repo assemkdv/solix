@@ -28,6 +28,161 @@ Chosen to match the legacy script `labeling/labeling.py`:
 | threshold | `M` (≥ M1.0) | first letter `M` or `X` |
 | image list | `strict=False`, `duplicate_policy="first"` | – |
 
+## Step by step, with real rows
+
+What `scripts/validate_full_disk.py` does, shown on a few real rows of
+each file. The rows below are copied from the actual input files and the
+actual run (full files are not committed; see "Reproduce").
+
+### Step 1 – image list → image index
+
+**Input** (`totalfiles_jpg_512.csv`, no header, one path per line; 63,729
+lines). First lines, and a line that is not an image:
+
+```text
+/data/hmi_jpgs_512/2010/12/21/HMI.m2010.12.21_21.00.00.jpg
+/data/hmi_jpgs_512/2010/12/21/HMI.m2010.12.21_09.00.00.jpg
+/data/hmi_jpgs_512/2010/12/21/HMI.m2010.12.21_20.00.00.jpg
+...
+/data/hmi_jpgs_512/labels_store/C_full_dataset_cleaned_9_hours.csv     (line 33,542)
+```
+
+**Code:**
+
+```python
+from flare_indexer import build_image_index_from_filenames
+
+image_index, report = build_image_index_from_filenames(
+    "totalfiles_jpg_512.csv", strict=False, duplicate_policy="first", return_report=True,
+)
+```
+
+**What it does.** Reads the time from each file name
+(`HMI.m2010.12.06_07.00.00.jpg` → `2010-12-06 07:00:00`), skips the 80
+lines that are not image names (like the `labels_store/*.csv` line), and
+sorts by time.
+
+**Output** (first rows of 63,649):
+
+```text
+          timestamp                                                 image_path
+2010-12-06 07:00:00 /data/hmi_jpgs_512/2010/12/06/HMI.m2010.12.06_07.00.00.jpg
+2010-12-06 08:00:00 /data/hmi_jpgs_512/2010/12/06/HMI.m2010.12.06_08.00.00.jpg
+2010-12-06 09:00:00 /data/hmi_jpgs_512/2010/12/06/HMI.m2010.12.06_09.00.00.jpg
+```
+
+### Step 2 – GOES catalog → flare catalog
+
+**Input** (`goes_flares_integrated.csv`, 14,401 rows, 33 columns). The
+columns that are used, first two rows:
+
+```text
+         start_time           peak_time            end_time goes_class  noaa_active_region     fl_lon  fl_lat
+2010-05-01 01:34:00 2010-05-01 01:39:00 2010-05-01 01:43:00       C5.7             11067.0 -73.000000    23.0
+2010-05-01 05:23:00 2010-05-01 05:27:00 2010-05-01 05:31:00       B1.6             11064.0 -24.824109    15.0
+```
+
+**Code:**
+
+```python
+from flare_indexer import adapt_goes_catalog
+
+catalog = adapt_goes_catalog("goes_flares_integrated.csv")
+catalog.to_csv("flare_catalog_adapted.csv", index=False)
+```
+
+**What it does.** Keeps the three times, renames `goes_class` → `class`
+and `noaa_active_region` → `active_region`, checks every class, and drops
+the other 26 columns.
+
+**Output** (first two rows):
+
+```text
+         start_time           peak_time            end_time class  active_region     fl_lon  fl_lat
+2010-05-01 01:34:00 2010-05-01 01:39:00 2010-05-01 01:43:00  C5.7        11067.0 -73.000000    23.0
+2010-05-01 05:23:00 2010-05-01 05:27:00 2010-05-01 05:31:00  B1.6        11064.0 -24.824109    15.0
+```
+
+### Step 3 – labels
+
+**Code** (the script runs this twice: once with
+`BinaryThresholdStrategy("M")` for `label`, once with `MaxFlareStrategy()`
+for `max_flux`):
+
+```python
+from flare_indexer import BinaryThresholdStrategy, DatasetBuilder
+
+builder = DatasetBuilder(
+    prediction_window=24,            # or "23h59min59s" for the legacy window
+    strategy=BinaryThresholdStrategy(threshold="M"),
+    target="full_disk",
+    event_time="start",              # compare each flare's start_time
+    interval_mode="right_closed",    # window (t, t + 24h]
+)
+labels = builder.build("image_index_normalized.csv", "flare_catalog_adapted.csv")
+```
+
+**What it does.** For each image time `t`, finds flares whose
+`start_time` is in `(t, t + 24h]` and gives `1` if the strongest is M1.0
+or stronger.
+
+**Output** (`scripts/output/full_disk_labels.csv`, 63,649 rows; columns
+`timestamp, image_path, label, max_flux`). First rows:
+
+```text
+          timestamp                                                 image_path  label     max_flux
+2010-12-06 07:00:00 /data/hmi_jpgs_512/2010/12/06/HMI.m2010.12.06_07.00.00.jpg      0 0.000000e+00
+2010-12-06 08:00:00 /data/hmi_jpgs_512/2010/12/06/HMI.m2010.12.06_08.00.00.jpg      0 1.900000e-07
+2010-12-06 09:00:00 /data/hmi_jpgs_512/2010/12/06/HMI.m2010.12.06_09.00.00.jpg      0 1.900000e-07
+```
+
+`max_flux` is the strongest flare's X-ray flux in W/m² (a number, not
+class text): `0` means no flare in the window, `1.9e-07` is a B1.9 flare.
+
+**Why a label turns from 0 to 1** – three consecutive images:
+
+```text
+          timestamp  label  max_flux
+2011-01-26 23:00:00      0  0.000002
+2011-01-27 00:00:00      0  0.000002
+2011-01-27 01:00:00      1  0.000013
+```
+
+The catalog has an M1.3 flare starting at `2011-01-28 00:44`. For the
+00:00 image the window ends at `2011-01-28 00:00`, before the flare, so
+only C-class flares count → `0`. For the 01:00 image the window ends at
+`2011-01-28 01:00`, which includes 00:44 → max flux 1.3e-5 = M1.3 → `1`.
+
+### Step 4 – comparison with the legacy labels
+
+**Input** (`NEW_full_dataset_cleaned_1_hours_with_loc_and_time_new.csv`,
+the legacy output). The `label` column holds the image path; `goes_class`
+holds the strongest class, or `NF` for no flare:
+
+```text
+label,goes_class,fl_lon,fl_lat,rest_fl,rest_lon,rest_lat
+2010/12/06/HMI.m2010.12.06_07.00.00.jpg,NF,unk,unk,,,
+2010/12/06/HMI.m2010.12.06_08.00.00.jpg,B1.9,-38.5479308163,16.0,['B1.9'],[-38.5479308163],[16.0]
+```
+
+**What the script does.** Reads the time from the legacy file name,
+turns `goes_class` into 0/1 (`M` or `X` → 1, otherwise 0), and compares
+with our `label` image by image.
+
+**One of the six differences**, both windows side by side:
+
+```text
+          timestamp  label_24h  label_23h59m59s  legacy goes_class
+2014-08-23 11:00:00          0                0  C6.0
+2014-08-23 12:00:00          1                0  C6.0
+2014-08-23 13:00:00          1                1  M5.9
+```
+
+The catalog has an M5.9 flare starting at exactly `2014-08-24 12:00`. For
+the 12:00 image that is exactly `t + 24h`: inside `(t, t + 24h]` → `1`,
+but outside the legacy `(t, t + 23:59:59]` → `0`, which matches the
+legacy `C6.0`. For the 13:00 image both windows include it.
+
 ## Results
 
 | Quantity | Value |

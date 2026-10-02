@@ -1,0 +1,63 @@
+Using cached download: scripts/.cache/totalfiles_jpg_512.csv
+Using cached download: scripts/.cache/goes_flares_integrated.csv
+
+=== Building image index (strict=False, duplicate_policy='first') ===
+  total source rows:          63729
+  valid image rows before dedup: 63649
+  excluded malformed/non-image rows: 80
+    e.g. ['/data/hmi_jpgs_512/labels_store/C_full_dataset_cleaned_9_hours.csv', '/data/hmi_jpgs_512/labels_store/6_C_Fold2_train.csv', '/data/hmi_jpgs_512/labels_store/6_C_Fold3_train.csv', '/data/hmi_jpgs_512/labels_store/6_M_Fold1_train.csv', '/data/hmi_jpgs_512/labels_store/6_M_Fold2_train.csv']
+  duplicate timestamps:        0
+  final normalized images:     63649
+  timestamp range: 2010-12-06 07:00:00 -> 2018-12-30 23:00:00
+
+=== Adapting GOES catalog ===
+  total GOES events: 14401
+  event date range (peak_time): 2010-05-01 01:39:00 -> 2018-12-29 13:17:00
+
+=== Building labels (full-disk, event_time=start, interval_mode=right_closed, prediction_window=24h, M-threshold) ===
+  total generated labels: 63649
+  positive (>=M): 9006
+  negative:       54643
+  label distribution: {0: np.int64(54643), 1: np.int64(9006)}
+  output written to: <output-dir>/labels_24h.csv
+
+=== Comparing against legacy labels ===
+Using cached download: scripts/.cache/legacy_labels.csv
+  generated rows eligible for comparison: 63649
+  legacy rows eligible for comparison:     63649 (excluded 0 malformed legacy rows)
+  overlapping timestamps:                  63649
+  generated timestamps not in legacy:       0
+  legacy timestamps not in generated:       0
+  exact binary-label matches:               63643
+  binary-label mismatches:                  6
+  agreement percentage:                     99.9906%
+  false positives (generated=1, legacy=0):  6
+  false negatives (generated=0, legacy=1):  0
+
+  representative mismatch rows:
+    2011-03-06 05:00:00  generated=1  legacy=0  generated_max_flux=1.20e-05  legacy_goes_class='C8.6'
+    2011-08-07 18:00:00  generated=1  legacy=0  generated_max_flux=3.50e-05  legacy_goes_class='C2.2'
+    2013-07-02 07:00:00  generated=1  legacy=0  generated_max_flux=1.50e-05  legacy_goes_class='C7.2'
+    2014-08-23 12:00:00  generated=1  legacy=0  generated_max_flux=5.90e-05  legacy_goes_class='C6.0'
+    2014-10-19 09:00:00  generated=1  legacy=0  generated_max_flux=3.90e-05  legacy_goes_class='C9.0'
+    2014-12-03 08:00:00  generated=1  legacy=0  generated_max_flux=1.30e-05  legacy_goes_class='C3.8'
+
+=== Mismatch categorization (Task 7) ===
+  legacy_23h59m59s_boundary: 6
+  duplicate_policy_candidate: 0
+  unknown_unexplained: 0
+
+  legacy_23h59m59s_boundary examples (image_time, qualifying_class, flare_start_time):
+    2011-03-06 05:00:00  M1.2  start=2011-03-07 05:00:00  (== t + exactly 24h)
+    2011-08-07 18:00:00  M3.5  start=2011-08-08 18:00:00  (== t + exactly 24h)
+    2013-07-02 07:00:00  M1.5  start=2013-07-03 07:00:00  (== t + exactly 24h)
+    2014-08-23 12:00:00  M5.9  start=2014-08-24 12:00:00  (== t + exactly 24h)
+    2014-10-19 09:00:00  M3.9  start=2014-10-20 09:00:00  (== t + exactly 24h)
+    2014-12-03 08:00:00  M1.3  start=2014-12-04 08:00:00  (== t + exactly 24h)
+
+  malformed_legacy_row: excluded upstream, before comparison (see 'excluded malformed legacy rows' above) -- 0 by definition here.
+  numerical_goes_ordering_vs_lexical: structurally cannot cause a binary-label mismatch -- both orderings agree on whether ANY M/X-class flare is present in a window (the first character alone already sorts correctly both ways); it only affects which single flare legacy reports as 'the' max, not the M-threshold label.
+  event_time / interval_boundary (basis) differences: not applicable to remaining mismatches by construction -- this run already uses event_time='start', interval_mode='right_closed' to match the legacy convention. Run this script with the library's *default* settings (peak/left_closed) separately to see the aggregate agreement-rate impact of that choice.
+
+=== Runtime: 31.29s ===
+Summary written to: docs/validation/full_disk_summary_24h.json

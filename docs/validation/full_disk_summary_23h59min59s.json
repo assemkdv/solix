@@ -1,0 +1,51 @@
+{
+  "settings": {
+    "target": "full_disk",
+    "event_time": "start",
+    "interval_mode": "right_closed",
+    "prediction_window": "0 days 23:59:59",
+    "threshold": "M",
+    "duplicate_policy": "first"
+  },
+  "inputs": {
+    "image_list": {
+      "source": "https://raw.githubusercontent.com/chetrajpandey/explainingFullDisk/main/labeling/data_labels/totalfiles_jpg_512.csv",
+      "sha256": "767e5b17b18178a4776002e0958ba9232b8a794b6dc85c99ec8c6230e3d26ddc"
+    },
+    "event_catalog": {
+      "source": "https://raw.githubusercontent.com/chetrajpandey/explainingFullDisk/main/labeling/data_source/goes_flares_integrated.csv",
+      "sha256": "2a1c76ff6ba508fede2add75bc7d4a96a61283d676cc360ae13d5aa1d56dcf48"
+    }
+  },
+  "image_index": {
+    "source_rows": 63729,
+    "valid_images": 63649,
+    "excluded_non_image_rows": 80,
+    "duplicate_timestamps": 0,
+    "final_images": 63649,
+    "first_timestamp": "2010-12-06 07:00:00",
+    "last_timestamp": "2018-12-30 23:00:00"
+  },
+  "catalog": {
+    "events": 14401
+  },
+  "labels": {
+    "total": 63649,
+    "positive": 9000,
+    "negative": 54649
+  },
+  "legacy_comparison": {
+    "source": "https://raw.githubusercontent.com/chetrajpandey/explainingFullDisk/main/labeling/data_labels/NEW_full_dataset_cleaned_1_hours_with_loc_and_time_new.csv",
+    "sha256": "cc8cef7161c154edacc7b018ff3d8253daba7935a470375c1f2ada1adcacc7ee",
+    "overlapping_timestamps": 63649,
+    "generated_only": 0,
+    "legacy_only": 0,
+    "malformed_legacy_rows": 0,
+    "matches": 63649,
+    "mismatches": 0,
+    "generated_1_legacy_0": 0,
+    "generated_0_legacy_1": 0,
+    "mismatch_categories": {},
+    "mismatch_rows": []
+  }
+}

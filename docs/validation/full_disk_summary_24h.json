@@ -1,0 +1,104 @@
+{
+  "settings": {
+    "target": "full_disk",
+    "event_time": "start",
+    "interval_mode": "right_closed",
+    "prediction_window": "1 days 00:00:00",
+    "threshold": "M",
+    "duplicate_policy": "first"
+  },
+  "inputs": {
+    "image_list": {
+      "source": "https://raw.githubusercontent.com/chetrajpandey/explainingFullDisk/main/labeling/data_labels/totalfiles_jpg_512.csv",
+      "sha256": "767e5b17b18178a4776002e0958ba9232b8a794b6dc85c99ec8c6230e3d26ddc"
+    },
+    "event_catalog": {
+      "source": "https://raw.githubusercontent.com/chetrajpandey/explainingFullDisk/main/labeling/data_source/goes_flares_integrated.csv",
+      "sha256": "2a1c76ff6ba508fede2add75bc7d4a96a61283d676cc360ae13d5aa1d56dcf48"
+    }
+  },
+  "image_index": {
+    "source_rows": 63729,
+    "valid_images": 63649,
+    "excluded_non_image_rows": 80,
+    "duplicate_timestamps": 0,
+    "final_images": 63649,
+    "first_timestamp": "2010-12-06 07:00:00",
+    "last_timestamp": "2018-12-30 23:00:00"
+  },
+  "catalog": {
+    "events": 14401
+  },
+  "labels": {
+    "total": 63649,
+    "positive": 9006,
+    "negative": 54643
+  },
+  "legacy_comparison": {
+    "source": "https://raw.githubusercontent.com/chetrajpandey/explainingFullDisk/main/labeling/data_labels/NEW_full_dataset_cleaned_1_hours_with_loc_and_time_new.csv",
+    "sha256": "cc8cef7161c154edacc7b018ff3d8253daba7935a470375c1f2ada1adcacc7ee",
+    "overlapping_timestamps": 63649,
+    "generated_only": 0,
+    "legacy_only": 0,
+    "malformed_legacy_rows": 0,
+    "matches": 63643,
+    "mismatches": 6,
+    "generated_1_legacy_0": 6,
+    "generated_0_legacy_1": 0,
+    "mismatch_categories": {
+      "legacy_23h59m59s_boundary": 6,
+      "duplicate_policy_candidate": 0,
+      "unknown_unexplained": 0
+    },
+    "mismatch_rows": [
+      {
+        "timestamp": "2011-03-06 05:00:00",
+        "image_path": "/data/hmi_jpgs_512/2011/03/06/HMI.m2011.03.06_05.00.00.jpg",
+        "generated_label": 1,
+        "legacy_label": 0,
+        "generated_max_flux": 1.2e-05,
+        "legacy_goes_class": "C8.6"
+      },
+      {
+        "timestamp": "2011-08-07 18:00:00",
+        "image_path": "/data/hmi_jpgs_512/2011/08/07/HMI.m2011.08.07_18.00.00.jpg",
+        "generated_label": 1,
+        "legacy_label": 0,
+        "generated_max_flux": 3.5000000000000004e-05,
+        "legacy_goes_class": "C2.2"
+      },
+      {
+        "timestamp": "2013-07-02 07:00:00",
+        "image_path": "/data/hmi_jpgs_512/2013/07/02/HMI.m2013.07.02_07.00.00.jpg",
+        "generated_label": 1,
+        "legacy_label": 0,
+        "generated_max_flux": 1.5000000000000002e-05,
+        "legacy_goes_class": "C7.2"
+      },
+      {
+        "timestamp": "2014-08-23 12:00:00",
+        "image_path": "/data/hmi_jpgs_512/2014/08/23/HMI.m2014.08.23_12.00.00.jpg",
+        "generated_label": 1,
+        "legacy_label": 0,
+        "generated_max_flux": 5.900000000000001e-05,
+        "legacy_goes_class": "C6.0"
+      },
+      {
+        "timestamp": "2014-10-19 09:00:00",
+        "image_path": "/data/hmi_jpgs_512/2014/10/19/HMI.m2014.10.19_09.00.00.jpg",
+        "generated_label": 1,
+        "legacy_label": 0,
+        "generated_max_flux": 3.9e-05,
+        "legacy_goes_class": "C9.0"
+      },
+      {
+        "timestamp": "2014-12-03 08:00:00",
+        "image_path": "/data/hmi_jpgs_512/2014/12/03/HMI.m2014.12.03_08.00.00.jpg",
+        "generated_label": 1,
+        "legacy_label": 0,
+        "generated_max_flux": 1.3000000000000001e-05,
+        "legacy_goes_class": "C3.8"
+      }
+    ]
+  }
+}

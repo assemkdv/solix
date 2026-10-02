@@ -12,6 +12,7 @@ Usage:
     python scripts/validate_full_disk.py
     python scripts/validate_full_disk.py --legacy-labels <path-or-url>
     python scripts/validate_full_disk.py --image-list <path> --event-catalog <path> --output out.csv
+    python scripts/validate_full_disk.py --legacy-labels default --prediction-window 23h59min59s
 
 Local paths and http(s) URLs are both accepted for --image-list,
 --event-catalog, and --legacy-labels. URLs are downloaded once into
@@ -20,6 +21,8 @@ directory to force a re-download.
 """
 
 import argparse
+import hashlib
+import json
 import re
 import time
 import urllib.request
@@ -28,6 +31,7 @@ from pathlib import Path
 import pandas as pd
 
 from flare_indexer import BinaryThresholdStrategy, DatasetBuilder, EventMatcher, FlareClassifier, MaxFlareStrategy
+from flare_indexer.events import _parse_prediction_window
 from flare_indexer.loaders import adapt_goes_catalog, build_image_index_from_filenames
 
 DEFAULT_IMAGE_LIST_URL = (
@@ -91,6 +95,14 @@ def _binarize_legacy_class(raw) -> tuple[int | None, str]:
     return None, "malformed"
 
 
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--image-list", default=DEFAULT_IMAGE_LIST_URL,
@@ -102,6 +114,12 @@ def parse_args():
                               f"Pass 'default' to use the known URL ({DEFAULT_LEGACY_LABELS_URL}).")
     parser.add_argument("--output", default=str(OUTPUT_DIR / "full_disk_labels.csv"),
                          help="Where to write the generated (timestamp, image_path, label, max_flux) CSV.")
+    parser.add_argument("--prediction-window", default="24h",
+                         help="Prediction window: hours (24) or a pandas duration ('24h', '23h59min59s'). "
+                              "Default 24h; legacy labeling.py effectively used 23h59min59s.")
+    parser.add_argument("--summary", default=None,
+                         help="Optional path for a small JSON summary (counts, settings, input SHA-256, "
+                              "mismatches) suitable for committing to the repository.")
     parser.add_argument("--duplicate-policy", default="first", choices=["error", "first", "last"],
                          help="How to resolve duplicate image timestamps (default: first).")
     args = parser.parse_args()
@@ -141,16 +159,20 @@ def main():
     image_index_cache_path = CACHE_DIR / "image_index_normalized.csv"
     image_index.to_csv(image_index_cache_path, index=False)
 
-    print("\n=== Building labels (full-disk, event_time=start, interval_mode=right_closed, M-threshold) ===")
+    # A bare number on the command line means hours, as in the Python API.
+    window = float(args.prediction_window) if re.fullmatch(r"\d+(\.\d+)?", args.prediction_window) \
+        else args.prediction_window
+    print(f"\n=== Building labels (full-disk, event_time=start, interval_mode=right_closed, "
+          f"prediction_window={window}, M-threshold) ===")
     binary_builder = DatasetBuilder(
-        prediction_window=24,
+        prediction_window=window,
         strategy=BinaryThresholdStrategy(threshold="M"),
         target="full_disk",
         event_time="start",
         interval_mode="right_closed",
     )
     flux_builder = DatasetBuilder(
-        prediction_window=24,
+        prediction_window=window,
         strategy=MaxFlareStrategy(),
         target="full_disk",
         event_time="start",
@@ -178,21 +200,55 @@ def main():
     print(f"  label distribution: {dict(output['label'].value_counts())}")
     print(f"  output written to: {output_path}")
 
+    summary = {
+        "settings": {
+            "target": "full_disk",
+            "event_time": "start",
+            "interval_mode": "right_closed",
+            "prediction_window": str(_parse_prediction_window(window)),
+            "threshold": "M",
+            "duplicate_policy": args.duplicate_policy,
+        },
+        "inputs": {
+            "image_list": {"source": args.image_list, "sha256": _sha256(image_list_path)},
+            "event_catalog": {"source": args.event_catalog, "sha256": _sha256(event_catalog_path)},
+        },
+        "image_index": {
+            "source_rows": image_report.total_input_rows,
+            "valid_images": image_report.valid_image_rows_before_dedup,
+            "excluded_non_image_rows": image_report.excluded_row_count,
+            "duplicate_timestamps": image_report.duplicate_timestamp_count,
+            "final_images": image_report.final_row_count,
+            "first_timestamp": str(image_index["timestamp"].min()),
+            "last_timestamp": str(image_index["timestamp"].max()),
+        },
+        "catalog": {"events": len(catalog)},
+        "labels": {"total": len(output), "positive": positives, "negative": negatives},
+    }
+
     if args.legacy_labels:
-        _compare_to_legacy(args.legacy_labels, output, image_report, catalog_cache_path)
+        summary["legacy_comparison"] = _compare_to_legacy(
+            args.legacy_labels, output, image_report, catalog_cache_path,
+        )
 
     runtime = time.monotonic() - t0
     print(f"\n=== Runtime: {runtime:.2f}s ===")
 
+    if args.summary:
+        summary_path = Path(args.summary)
+        summary_path.parent.mkdir(parents=True, exist_ok=True)
+        summary_path.write_text(json.dumps(summary, indent=2) + "\n")
+        print(f"Summary written to: {summary_path}")
 
-def _compare_to_legacy(legacy_source: str, generated: pd.DataFrame, image_report, catalog_path: Path) -> None:
+
+def _compare_to_legacy(legacy_source: str, generated: pd.DataFrame, image_report, catalog_path: Path) -> dict | None:
     print("\n=== Comparing against legacy labels ===")
     legacy_path = _resolve_source(legacy_source, "legacy_labels.csv")
     legacy_raw = pd.read_csv(legacy_path)
 
     if "label" not in legacy_raw.columns:
         print("  legacy file has no 'label' column -- cannot compare.")
-        return
+        return None
 
     # legacy's "label" column holds relative paths like
     # "2010/12/06/HMI.m2010.12.06_07.00.00.jpg" -- reuse the same filename
@@ -260,10 +316,35 @@ def _compare_to_legacy(legacy_source: str, generated: pd.DataFrame, image_report
             print(f"    {row['timestamp']}  generated={row['label']}  legacy={row['legacy_label']}"
                   f"  generated_max_flux={row['max_flux']:.2e}  legacy_goes_class={row['goes_class']!r}")
 
-    _categorize_mismatches(mismatches, image_report, catalog_path)
+    categories = _categorize_mismatches(mismatches, image_report, catalog_path)
+
+    return {
+        "source": legacy_source,
+        "sha256": _sha256(legacy_path),
+        "overlapping_timestamps": len(merged),
+        "generated_only": len(generated_only),
+        "legacy_only": len(legacy_only),
+        "malformed_legacy_rows": malformed_count,
+        "matches": int(matches.sum()),
+        "mismatches": len(mismatches),
+        "generated_1_legacy_0": len(false_positives),
+        "generated_0_legacy_1": len(false_negatives),
+        "mismatch_categories": categories,
+        "mismatch_rows": [
+            {
+                "timestamp": str(row["timestamp"]),
+                "image_path": row["image_path"],
+                "generated_label": int(row["label"]),
+                "legacy_label": int(row["legacy_label"]),
+                "generated_max_flux": float(row["max_flux"]),
+                "legacy_goes_class": str(row["goes_class"]),
+            }
+            for _, row in mismatches.iterrows()
+        ],
+    }
 
 
-def _categorize_mismatches(mismatches: pd.DataFrame, image_report, catalog_path: Path) -> None:
+def _categorize_mismatches(mismatches: pd.DataFrame, image_report, catalog_path: Path) -> dict:
     """
     Best-effort, per-row explanation of remaining binary-label mismatches.
 
@@ -280,7 +361,7 @@ def _categorize_mismatches(mismatches: pd.DataFrame, image_report, catalog_path:
     print("\n=== Mismatch categorization (Task 7) ===")
     if not len(mismatches):
         print("  no mismatches to categorize.")
-        return
+        return {}
 
     matcher = EventMatcher(catalog_path)
     classifier = FlareClassifier()
@@ -331,6 +412,7 @@ def _categorize_mismatches(mismatches: pd.DataFrame, image_report, catalog_path:
         "with the library's *default* settings (peak/left_closed) separately to see the "
         "aggregate agreement-rate impact of that choice."
     )
+    return counts
 
 
 if __name__ == "__main__":

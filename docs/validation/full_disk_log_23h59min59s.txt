@@ -1,0 +1,41 @@
+Using cached download: scripts/.cache/totalfiles_jpg_512.csv
+Using cached download: scripts/.cache/goes_flares_integrated.csv
+
+=== Building image index (strict=False, duplicate_policy='first') ===
+  total source rows:          63729
+  valid image rows before dedup: 63649
+  excluded malformed/non-image rows: 80
+    e.g. ['/data/hmi_jpgs_512/labels_store/C_full_dataset_cleaned_9_hours.csv', '/data/hmi_jpgs_512/labels_store/6_C_Fold2_train.csv', '/data/hmi_jpgs_512/labels_store/6_C_Fold3_train.csv', '/data/hmi_jpgs_512/labels_store/6_M_Fold1_train.csv', '/data/hmi_jpgs_512/labels_store/6_M_Fold2_train.csv']
+  duplicate timestamps:        0
+  final normalized images:     63649
+  timestamp range: 2010-12-06 07:00:00 -> 2018-12-30 23:00:00
+
+=== Adapting GOES catalog ===
+  total GOES events: 14401
+  event date range (peak_time): 2010-05-01 01:39:00 -> 2018-12-29 13:17:00
+
+=== Building labels (full-disk, event_time=start, interval_mode=right_closed, prediction_window=23h59min59s, M-threshold) ===
+  total generated labels: 63649
+  positive (>=M): 9000
+  negative:       54649
+  label distribution: {0: np.int64(54649), 1: np.int64(9000)}
+  output written to: <output-dir>/labels_23h59min59s.csv
+
+=== Comparing against legacy labels ===
+Using cached download: scripts/.cache/legacy_labels.csv
+  generated rows eligible for comparison: 63649
+  legacy rows eligible for comparison:     63649 (excluded 0 malformed legacy rows)
+  overlapping timestamps:                  63649
+  generated timestamps not in legacy:       0
+  legacy timestamps not in generated:       0
+  exact binary-label matches:               63649
+  binary-label mismatches:                  0
+  agreement percentage:                     100.0000%
+  false positives (generated=1, legacy=0):  0
+  false negatives (generated=0, legacy=1):  0
+
+=== Mismatch categorization (Task 7) ===
+  no mismatches to categorize.
+
+=== Runtime: 29.88s ===
+Summary written to: docs/validation/full_disk_summary_23h59min59s.json

@@ -1,5 +1,8 @@
 # User guide
 
+> Compact reference. For a step-by-step guide with verified examples, start with the
+> [researcher manual](researcher_manual.md).
+
 Reference for `flare-indexer` as implemented in this repository. Each
 statement here describes current code behavior; open scientific choices
 are listed in [decisions.md](decisions.md).

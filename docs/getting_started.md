@@ -1,5 +1,7 @@
 # Getting started
 
+> A ten-minute introduction. The full guide is the [researcher manual](researcher_manual.md).
+
 This page is for someone who has never used `flare-indexer`. In about ten
 minutes you will install it, label a small synthetic dataset, and know
 where to look next.

@@ -6,6 +6,14 @@ ready-to-train table of image/sequence -> label pairs.
 
 ## Documentation
 
+**Start here:**
+
+- **[Researcher manual](docs/researcher_manual.md)** — how to install and use the package, with verified examples
+- **[System design](docs/architecture/system_design.md)** — how the code works inside, with a traced example
+- **[Meeting walkthrough](docs/meeting_walkthrough.md)** — what is done, what is open, and a demo command
+
+More:
+
 - [Getting started](docs/getting_started.md) and runnable [examples](examples/) with synthetic data
 - [User guide](docs/user_guide.md): input/output schemas, parameters, window boundaries, errors
 - [Active-region workflow](docs/active_region_workflow.md)

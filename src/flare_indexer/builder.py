@@ -1,7 +1,11 @@
+import warnings
+
 import pandas as pd
 from dataclasses import dataclass, field
 from pathlib import Path
-from .events import EventMatcher, _normalize_active_region, VALID_EVENT_TIMES, VALID_INTERVAL_MODES
+from .events import (
+    EventMatcher, _normalize_active_region, _parse_prediction_window, VALID_EVENT_TIMES, VALID_INTERVAL_MODES,
+)
 
 _ROW_BASED_PARAM_NAMES = ("sequence_length", "stride", "cadence_minutes")
 _TIME_BASED_PARAM_NAMES = ("start", "cadence", "observation_window", "sliding_window")
@@ -10,6 +14,8 @@ _TIME_BASED_PARAM_NAMES = ("start", "cadence", "observation_window", "sliding_wi
 # SequenceBuildReport keeps verbatim, so a very long-running build doesn't
 # blow up memory just to report on itself. Counts are always exact.
 _MAX_SEQUENCE_REPORT_SAMPLES = 50
+
+VALID_MISSING_ACTIVE_REGION_POLICIES = {"negative", "drop", "error"}
 
 
 @dataclass
@@ -112,9 +118,11 @@ class DatasetBuilder:
 
     Parameters
     ----------
-    prediction_window : int
-        Hours after each image timestamp (or, for sequences, after the
-        final image in the sequence) to search for flares.
+    prediction_window : int | float | str | pd.Timedelta
+        How far after each image timestamp (or, for sequences, after the
+        final image in the sequence) to search for flares. A plain number
+        is hours (e.g. 24); a string/Timedelta is a pandas duration (e.g.
+        "24h", "23h59min59s").
     strategy : BinaryThresholdStrategy | MaxFlareStrategy
         Labeling strategy that converts a list of FlareEvents to a label.
     target : str
@@ -132,6 +140,20 @@ class DatasetBuilder:
         (default, preserves original behavior) for
         [t, t + prediction_window), or "right_closed" for
         (t, t + prediction_window]. See EventMatcher.query.
+    missing_active_region : str
+        Only used when target="active_region". What to do with an image
+        (or sequence) whose image-side active_region is missing:
+        "negative" (default, preserves original behavior) labels it as if
+        no flare occurred -- and emits a UserWarning with the count, since
+        such a label is "unknown", not a confirmed negative; "drop" leaves
+        it out of the output; "error" raises ValueError.
+    include_metadata : bool
+        Single-image mode only. False (default, preserves original
+        behavior) returns just (timestamp, label) -- or, for
+        target="active_region", the same. True also returns every other
+        image-index column (e.g. image_path); for target="active_region"
+        the normalized active_region is placed right before label, so
+        several regions observed at the same timestamp stay distinguishable.
 
     Row-based sequence parameters (mutually exclusive with the time-based
     ones below -- see "Sequence mode selection")
@@ -213,9 +235,15 @@ class DatasetBuilder:
         cadence=None,
         observation_window=None,
         sliding_window=None,
+        missing_active_region="negative",
+        include_metadata=False,
     ):
-        if prediction_window <= 0:
-            raise ValueError(f"prediction_window must be > 0, got {prediction_window}")
+        _parse_prediction_window(prediction_window)
+        if missing_active_region not in VALID_MISSING_ACTIVE_REGION_POLICIES:
+            raise ValueError(
+                f"missing_active_region must be one of {sorted(VALID_MISSING_ACTIVE_REGION_POLICIES)}, "
+                f"got {missing_active_region!r}"
+            )
         if target not in self.VALID_TARGETS:
             raise ValueError(f"target must be one of {sorted(self.VALID_TARGETS)}, got {target!r}")
         if event_time not in VALID_EVENT_TIMES:
@@ -246,6 +274,8 @@ class DatasetBuilder:
         self.target = target
         self.event_time = event_time
         self.interval_mode = interval_mode
+        self.missing_active_region = missing_active_region
+        self.include_metadata = include_metadata
         self.time_based = bool(time_based_given)
 
         if self.time_based:
@@ -366,6 +396,8 @@ class DatasetBuilder:
         index_df["timestamp"] = pd.to_datetime(index_df["timestamp"])
 
         matcher = EventMatcher(event_catalog_path)
+        if self.target == "active_region":
+            self._warn_catalog_missing_active_region(matcher, event_catalog_path)
 
         if self.time_based:
             if self.target == "active_region":
@@ -394,18 +426,36 @@ class DatasetBuilder:
             label = self.strategy.label(flares)
             records.append({"timestamp": ts, "label": label})
 
+        columns = ["timestamp", "label"]
         if not records:
-            return pd.DataFrame(columns=["timestamp", "label"])
-        return pd.DataFrame(records)
+            result = pd.DataFrame(columns=columns)
+        else:
+            result = pd.DataFrame(records)
+        if self.include_metadata:
+            extra_columns = [c for c in index_df.columns if c != "timestamp"]
+            for col in extra_columns:
+                result[col] = index_df[col].to_numpy()
+        return result
 
     def _build_single_image_active_region(self, index_df: pd.DataFrame, matcher: EventMatcher) -> pd.DataFrame:
+        extra_columns = [c for c in index_df.columns if c not in ("timestamp", "active_region")]
+        if self.include_metadata:
+            columns = ["timestamp", "active_region", "label"] + extra_columns
+        else:
+            columns = ["timestamp", "label"]
+
         records = []
-        for ts, raw_active_region in zip(index_df["timestamp"], index_df["active_region"]):
+        missing_rows = []
+        for position, (ts, raw_active_region) in enumerate(zip(index_df["timestamp"], index_df["active_region"])):
             active_region = _normalize_active_region(raw_active_region)
             if active_region is None:
                 # Missing image-side active_region must not silently match
                 # anything -- skip the query entirely rather than falling
-                # back to full-disk matching.
+                # back to full-disk matching. What happens to the row is
+                # governed by missing_active_region.
+                missing_rows.append(f"row {position} ({ts})")
+                if self.missing_active_region == "drop":
+                    continue
                 flares = []
             else:
                 flares = matcher.query(
@@ -413,11 +463,50 @@ class DatasetBuilder:
                     event_time=self.event_time, interval_mode=self.interval_mode,
                 )
             label = self.strategy.label(flares)
-            records.append({"timestamp": ts, "label": label})
+            record = {"timestamp": ts, "active_region": active_region, "label": label}
+            for col in extra_columns:
+                record[col] = index_df[col].iloc[position]
+            records.append(record)
+
+        self._report_missing_active_regions(missing_rows, "image(s)")
 
         if not records:
-            return pd.DataFrame(columns=["timestamp", "label"])
-        return pd.DataFrame(records)
+            return pd.DataFrame(columns=columns)
+        return pd.DataFrame(records)[columns]
+
+    def _report_missing_active_regions(self, missing: list, unit: str) -> None:
+        if not missing:
+            return
+        sample = ", ".join(missing[:5]) + (", ..." if len(missing) > 5 else "")
+        if self.missing_active_region == "error":
+            raise ValueError(
+                f"{len(missing)} {unit} have a missing active_region (e.g. {sample}). "
+                "Their label is unknown, not negative. Fill in active_region, or pass "
+                "missing_active_region='drop' or 'negative' to DatasetBuilder."
+            )
+        if self.missing_active_region == "negative":
+            warnings.warn(
+                f"{len(missing)} {unit} have a missing active_region (e.g. {sample}) and were "
+                "labeled as if no flare occurred. Such labels are unknown, not confirmed "
+                "negatives. Pass missing_active_region='drop' to leave them out, or 'error' "
+                "to stop.",
+                UserWarning,
+                stacklevel=4,
+            )
+
+    def _warn_catalog_missing_active_region(self, matcher: EventMatcher, path) -> None:
+        catalog = matcher._catalog
+        if "active_region" not in catalog.columns or catalog.empty:
+            return
+        missing = int(catalog["active_region"].apply(_normalize_active_region).isna().sum())
+        if missing:
+            warnings.warn(
+                f"{missing} of {len(catalog)} flare(s) in the catalog at {path} have no "
+                "active_region. With target='active_region' they can never match any image, "
+                "so a region that produced one of them may be labeled negative.",
+                UserWarning,
+                stacklevel=3,
+            )
 
     def _validate_sequence_timestamps(self, timestamps: pd.Series, path: Path) -> None:
         if not timestamps.is_monotonic_increasing:
@@ -511,6 +600,7 @@ class DatasetBuilder:
         columns = ["sequence_start", "sequence_end", "timestamps", "n_images", "active_region", "label"] + extra_columns
 
         records = []
+        missing_sequences = []
         start = 0
         while start + length <= n:
             window = timestamps[start:start + length]
@@ -521,6 +611,10 @@ class DatasetBuilder:
                 )
                 sequence_end = window[-1]
                 if active_region is None:
+                    missing_sequences.append(f"rows {start}:{start + length}")
+                    if self.missing_active_region == "drop":
+                        start += self.stride
+                        continue
                     flares = []
                 else:
                     flares = matcher.query(
@@ -542,6 +636,8 @@ class DatasetBuilder:
                 records.append(record)
 
             start += self.stride
+
+        self._report_missing_active_regions(missing_sequences, "sequence(s)")
 
         if not records:
             return pd.DataFrame(columns=columns)
@@ -664,6 +760,7 @@ class DatasetBuilder:
         columns = ["sequence_start", "sequence_end", "timestamps", "n_images", "active_region", "label"] + extra_columns
 
         records = []
+        missing_sequences = []
         for window_timestamps, positions in candidates:
             window_active_regions = index_df["active_region"].iloc[positions].tolist()
             active_region = self._sequence_active_region(
@@ -671,6 +768,9 @@ class DatasetBuilder:
             )
             sequence_end = window_timestamps[-1]
             if active_region is None:
+                missing_sequences.append(f"starting at {window_timestamps[0]}")
+                if self.missing_active_region == "drop":
+                    continue
                 flares = []
             else:
                 flares = matcher.query(
@@ -690,6 +790,8 @@ class DatasetBuilder:
             for col in extra_columns:
                 record[col] = index_df[col].iloc[positions].tolist()
             records.append(record)
+
+        self._report_missing_active_regions(missing_sequences, "sequence(s)")
 
         if not records:
             return pd.DataFrame(columns=columns), report

@@ -21,6 +21,33 @@ VALID_EVENT_TIMES = {"start", "peak"}
 VALID_INTERVAL_MODES = {"left_closed", "right_closed"}
 
 
+def _parse_prediction_window(value) -> pd.Timedelta:
+    """
+    Normalize a prediction window into a strictly positive pd.Timedelta.
+
+    A plain number (int or float) is interpreted as hours, preserving the
+    original `prediction_window=24` behavior. Anything else is parsed as a
+    pandas-compatible duration, e.g. "24h", "23h59min59s", or a
+    pd.Timedelta -- which is what allows reproducing a legacy window such
+    as (t, t + 23:59:59] exactly.
+    """
+    if isinstance(value, bool):
+        raise ValueError(f"prediction_window must be a number of hours or a duration, got {value!r}")
+    try:
+        if isinstance(value, (int, float, np.integer, np.floating)):
+            window = pd.Timedelta(hours=float(value))
+        else:
+            window = pd.Timedelta(value)
+    except (ValueError, TypeError) as exc:
+        raise ValueError(
+            f"prediction_window must be a number of hours or a duration (e.g. 24, '24h', "
+            f"'23h59min59s'), got {value!r}: {exc}"
+        ) from None
+    if pd.isna(window) or window <= pd.Timedelta(0):
+        raise ValueError(f"prediction_window must be > 0, got {value!r}")
+    return window
+
+
 def _normalize_active_region(value) -> str | None:
     # A catalog with any missing active_region cells gets read by pandas as
     # float64 (NaN for missing), so a present value like 4456 arrives as the
@@ -245,6 +272,9 @@ class EventMatcher:
           itself, includes window_end exactly. This matches the legacy
           full-disk script's convention.
 
+        prediction_window_hours is either a number of hours (e.g. 24) or a
+        pandas-compatible duration (e.g. "23h59min59s", pd.Timedelta).
+
         Example: image taken at 10:00, window = 24 hours, defaults
         → returns all flares with peak_time in [10:00, 10:00 next day)
 
@@ -259,7 +289,7 @@ class EventMatcher:
         if interval_mode not in VALID_INTERVAL_MODES:
             raise ValueError(f"interval_mode must be one of {sorted(VALID_INTERVAL_MODES)}, got {interval_mode!r}")
 
-        window_end = image_time + pd.Timedelta(hours=prediction_window_hours)
+        window_end = image_time + _parse_prediction_window(prediction_window_hours)
 
         sorted_values, sort_positions = self._sorted_view(event_time)
         image_time_np = np.datetime64(image_time)

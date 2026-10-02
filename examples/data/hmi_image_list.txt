@@ -1,0 +1,7 @@
+/data/hmi_jpgs_512/2024/03/01/HMI.m2024.03.01_00.00.00.jpg
+/data/hmi_jpgs_512/2024/03/01/HMI.m2024.03.01_01.00.00.jpg
+/data/hmi_jpgs_512/2024/03/01/HMI.m2024.03.01_02.00.00.jpg
+/data/hmi_jpgs_512/labels_store/Fold1_train.csv
+/data/hmi_jpgs_512/2024/03/01/HMI.m2024.03.01_03.00.00.jpg
+/data/hmi_jpgs_512/2024/03/01/HMI.m2024.03.01_04.00.00.jpg
+/data/hmi_jpgs_512/2024/03/01/HMI.m2024.03.01_05.00.00.jpg

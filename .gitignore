@@ -222,3 +222,6 @@ scripts/output/
 # Streamlit
 .streamlit/secrets.toml
 .DS_Store
+
+# Example outputs
+examples/output/

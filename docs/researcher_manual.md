@@ -361,7 +361,9 @@ with warnings.catch_warnings(record=True) as caught:
         include_metadata=True,
     ).build("docs/fixtures/ar_images.csv", "docs/fixtures/catalog.csv")
 print()
-print(ar_labels.to_string(index=False, na_rep="(none)"))
+# Missing regions are shown as "(none)"; filling them first makes the display
+# the same in every pandas version.
+print(ar_labels.fillna({"active_region": "(none)"}).to_string(index=False))
 print()
 for warning in caught:
     print("WARNING:", warning.message)

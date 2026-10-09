@@ -293,4 +293,4 @@ about 5.8 MB: `timestamp, image_path, label, max_flux`) is regenerated and not
 committed. Runtime ≈ 30 s per run on a laptop.
 
 Files here: `full_disk_summary_*.json` (counts, settings, hashes,
-mismatch rows), `full_disk_log_*.txt` (console output).
+catalog corrections, mismatch rows).

@@ -1,7 +1,8 @@
 # System design
 
-This document follows the labeling process. See [architecture.md](architecture.md)
-for the module list and [user guide](../user_guide.md) for full configuration details.
+This document follows the labeling process. See the
+[researcher manual](../researcher_manual.md) for full configuration details
+and the [API reference](../api_reference.md) for every public name.
 
 ## Inputs and output
 

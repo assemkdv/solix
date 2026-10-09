@@ -204,7 +204,8 @@ python scripts/validate_active_region.py --labels \
 
 The first run downloads about 65 MB of fold CSVs plus the mapping and
 catalog into `scripts/.cache/` (ignored by git); no images are
-downloaded. The console output is in `active_region_log.txt`.
+downloaded. The counts, hashes and corrections are in
+`active_region_summary.json`.
 
 ### Limitations of A
 

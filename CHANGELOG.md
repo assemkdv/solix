@@ -58,8 +58,9 @@ Not yet released; version in `setup.cfg` is still 0.2.1.
   checks, runs examples 07/08 or 10/11 and their tests, and fails on any
   unexpected skip. The `build` job also checks the sdist contents and
   imports the installed wheel. Not yet run on GitHub.
-- `docs/release_verification.md`: what was verified for the built
-  artifacts and what remains open.
+- Release-readiness checks of the built wheel and sdist: clean-venv
+  installs on 3.12/3.13, both extras, examples from the sdist, a CI job
+  that runs the framework examples and fails on unexpected skips.
 
 ### Changed
 - The sdist no longer includes generated `examples/output/` files or the

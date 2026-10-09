@@ -512,13 +512,20 @@ no `Pipeline` object from `sklearn`).
   `reduce()` method, with no changes to `DatasetBuilder` or
   `DatasetBuildingPipeline` required.
 - **`LabelAssigner`** — a `typing.Protocol` for anything with an
-  `assign(reduced_value)` method. Two are provided:
+  `assign(reduced_value)` method. Three are provided:
   - **`BinaryThresholdLabeler(threshold="M")`** — `1` if the reduced value
     meets or exceeds the threshold's flux, else `0`. `threshold` may be a
     plain letter (`"M"`) or a full GOES class with a number (`"C4.2"`).
   - **`RegressionLabeler()`** — passes the reduced value through
     unchanged, normalizing numeric scalar types (e.g. a numpy `float64`)
     to plain Python `int`/`float`.
+  - **`MulticlassLabeler()`** — the GOES class of the reduced flux:
+    `"NF"` (exactly `0.0`), `"A"`, `"B"`, `"C"`, `"M"` or `"X"`, decided by
+    numeric flux boundaries (`"M10.0"` and `"X1.0"` are both `"X"`). With
+    `MaxFluxReducer` it is the class of the strongest flare in the window,
+    not a list or count of every class present. Positive flux below A1.0,
+    negative, non-finite and non-numeric values raise errors. See
+    `examples/09_multiclass_labels.py`.
 - **`DatasetBuildingPipeline(reducer, labeler)`** — coordinates the three
   stages. `reducer` and `labeler` can be the provided classes above or
   **any custom, duck-typed object** exposing the matching method — no

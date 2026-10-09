@@ -1,6 +1,6 @@
 # API reference
 
-Every public name exported by `flare_indexer` (the 19 names in
+Every public name exported by `flare_indexer` (the 20 names in
 `flare_indexer.__all__`), every public method of those classes, and the
 public module-level helpers that are not exported. A developer appendix
 at the end describes private helpers; researchers should not depend on
@@ -29,6 +29,7 @@ package uses flux numbers, never class text.
 | `LabelAssigner` | Protocol (contract) | `labelers` | [link](#labelassigner) |
 | `BinaryThresholdLabeler` | class | `labelers` | [link](#binarythresholdlabeler) |
 | `RegressionLabeler` | class | `labelers` | [link](#regressionlabeler) |
+| `MulticlassLabeler` | class | `labelers` | [link](#multiclasslabeler) |
 | `BinaryThresholdStrategy` | class | `strategies` | [link](#binarythresholdstrategy) |
 | `MaxFlareStrategy` | class | `strategies` | [link](#maxflarestrategy) |
 | `PipelineResult` | data container | `pipeline` | [link](#pipelineresult) |
@@ -43,7 +44,7 @@ Public methods: `FluxConverter.to_flux`, `FlareClassifier.is_strong`,
 `EventMatcher.query`, `EventReducer.reduce` (contract),
 `MaxFluxReducer.reduce`, `LabelAssigner.assign` (contract),
 `BinaryThresholdLabeler.assign`, `RegressionLabeler.assign`,
-`BinaryThresholdStrategy.label`, `MaxFlareStrategy.label`,
+`MulticlassLabeler.assign`, `BinaryThresholdStrategy.label`, `MaxFlareStrategy.label`,
 `DatasetBuildingPipeline.extract_events`, `.reduce_events`,
 `.assign_label`, `.run_one`, `.label`, `DatasetBuilder.build`.
 
@@ -414,7 +415,7 @@ returning a label can be the labeler of a `DatasetBuildingPipeline`.
 
 Contract: `assign(reduced_value) -> label`. Receives whatever the reducer
 returned; returns the final label. Concrete implementations:
-`BinaryThresholdLabeler`, `RegressionLabeler`.
+`BinaryThresholdLabeler`, `RegressionLabeler`, `MulticlassLabeler`.
 
 ### `BinaryThresholdLabeler`
 
@@ -494,6 +495,145 @@ for value in [1.2e-4, np.float64(2e-5), 3, "text"]:
 
 **Output explained.** Numbers become plain Python numbers; non-numbers
 are returned as they are.
+
+### `MulticlassLabeler`
+
+```python
+from flare_indexer import MulticlassLabeler
+MulticlassLabeler()
+```
+
+**Purpose.** Turn a reduced flux into a GOES class label: `"NF"`, `"A"`,
+`"B"`, `"C"`, `"M"` or `"X"`. Use it with `MaxFluxReducer`:
+
+```python
+fidx.DatasetBuildingPipeline(reducer=fidx.MaxFluxReducer(), labeler=fidx.MulticlassLabeler())
+```
+
+**What the label means.** The class of the *one* flux value the reducer
+selected. With `MaxFluxReducer` that is the strongest flare in the
+window; the label does not say which other classes occurred or how many
+flares there were (one X1.0 and ten C flares → `"X"`). Use a custom
+reducer for counts.
+
+**Public attribute.** `CLASSES = ("NF", "A", "B", "C", "M", "X")`, in
+increasing flux order (e.g. to map labels to class indices).
+
+### `MulticlassLabeler.assign`
+
+```python
+MulticlassLabeler().assign(reduced_flux) -> str
+```
+
+**Inputs.** `reduced_flux`: a flux number in W/m² (`int`, `float`,
+`numpy` number, `Fraction`).
+
+**Returns.**
+
+| Flux (W/m²) | Label |
+|---|---|
+| exactly `0.0` (empty window) | `"NF"` |
+| `1e-8 ≤ flux < 1e-7` | `"A"` |
+| `1e-7 ≤ flux < 1e-6` | `"B"` |
+| `1e-6 ≤ flux < 1e-5` | `"C"` |
+| `1e-5 ≤ flux < 1e-4` | `"M"` |
+| `flux ≥ 1e-4` | `"X"` |
+
+The comparison is numeric (boundaries from `FluxConverter.FLUX_MAP`);
+each boundary belongs to the higher class, so `"M10.0"` and `"X1.0"` are
+both `"X"`. The comparison is exact, with no tolerance: a float even one
+step below a boundary (`math.nextafter(1e-5, 0)`) is in the lower class.
+Class text reaches the boundary exactly because `FluxConverter.to_flux`
+converts equivalent text to the identical float (`"C10.0"` → `1e-05`, so
+`"M"`; `BinaryThresholdLabeler("M")` gives `1` for it too).
+
+**Errors.**
+- `ValueError` for a positive flux below `1e-8` (e.g. from a catalog class
+  `"A0.5"`): the GOES scale has no letter for it, and it is a flare, so it
+  is not labeled `"NF"`. Inside `DatasetBuilder` this stops the build.
+- `ValueError` for a negative, NaN or infinite flux.
+- `TypeError` for anything that is not a real number, including class
+  text such as `"M2.0"` and `True`/`False`.
+
+Run (requires Setup):
+
+<!-- example: multiclass_assign -->
+```python
+to_flux = fidx.FluxConverter().to_flux
+labeler = fidx.MulticlassLabeler()
+for goes_class in ["A1.0", "B9.9", "C1.0", "C10.0", "M9.9", "M10.0", "X1.0"]:
+    print(goes_class, to_flux(goes_class), labeler.assign(to_flux(goes_class)))
+import math
+print(labeler.assign(0.0), labeler.assign(1e-5), labeler.assign(math.nextafter(1e-5, 0)))
+for bad in [5e-9, -1e-6, float("nan"), "M2.0"]:
+    try:
+        labeler.assign(bad)
+    except (ValueError, TypeError) as error:
+        print(type(error).__name__, str(error)[:60], "...")
+```
+<!-- output: multiclass_assign -->
+```text
+A1.0 1e-08 A
+B9.9 9.9e-07 B
+C1.0 1e-06 C
+C10.0 1e-05 M
+M9.9 9.9e-05 M
+M10.0 0.0001 X
+X1.0 0.0001 X
+NF M C
+ValueError MulticlassLabeler.assign got a positive flux 5e-09 W/m^2 bel ...
+ValueError MulticlassLabeler.assign got a negative flux -1e-06; X-ray f ...
+ValueError MulticlassLabeler.assign got a non-finite flux nan. ...
+TypeError MulticlassLabeler.assign expects a flux number in W/m^2 (e.g ...
+```
+
+**Output explained.** C10.0 is exactly 1e-5 and so `"M"`; M10.0 and
+X1.0 are both `"X"`; exactly 1e-5 is `"M"`, the next float below it is
+`"C"`; nothing in the window is `"NF"`.
+
+Run through `DatasetBuilder` (requires Setup): full-disk images, the same
+images as time-based sequences (labeled from the last image), and
+active-region patches. Window `(t, t + 6h]` on the flare start time.
+
+<!-- example: multiclass_builder -->
+```python
+multiclass = fidx.DatasetBuildingPipeline(reducer=fidx.MaxFluxReducer(), labeler=fidx.MulticlassLabeler())
+options = dict(prediction_window="6h", strategy=multiclass, event_time="start", interval_mode="right_closed")
+
+print(fidx.DatasetBuilder(**options).build(IMAGES, CATALOG))
+sequences = fidx.DatasetBuilder(**options, cadence="3h", observation_window="6h", sliding_window="3h") \
+    .build(IMAGES, CATALOG)
+print(sequences[["sequence_start", "sequence_end", "label"]])
+ar = fidx.DatasetBuilder(**options, target="active_region", missing_active_region="drop", include_metadata=True)
+print(ar.build(AR_IMAGES, CATALOG)[["timestamp", "active_region", "label"]])
+```
+<!-- output: multiclass_builder -->
+```text
+            timestamp label
+0 2024-05-01 00:00:00     M
+1 2024-05-01 03:00:00     X
+2 2024-05-01 06:00:00     X
+3 2024-05-01 09:00:00    NF
+4 2024-05-01 18:00:00     M
+       sequence_start        sequence_end label
+0 2024-05-01 00:00:00 2024-05-01 03:00:00     X
+1 2024-05-01 03:00:00 2024-05-01 06:00:00     X
+2 2024-05-01 06:00:00 2024-05-01 09:00:00    NF
+            timestamp active_region label
+0 2024-05-01 00:00:00         13700     M
+1 2024-05-01 00:00:00         13701    NF
+2 2024-05-01 03:00:00         13700     M
+3 2024-05-01 03:00:00         13701     X
+4 2024-05-01 06:00:00         13700    NF
+```
+
+**Output explained.** Image 00:00 sees C4.0 and M2.0 → `"M"`; 03:00 and
+06:00 see X1.2 → `"X"`; 09:00 sees nothing → `"NF"`; 18:00 sees the M1.0
+starting at midnight → `"M"`. Each sequence takes the label of its last
+image's window (the 09:00–12:00 sequence is skipped: no image at 12:00).
+In active-region mode region 13701 at 00:00 is `"NF"` while full-disk
+says `"M"`: the M2.0 belongs to 13700. The patch without a region is
+dropped.
 
 ---
 
@@ -1085,7 +1225,7 @@ accounted for.
 
 | Helper | Purpose | Called by |
 |---|---|---|
-| `_flux_converter` (reducers, labelers) | shared `FluxConverter` instance | `MaxFluxReducer.reduce`, `BinaryThresholdLabeler.__init__` |
+| `_flux_converter` (reducers, labelers) | shared `FluxConverter` instance | `MaxFluxReducer.reduce`, `BinaryThresholdLabeler.__init__`, `MulticlassLabeler.assign` (class boundaries) |
 | `_max_flux_reducer` (strategies) | shared `MaxFluxReducer` instance | both strategies |
 | `_require_method` (pipeline) | check `reduce`/`assign` exist; `TypeError` otherwise | `DatasetBuildingPipeline.__init__` |
 | `_read_paths_file` (loaders) | read a one-path-per-line file (BOM-safe) → `list[str]` | `build_image_index_from_filenames` |

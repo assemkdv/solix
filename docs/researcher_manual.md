@@ -475,7 +475,7 @@ stages yourself, for one time point, to inspect or debug a label.
 |---|---|---|
 | 1. Match events | `EventMatcher(catalog).query(t, window, ...)` or `pipeline.extract_events(...)` | `list[FlareEvent]` |
 | 2. Reduce | `MaxFluxReducer().reduce(events)` or `pipeline.reduce_events(events)` | `float` (W/m²; `0.0` for no events) |
-| 3. Assign | `BinaryThresholdLabeler("M").assign(value)` or `pipeline.assign_label(value)` | `int` 0/1 (binary) or the value itself (`RegressionLabeler`) |
+| 3. Assign | `BinaryThresholdLabeler("M").assign(value)` or `pipeline.assign_label(value)` | `int` 0/1 (binary), the value itself (`RegressionLabeler`) or a class `"NF"`…`"X"` (`MulticlassLabeler`) |
 | All three | `pipeline.run_one(matcher, t, window, ...)` | `PipelineResult(events, reduced_value, label)` |
 
 Stop after **matching** (requires `fidx`, `pd` from §4):

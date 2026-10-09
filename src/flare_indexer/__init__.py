@@ -1,7 +1,7 @@
 from .classifier import FlareClassifier, FluxConverter, InvalidGOESClassError
 from .events import EventMatcher, FlareEvent
 from .reducers import EventReducer, MaxFluxReducer
-from .labelers import LabelAssigner, BinaryThresholdLabeler, RegressionLabeler
+from .labelers import LabelAssigner, BinaryThresholdLabeler, RegressionLabeler, MulticlassLabeler
 from .strategies import BinaryThresholdStrategy, MaxFlareStrategy
 from .pipeline import PipelineResult, DatasetBuildingPipeline
 from .builder import DatasetBuilder, SequenceBuildReport
@@ -18,6 +18,7 @@ __all__ = [
     "LabelAssigner",
     "BinaryThresholdLabeler",
     "RegressionLabeler",
+    "MulticlassLabeler",
     "BinaryThresholdStrategy",
     "MaxFlareStrategy",
     "PipelineResult",

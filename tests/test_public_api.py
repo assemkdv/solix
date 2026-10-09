@@ -13,6 +13,7 @@ def test_public_names_are_accessible():
         "LabelAssigner",
         "BinaryThresholdLabeler",
         "RegressionLabeler",
+        "MulticlassLabeler",
         "BinaryThresholdStrategy",
         "MaxFlareStrategy",
         "PipelineResult",

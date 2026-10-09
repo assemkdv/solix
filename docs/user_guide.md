@@ -168,6 +168,10 @@ time scale (see §8 on TAI vs. UTC).
 
 Both are built from two smaller pieces, `MaxFluxReducer` (flares → max
 flux) and a labeler (`BinaryThresholdLabeler`, `RegressionLabeler`).
+For class labels `"NF"`, `"A"` … `"X"` (the class of the strongest flare
+in the window, not every class present), pass
+`DatasetBuildingPipeline(reducer=MaxFluxReducer(), labeler=MulticlassLabeler())`
+as the strategy – see `examples/09_multiclass_labels.py`.
 `DatasetBuildingPipeline(reducer, labeler)` lets you swap either piece or
 inspect each stage – see `examples/06_modular_pipeline.py`.
 

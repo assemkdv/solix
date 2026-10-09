@@ -76,6 +76,7 @@ python examples/03_sequences.py                # labels for image sequences
 python examples/04_active_region.py            # per-region labels, missing regions
 python examples/05_real_data_loaders.py        # converting real input formats
 python examples/06_modular_pipeline.py         # inspect / customize each stage
+python examples/09_multiclass_labels.py        # NF/A/B/C/M/X labels
 ```
 
 Outputs are written to `examples/output/` (ignored by git).

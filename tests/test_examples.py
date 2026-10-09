@@ -39,6 +39,13 @@ def test_boundary_example_shows_label_change(tmp_path):
     assert "(t, t+23:59:59]    label=0" in output
 
 
+def test_multiclass_example_shows_class_labels(tmp_path):
+    output = _run(EXAMPLES_DIR / "09_multiclass_labels.py", tmp_path)
+    assert "label counts: NF=16, A=0, B=24, C=2, M=54, X=22" in output
+    assert "binary M label == (multiclass in {M, X}) for every image: True" in output
+    assert "2024-03-01 12:00:00         13600     M               X" in output
+
+
 def test_sample_data_matches_generator(tmp_path):
     copy = tmp_path / "data"
     shutil.copytree(EXAMPLES_DIR / "data", copy)

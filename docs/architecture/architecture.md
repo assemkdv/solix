@@ -23,7 +23,7 @@ script rather than the outputs, then run
 | `classifier.py` | GOES class parsing/validation, class → flux (W/m²) | `FluxConverter`, `FlareClassifier`, `InvalidGOESClassError` |
 | `events.py` | Load/validate catalog (two schemas, GOES classes), window query | `EventMatcher`, `FlareEvent` |
 | `reducers.py` | Flares → one value | `EventReducer` (protocol), `MaxFluxReducer` |
-| `labelers.py` | Value → label | `LabelAssigner` (protocol), `BinaryThresholdLabeler`, `RegressionLabeler` |
+| `labelers.py` | Value → label | `LabelAssigner` (protocol), `BinaryThresholdLabeler`, `RegressionLabeler`, `MulticlassLabeler` |
 | `strategies.py` | Ready-made reducer + labeler pairs | `BinaryThresholdStrategy`, `MaxFlareStrategy` |
 | `pipeline.py` | Stage-by-stage, inspectable labeling | `DatasetBuildingPipeline`, `PipelineResult` |
 | `builder.py` | Image index → labeled table; sequences (grouped by region in AR mode); missing-region policy | `DatasetBuilder`, `SequenceBuildReport` |

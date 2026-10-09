@@ -18,6 +18,14 @@ Not yet released; version in `setup.cfg` is still 0.2.1.
   user guide, AR workflow, architecture diagrams, validation reports,
   open decisions).
 - CI builds the sdist and wheel and checks them with `twine check`.
+- `MulticlassLabeler`: maps a reduced flux to `"NF"`, `"A"`, `"B"`, `"C"`,
+  `"M"` or `"X"` by numeric class boundaries; use it as
+  `DatasetBuildingPipeline(reducer=MaxFluxReducer(), labeler=MulticlassLabeler())`.
+  The label is the class of the reducer's representative flux (the
+  strongest flare), not the set or count of classes in the window.
+  `0.0` is `"NF"`; a positive flux below A1.0 and negative, non-finite or
+  non-numeric values raise errors. Boundaries are exact (no tolerance).
+  Example: `examples/09_multiclass_labels.py`.
 
 - Active-region sequences are built per region: the index is grouped by
   region first, so several regions may share timestamps.

@@ -1,5 +1,5 @@
 """
-Reading the Helioviewer HMI JPEG 2000 files used by examples 07 and 08.
+Reading the Helioviewer HMI JPEG 2000 files used by examples 07, 08, 10 and 11.
 
 Kept apart from fetch_real_data.py so the examples can read and decode the
 cached files without any network code. Decoding needs Pillow built with

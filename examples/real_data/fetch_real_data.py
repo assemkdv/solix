@@ -1,5 +1,5 @@
 """
-Acquire the real images and flare catalog used by examples 07 and 08.
+Acquire the real images and flare catalog used by examples 07, 08, 10 and 11.
 
 This script only acquires data; it does no labeling. It writes:
 
@@ -67,7 +67,7 @@ REQUESTED_TIMES = pd.date_range("2017-09-03 01:00:00", periods=10, freq="1h")
 MAX_OFFSET = pd.Timedelta("60s")
 
 # The catalog interval must contain every prediction window (t, t + 24h]
-# of every image above; examples 07 and 08 check this before labeling.
+# of every image above; examples 07, 08, 10 and 11 check this before labeling.
 CATALOG_START = pd.Timestamp("2017-09-01 00:00:00")
 CATALOG_END = pd.Timestamp("2017-09-06 00:00:00")
 

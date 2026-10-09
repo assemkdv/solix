@@ -1,8 +1,8 @@
 """
-Helpers shared by the real-image examples 07 and 08: turning the download
-manifest into an image index, checking catalog coverage, saving sequence
-tables with list-valued columns, and an independent label check that does
-not use flare_indexer.
+Helpers shared by the real-image examples (07, 08 with PyTorch; 10, 11
+with TensorFlow): turning the download manifest into an image index,
+checking catalog coverage, saving sequence tables with list-valued columns,
+and an independent label check that does not use flare_indexer.
 """
 
 import hashlib
@@ -20,7 +20,7 @@ CATALOG_PROVENANCE = REAL_DATA / "catalog_provenance.json"
 FETCH_COMMAND = "python examples/real_data/fetch_real_data.py"
 
 
-FRAMEWORKS = {"torch": "torch"}  # import name -> pip name
+FRAMEWORKS = {"torch": "torch", "tensorflow": "tensorflow"}  # import name -> pip name
 
 
 def require_optional_dependencies(framework: str = "torch"):

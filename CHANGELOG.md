@@ -34,6 +34,12 @@ Not yet released; version in `setup.cfg` is still 0.2.1.
   `DATE_OBS`; the fetch script replays the recorded manifest (ids, URLs,
   SHA-256) by default and rediscovers images only with `--refresh`.
   Optional extra `pytorch-examples` (torch, pillow).
+- `examples/10_tensorflow_full_disk_images.py` and
+  `examples/11_tensorflow_full_disk_sequences.py`: the same real images,
+  catalog, labels and checks loaded as `tf.data.Dataset` batches
+  `[B, H, W, C]` and `[B, T, H, W, C]` (explicit channel-first →
+  channel-last conversion). Optional extra `tensorflow-examples`
+  (tensorflow, pillow; TensorFlow has no Python 3.14 wheels yet).
 
 - Active-region sequences are built per region: the index is grouped by
   region first, so several regions may share timestamps.

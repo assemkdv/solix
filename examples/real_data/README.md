@@ -1,20 +1,28 @@
-# Real-image PyTorch examples (07 and 08)
+# Real-image PyTorch and TensorFlow examples (07, 08, 10, 11)
 
-Two examples label real SDO/HMI full-disk images with `flare_indexer` and
-load them with a PyTorch `Dataset` and `DataLoader`:
+Four examples label the same real SDO/HMI full-disk images with
+`flare_indexer` and load them with a deep-learning framework:
 
-| Example | Sample | Batch shape |
-|---|---|---|
-| [`07_pytorch_full_disk_images.py`](../07_pytorch_full_disk_images.py) | one image, labeled from its observation time `t` | `[B, C, H, W]` = `[B, 1, 256, 256]` |
-| [`08_pytorch_full_disk_sequences.py`](../08_pytorch_full_disk_sequences.py) | 3 images 1 h apart, labeled from the final observation time `t_end` | `[B, T, C, H, W]` = `[B, 3, 1, 256, 256]` |
+| Example | Framework | Sample | Batch shape |
+|---|---|---|---|
+| [`07_pytorch_full_disk_images.py`](../07_pytorch_full_disk_images.py) | PyTorch `Dataset`/`DataLoader` | one image, labeled from its observation time `t` | `[B, C, H, W]` = `[B, 1, 256, 256]` |
+| [`08_pytorch_full_disk_sequences.py`](../08_pytorch_full_disk_sequences.py) | PyTorch `Dataset`/`DataLoader` | 3 images 1 h apart, labeled from the final observation time `t_end` | `[B, T, C, H, W]` = `[B, 3, 1, 256, 256]` |
+| [`10_tensorflow_full_disk_images.py`](../10_tensorflow_full_disk_images.py) | `tf.data.Dataset` | as 07 | `[B, H, W, C]` = `[B, 256, 256, 1]` |
+| [`11_tensorflow_full_disk_sequences.py`](../11_tensorflow_full_disk_sequences.py) | `tf.data.Dataset` | as 08, oldest image first | `[B, T, H, W, C]` = `[B, 3, 256, 256, 1]` |
 
-PyTorch code lives only in these example scripts, not in the package.
-PyTorch and Pillow are optional dependencies; the base package and its
-tests need neither.
+Framework code lives only in these example scripts, not in the package.
+PyTorch, TensorFlow and Pillow are optional dependencies; the base
+package and its tests need none of them.
+
+The TensorFlow examples use the same manifest, cached images, catalog,
+decoder, provenance checks and independent label checks as the PyTorch
+ones. The shared decoder returns channel-first `[C, H, W]`; examples 10
+and 11 convert each image explicitly to TensorFlow's channel-last
+`[H, W, C]` (`to_channels_last` in example 10) before batching.
 
 ## Labeling settings
 
-Both examples set every labeling choice explicitly; the package defaults
+All four examples set every labeling choice explicitly; the package defaults
 are not used and not changed.
 
 ```python
@@ -24,7 +32,7 @@ fidx.DatasetBuilder(
     target="full_disk",
     event_time="start",
     interval_mode="right_closed",                # (t, t + 24h]
-    # example 08 only:
+    # examples 08 and 11 only:
     cadence="1h", observation_window="3h", sliding_window="1h",
 )
 ```
@@ -43,6 +51,16 @@ python examples/real_data/fetch_real_data.py      # replays the committed manife
 python examples/07_pytorch_full_disk_images.py
 python examples/08_pytorch_full_disk_sequences.py
 pytest tests/test_pytorch_examples.py tests/test_fetch_real_data.py
+```
+
+TensorFlow (2.21 publishes wheels for Python 3.10–3.13, not 3.14):
+
+```bash
+python3.13 -m venv .venv-tf && . .venv-tf/bin/activate
+pip install -e ".[tensorflow-examples]"           # flare_indexer + tensorflow + pillow
+python examples/10_tensorflow_full_disk_images.py
+python examples/11_tensorflow_full_disk_sequences.py
+pytest tests/test_tensorflow_examples.py          # add torch to also compare with 07/08
 ```
 
 Without the package installed, prefix the commands with
@@ -200,13 +218,35 @@ That positive sequence existed only because of the rounding; with the
 actual observation times it is incomplete and is skipped. The data were not changed to recover it.
 Single-image labels are the same in both versions.
 
+Examples 10 and 11 (TensorFlow 2.21.0, Python 3.13, executed 2026-10-09)
+produce the same label tables as 07 and 08 (byte-identical CSVs) and the
+same samples in the same order:
+
+```
+10: tf.data.Dataset.from_generator(...).batch(4)  element_spec images: TensorSpec(shape=(None, 256, 256, 1), dtype=tf.float32, name=None)
+batch 0: images [4, 256, 256, 1] float32 range [0.000, 1.000]  labels [0, 0, 0, 0]
+batch 1: images [4, 256, 256, 1] float32 range [0.000, 1.000]  labels [0, 1, 1, 1]
+batch 2: images [1, 256, 256, 1] float32 range [0.000, 1.000]  labels [1]
+9 images: 4 positive, 5 negative; all checks passed
+
+11: tf.data.Dataset.from_generator(...).batch(2)  element_spec images: TensorSpec(shape=(None, 3, 256, 256, 1), dtype=tf.float32, name=None)
+candidates 8, emitted 2, skipped 6
+batch 0: images [2, 3, 256, 256, 1] float32  labels [0, 0]
+2 sequences: 0 positive, 2 negative; all checks passed
+```
+
+`test_tensorflow_and_pytorch_loaders_yield_the_same_samples` checks, for
+every sample, that the TensorFlow array equals the PyTorch tensor after
+moving the channel axis last, and that timestamps, image paths and labels
+are identical.
+
 ## Saved sequence index
 
 `08_sequence_labels.csv` has two list-valued columns, `timestamps` and
-`image_path`. Example 08 writes them as JSON lists (timestamps as ISO
-strings) and reads them back with `load_sequences` (both functions are in
-`real_examples.py`), which parses them into lists of `pd.Timestamp` and
-`str`; the example checks the reloaded table equals the original. A plain `pd.read_csv` returns these columns as
+`image_path`. Examples 08 and 11 write them as JSON lists (timestamps as ISO
+strings) and read them back with `load_sequences` (both in `real_examples.py`), which parses them into
+lists of `pd.Timestamp` and `str`; the examples check the reloaded table
+equals the original. A plain `pd.read_csv` returns these columns as
 strings.
 
 ## Checks performed
@@ -214,7 +254,7 @@ strings.
 - Every loaded image's header time equals its index time.
 - Within each sequence: oldest image first, images exactly 1 h apart,
   last image time = `sequence_end`.
-- DataLoader order, labels and image paths equal the label table.
+- DataLoader / tf.data order, labels and image paths equal the label table.
 - Batch shapes and dtype (`float32`, values in [0, 1]) in every batch.
 - Every label is recomputed without `flare_indexer` from the catalog rows
   (`t < start_time ≤ t + 24h`, class M or X), with `t` parsed directly from

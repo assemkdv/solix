@@ -17,6 +17,100 @@
       "sha256": "2a1c76ff6ba508fede2add75bc7d4a96a61283d676cc360ae13d5aa1d56dcf48"
     }
   },
+  "catalog_corrections": {
+    "source": "/Users/assemkadirova/Developer/flare-indexer/scripts/.cache/goes_flares_integrated.csv",
+    "source_sha256": "2a1c76ff6ba508fede2add75bc7d4a96a61283d676cc360ae13d5aa1d56dcf48",
+    "source_is_the_known_catalog": true,
+    "corrected_copy": "/Users/assemkadirova/Developer/flare-indexer/scripts/.cache/goes_flares_integrated_corrected.csv",
+    "ngdc_url": "https://www.ngdc.noaa.gov/stp/space-weather/solar-data/solar-features/solar-flares/x-rays/goes/xrs/",
+    "rule": "peak_time -> next-day 00:00 where NOAA max is 0000; -> missing where NOAA max is ////",
+    "corrections": [
+      {
+        "data_row": 1592,
+        "goes_class": "C2.5",
+        "noaa_active_region": 11190,
+        "start_time": "2011-04-11 23:40:00",
+        "original_peak_time": "2011-04-11 00:00:00",
+        "corrected_peak_time": null,
+        "end_time": "2011-04-12 00:03:00",
+        "ngdc_file": "goes-xrs-report_2011.txt",
+        "ngdc_line": "110411 2340 0003 ////",
+        "reason": "NOAA records no maximum time (////); the catalog's 00:00 is a fill value, so the peak is unknown."
+      },
+      {
+        "data_row": 3534,
+        "goes_class": "C1.1",
+        "noaa_active_region": 11450,
+        "start_time": "2012-04-05 23:50:00",
+        "original_peak_time": "2012-04-05 00:00:00",
+        "corrected_peak_time": "2012-04-06 00:00:00",
+        "end_time": "2012-04-06 00:05:00",
+        "ngdc_file": "goes-xrs-report_2012.txt",
+        "ngdc_line": "120405 2350 0005 0000",
+        "reason": "NOAA reports the maximum at 0000; the only midnight within the flare is the next day's."
+      },
+      {
+        "data_row": 3940,
+        "goes_class": "C1.0",
+        "noaa_active_region": 11494,
+        "start_time": "2012-06-06 23:56:00",
+        "original_peak_time": "2012-06-06 00:00:00",
+        "corrected_peak_time": "2012-06-07 00:00:00",
+        "end_time": "2012-06-07 00:05:00",
+        "ngdc_file": "goes-xrs-report_2012.txt",
+        "ngdc_line": "120606 2356 0005 0000",
+        "reason": "NOAA reports the maximum at 0000; the only midnight within the flare is the next day's."
+      },
+      {
+        "data_row": 4357,
+        "goes_class": "C6.3",
+        "noaa_active_region": 11538,
+        "start_time": "2012-07-30 23:50:00",
+        "original_peak_time": "2012-07-30 00:00:00",
+        "corrected_peak_time": "2012-07-31 00:00:00",
+        "end_time": "2012-07-31 00:04:00",
+        "ngdc_file": "goes-xrs-report_2012.txt",
+        "ngdc_line": "120730 2350 0004 0000",
+        "reason": "NOAA reports the maximum at 0000; the only midnight within the flare is the next day's."
+      },
+      {
+        "data_row": 4824,
+        "goes_class": "C1.5",
+        "noaa_active_region": 11589,
+        "start_time": "2012-10-13 23:46:00",
+        "original_peak_time": "2012-10-13 00:00:00",
+        "corrected_peak_time": "2012-10-14 00:00:00",
+        "end_time": "2012-10-14 00:18:00",
+        "ngdc_file": "goes-xrs-report_2012.txt",
+        "ngdc_line": "121013 2346 0018 0000",
+        "reason": "NOAA reports the maximum at 0000; the only midnight within the flare is the next day's."
+      },
+      {
+        "data_row": 8328,
+        "goes_class": "C3.8",
+        "noaa_active_region": 12065,
+        "start_time": "2014-05-25 23:49:00",
+        "original_peak_time": "2014-05-25 00:00:00",
+        "corrected_peak_time": "2014-05-26 00:00:00",
+        "end_time": "2014-05-26 00:04:00",
+        "ngdc_file": "goes-xrs-report_2014.txt",
+        "ngdc_line": "140525 2349 0004 0000",
+        "reason": "NOAA reports the maximum at 0000; the only midnight within the flare is the next day's."
+      },
+      {
+        "data_row": 13145,
+        "goes_class": "C1.3",
+        "noaa_active_region": 12644,
+        "start_time": "2017-03-26 23:49:00",
+        "original_peak_time": "2017-03-26 00:00:00",
+        "corrected_peak_time": "2017-03-27 00:00:00",
+        "end_time": "2017-03-27 00:08:00",
+        "ngdc_file": "goes-xrs-report_2017-ytd.txt",
+        "ngdc_line": "170326 2349 0008 0000",
+        "reason": "NOAA reports the maximum at 0000; the only midnight within the flare is the next day's."
+      }
+    ]
+  },
   "image_index": {
     "source_rows": 63729,
     "valid_images": 63649,

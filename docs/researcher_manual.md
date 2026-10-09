@@ -693,6 +693,15 @@ uses NOAA numbers, both files must use the same key; see
 - Windows only look forward. Reproducing the published active-region
   labels (which look back) is done only by
   `scripts/validate_active_region.py`, not by the package.
+- The lab's `goes_flares_integrated.csv` has seven midnight-crossing
+  flares whose `peak_time` is before their `start_time` (an upstream
+  error, also present in HEK). The package rejects such a catalog; both
+  validation scripts therefore apply the documented corrections in
+  `scripts/catalog_corrections.py` to a copy (six peaks moved to the next
+  day's 00:00 per NOAA's reports, one peak set to missing because NOAA
+  records none). Start-time labels are unaffected; the flare without a
+  peak cannot be matched by peak time. See `docs/validation/full_disk.md`,
+  Step 2a.
 - No time-zone or TAI/UTC conversion.
 - No catalog-coverage check: a catalog does not say which periods it
   covers, and the package does not guess.

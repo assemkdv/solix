@@ -871,7 +871,13 @@ a local path or an `http(s)` URL; URLs are downloaded once into
 script is tracked in git) and reused on later runs. The benchmark
 configuration matches Dr. Pandey's legacy full-disk convention:
 `event_time="start"`, `interval_mode="right_closed"` (i.e. `(t, t+24h]`),
-M-class binary threshold, `duplicate_policy="first"`.
+M-class binary threshold, `duplicate_policy="first"`. Before labeling, the
+script applies seven documented `peak_time` corrections
+(`scripts/catalog_corrections.py`, backed by NOAA's GOES X-ray reports) to a
+copy of the lab catalog, whose seven midnight-crossing flares otherwise
+have a peak before their start; the downloaded file is left unchanged and
+start-time labels are unaffected. Pass `--skip-catalog-corrections` for a
+different catalog.
 
 When `--legacy-labels` is given, the script normalizes both sides by
 timestamp (never by row position), handles the legacy no-flare markers

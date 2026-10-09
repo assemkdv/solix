@@ -41,6 +41,7 @@ import pandas as pd
 
 from flare_indexer import BinaryThresholdStrategy, DatasetBuilder, FluxConverter
 
+from catalog_corrections import apply_catalog_corrections, print_corrections
 from validate_full_disk import CACHE_DIR, _resolve_source, _sha256
 
 ARPATCH_COMMIT = "ee20210dd6c6aa0396f1f4b8575ad05e9d0142b6"
@@ -58,6 +59,9 @@ def parse_args():
     parser.add_argument("--event-catalog", default=DEFAULT_EVENT_CATALOG_URL,
                         help="goes_flares_integrated.csv (path or URL).")
     parser.add_argument("--prediction-window", default="24h", help="Forward window for flare_indexer.")
+    parser.add_argument("--skip-catalog-corrections", action="store_true",
+                        help="Do not apply the documented peak_time corrections of scripts/catalog_corrections.py "
+                             "(needed for a catalog other than the lab's goes_flares_integrated.csv).")
     parser.add_argument("--summary", default=None, help="Optional JSON summary output path.")
     return parser.parse_args()
 
@@ -193,6 +197,15 @@ def main():
     print(f"  duplicate (harpnumber, timestamp) rows across files: {duplicates_across_files}")
     print(f"  max patches at one timestamp: {int(index.groupby('timestamp').size().max())}")
 
+    # Same documented peak_time corrections as validate_full_disk.py; the
+    # cached upstream file is left as downloaded.
+    source_goes_path, corrections = goes_path, None
+    if not args.skip_catalog_corrections:
+        print("Correcting the GOES catalog (scripts/catalog_corrections.py):")
+        goes_path, corrections = apply_catalog_corrections(source_goes_path,
+                                                           CACHE_DIR / "goes_flares_integrated_corrected.csv")
+        print_corrections(corrections)
+
     catalog, catalog_stats = harp_keyed_catalog(goes_path, harp_map_path)
     print("HARP-keyed catalog:", catalog_stats)
 
@@ -246,8 +259,9 @@ def main():
             "arpatch_sfp_commit": ARPATCH_COMMIT,
             "label_files": files,
             "harp_map": {"source": args.harp_map, "sha256": _sha256(harp_map_path)},
-            "event_catalog": {"source": args.event_catalog, "sha256": _sha256(goes_path)},
+            "event_catalog": {"source": args.event_catalog, "sha256": _sha256(source_goes_path)},
         },
+        "catalog_corrections": corrections,
         "patches": len(index),
         "harps": int(index["active_region"].nunique()),
         "duplicate_rows_across_files": duplicates_across_files,

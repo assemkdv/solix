@@ -111,8 +111,16 @@ Not yet released; version in `setup.cfg` is still 0.2.1.
   shifted) and the message points to the full-timestamp schema. The
   cached lab GOES catalog used by `scripts/validate_full_disk.py` and
   `scripts/validate_active_region.py` has 7 such rows (all C-class,
-  2011–2017, peak recorded as 00:00 on the start date), so those scripts
-  stop with this error until the data is corrected.
+  2011–2017, peak recorded as 00:00 on the start date); the validation
+  scripts therefore apply documented corrections to a copy of that
+  catalog (`scripts/catalog_corrections.py`): six peaks move to the
+  next day's 00:00, as NOAA's GOES X-ray reports record the maximum at
+  `0000`; the 2011-04-11 C2.5 peak becomes missing, as NOAA records none.
+  The downloaded file is unchanged, every record is matched on all its
+  original values, every correction is printed and stored in the summary
+  JSON, and `--skip-catalog-corrections` turns them off. Start-time
+  results in `docs/validation/` are unchanged; the flare without a peak
+  cannot be matched by peak time.
 
 ### Since v0.2.1 (already on main before this branch)
 - Package renamed to `flare_indexer`; `FluxConverter` split from

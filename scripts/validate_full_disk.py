@@ -34,6 +34,8 @@ from flare_indexer import BinaryThresholdStrategy, DatasetBuilder, EventMatcher,
 from flare_indexer.events import _parse_prediction_window
 from flare_indexer.loaders import adapt_goes_catalog, build_image_index_from_filenames
 
+from catalog_corrections import apply_catalog_corrections, print_corrections
+
 DEFAULT_IMAGE_LIST_URL = (
     "https://raw.githubusercontent.com/chetrajpandey/explainingFullDisk/"
     "main/labeling/data_labels/totalfiles_jpg_512.csv"
@@ -122,6 +124,9 @@ def parse_args():
                               "mismatches) suitable for committing to the repository.")
     parser.add_argument("--duplicate-policy", default="first", choices=["error", "first", "last"],
                          help="How to resolve duplicate image timestamps (default: first).")
+    parser.add_argument("--skip-catalog-corrections", action="store_true",
+                         help="Do not apply the documented peak_time corrections of scripts/catalog_corrections.py "
+                              "(needed for a catalog other than the lab's goes_flares_integrated.csv).")
     args = parser.parse_args()
     if args.legacy_labels == "default":
         args.legacy_labels = DEFAULT_LEGACY_LABELS_URL
@@ -147,6 +152,16 @@ def main():
     print(f"  duplicate timestamps:        {image_report.duplicate_timestamp_count}")
     print(f"  final normalized images:     {image_report.final_row_count}")
     print(f"  timestamp range: {image_index['timestamp'].min()} -> {image_index['timestamp'].max()}")
+
+    # Seven midnight-crossing flares have an impossible peak_time in the
+    # upstream file (see scripts/catalog_corrections.py). The cached upstream
+    # file stays as downloaded; a corrected copy feeds the rest of the run.
+    source_catalog_path, corrections = event_catalog_path, None
+    if not args.skip_catalog_corrections:
+        print("\n=== Correcting the GOES catalog (scripts/catalog_corrections.py) ===")
+        event_catalog_path, corrections = apply_catalog_corrections(
+            source_catalog_path, CACHE_DIR / "goes_flares_integrated_corrected.csv")
+        print_corrections(corrections)
 
     print("\n=== Adapting GOES catalog ===")
     catalog = adapt_goes_catalog(event_catalog_path)
@@ -211,8 +226,9 @@ def main():
         },
         "inputs": {
             "image_list": {"source": args.image_list, "sha256": _sha256(image_list_path)},
-            "event_catalog": {"source": args.event_catalog, "sha256": _sha256(event_catalog_path)},
+            "event_catalog": {"source": args.event_catalog, "sha256": _sha256(source_catalog_path)},
         },
+        "catalog_corrections": corrections,
         "image_index": {
             "source_rows": image_report.total_input_rows,
             "valid_images": image_report.valid_image_rows_before_dedup,

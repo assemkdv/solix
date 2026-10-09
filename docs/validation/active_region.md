@@ -95,7 +95,18 @@ DEF_HARPNUM,NOAA_ARS,NRT_HARPNUM
 115.0,"11093,11099",        (line 33)
 ```
 
-**Step 1 – flare catalog keyed by HARP.** The GOES catalog's
+**Step 0 – documented corrections to the GOES catalog.** The script first
+applies the seven `peak_time` corrections of `scripts/catalog_corrections.py`
+to a copy of `goes_flares_integrated.csv` (the downloaded file is unchanged;
+see [full_disk.md, Step 2a](full_disk.md#step-2a--documented-corrections-to-the-goes-catalog)
+for the records and the NOAA evidence). All seven flares have a NOAA region
+and so appear in the HARP-keyed catalog. Both rules below use `start_time`
+only, so the corrections do not change any result; the 2011-04-11 C2.5
+flare (HARP 495) has no peak time and cannot be matched by peak. The
+corrections are printed and stored in the summary under
+`catalog_corrections`.
+
+**Step 1 – flare catalog keyed by HARP.** The corrected GOES catalog's
 `noaa_active_region` is replaced by the HARP number(s) that contain it
 (`harp_keyed_catalog()` in the script, same join as `step1_harp_to_noaa.py`).
 Output, first rows (`active_region` is now a HARP number):

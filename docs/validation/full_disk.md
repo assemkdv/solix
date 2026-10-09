@@ -71,10 +71,48 @@ sorts by time.
 2010-12-06 09:00:00 /data/hmi_jpgs_512/2010/12/06/HMI.m2010.12.06_09.00.00.jpg
 ```
 
-### Step 2 – GOES catalog → flare catalog
+### Step 2a – documented corrections to the GOES catalog
 
-**Input** (`goes_flares_integrated.csv`, 14,401 rows, 33 columns). The
-columns that are used, first two rows:
+Seven flares in `goes_flares_integrated.csv` start a few minutes before
+midnight and end after it, but their `peak_time` is `00:00` on the
+*start* date, i.e. before the start. The same values are in the HEK SWPC
+flare list the catalog was built from, so the error is upstream of the
+lab. `flare_indexer` rejects a catalog whose times are out of order, so
+the script applies the corrections in `scripts/catalog_corrections.py`
+to a **copy** (`scripts/.cache/goes_flares_integrated_corrected.csv`);
+the downloaded upstream file is unchanged and its hash above still
+applies. Each record is matched on all of its original values and must
+match exactly once, otherwise the script stops.
+
+Source for the corrections: NOAA's GOES X-ray reports (NGDC,
+`goes-xrs-report_<year>.txt`, bare `HHMM` times). They record the
+maximum as `0000` for six flares – the only midnight inside each flare is
+the start of the next day – and as `////` (missing) for the 2011-04-11
+flare. Row = data row in the file (1 = first row after the header).
+
+| Row | Flare | start_time | peak_time in the file | end_time | NOAA report (`yymmdd start end max`) | Correction |
+|---|---|---|---|---|---|---|
+| 1592 | C2.5, AR 11190 | 2011-04-11 23:40 | 2011-04-11 00:00 | 2011-04-12 00:03 | `110411 2340 0003 ////` | peak → **missing** |
+| 3534 | C1.1, AR 11450 | 2012-04-05 23:50 | 2012-04-05 00:00 | 2012-04-06 00:05 | `120405 2350 0005 0000` | peak → 2012-04-06 00:00 |
+| 3940 | C1.0, AR 11494 | 2012-06-06 23:56 | 2012-06-06 00:00 | 2012-06-07 00:05 | `120606 2356 0005 0000` | peak → 2012-06-07 00:00 |
+| 4357 | C6.3, AR 11538 | 2012-07-30 23:50 | 2012-07-30 00:00 | 2012-07-31 00:04 | `120730 2350 0004 0000` | peak → 2012-07-31 00:00 |
+| 4824 | C1.5, AR 11589 | 2012-10-13 23:46 | 2012-10-13 00:00 | 2012-10-14 00:18 | `121013 2346 0018 0000` | peak → 2012-10-14 00:00 |
+| 8328 | C3.8, AR 12065 | 2014-05-25 23:49 | 2014-05-25 00:00 | 2014-05-26 00:04 | `140525 2349 0004 0000` | peak → 2014-05-26 00:00 |
+| 13145 | C1.3, AR 12644 | 2017-03-26 23:49 | 2017-03-26 00:00 | 2017-03-27 00:08 | `170326 2349 0008 0000` | peak → 2017-03-27 00:00 |
+
+The 2011-04-11 C2.5 flare therefore has **no peak time**. It is still
+matched by start time (the basis used here and by the legacy script); it
+can never be matched by `event_time="peak"`. The corrections change
+only `peak_time`, so the start-time labels below are identical to the
+run before the corrections existed (same positives, same six
+mismatches). The script prints every correction and records them in the
+summary JSON under `catalog_corrections`. `--skip-catalog-corrections`
+turns them off for a different catalog.
+
+### Step 2 – corrected GOES catalog → flare catalog
+
+**Input** (the corrected copy of `goes_flares_integrated.csv`, 14,401 rows,
+33 columns). The columns that are used, first two rows:
 
 ```text
          start_time           peak_time            end_time goes_class  noaa_active_region     fl_lon  fl_lat
@@ -87,13 +125,13 @@ columns that are used, first two rows:
 ```python
 from flare_indexer import adapt_goes_catalog
 
-catalog = adapt_goes_catalog("goes_flares_integrated.csv")
+catalog = adapt_goes_catalog("goes_flares_integrated_corrected.csv")
 catalog.to_csv("flare_catalog_adapted.csv", index=False)
 ```
 
 **What it does.** Keeps the three times, renames `goes_class` → `class`
 and `noaa_active_region` → `active_region`, checks every class, and drops
-the other 26 columns.
+the other 26 columns. One row (2011-04-11 C2.5) has an empty `peak_time`.
 
 **Output** (first two rows):
 
@@ -235,6 +273,9 @@ Positive labels per year (24h window): 2010 0/562, 2011 1,237/6,528,
 - Both the package and the legacy script read the same catalog, so
   agreement says nothing about flares missing from it.
 - Times are compared as given; no TAI/UTC conversion.
+- Seven `peak_time` values are corrected before labeling (Step 2a). They
+  do not affect start-time labels; the 2011-04-11 C2.5 flare has no peak
+  time and cannot be matched by peak.
 
 ## Reproduce
 

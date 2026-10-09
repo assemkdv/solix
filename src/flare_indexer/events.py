@@ -136,6 +136,38 @@ def _parse_full_timestamp_column(df: pd.DataFrame, column: str, path) -> pd.Seri
         ) from None
 
 
+def _validate_time_order(df: pd.DataFrame, path, hhmm: bool) -> None:
+    """
+    Reject rows whose available times violate start <= peak <= end.
+
+    Equal times are allowed. A missing time (NaT, possible only in the
+    full-timestamp schema) is skipped, and the remaining times are still
+    compared with each other. Must run before the catalog is re-sorted, so
+    the reported data row matches the CSV (row 1 = first row after the
+    header).
+    """
+    columns = ["start_time", "peak_time", "end_time"]
+    for earlier, later in [("start_time", "peak_time"), ("peak_time", "end_time"), ("start_time", "end_time")]:
+        bad = df[earlier].notna() & df[later].notna() & (df[earlier] > df[later])
+        if not bad.any():
+            continue
+        position = int(np.flatnonzero(bad.to_numpy())[0])
+        row = df.iloc[position]
+        times = ", ".join(f"{c}={row[c]}" for c in columns)
+        message = (
+            f"Flare catalog at {path}, data row {position + 1}: times must satisfy "
+            f"start <= peak <= end, but {earlier} > {later} ({times})."
+        )
+        if hhmm:
+            message += (
+                " In the date + HHMM format all three times take the date from the "
+                "'date' column, so a flare that crosses midnight cannot be represented; "
+                "use the full-timestamp schema (start_time, peak_time, end_time with "
+                "explicit dates) for such events."
+            )
+        raise ValueError(message)
+
+
 class EventMatcher:
     """
     Given an image timestamp, finds all flares that happened
@@ -218,6 +250,7 @@ class EventMatcher:
         df["peak_time"] = _combine_date_and_hhmm(df, "date", "peak_time", path)
         df["start_time"] = _combine_date_and_hhmm(df, "date", "start_time", path)
         df["end_time"] = _combine_date_and_hhmm(df, "date", "end_time", path)
+        _validate_time_order(df, path, hhmm=True)
         validate_goes_class_column(df["goes_class"], path)
 
         return df.sort_values("peak_time").reset_index(drop=True)
@@ -227,6 +260,7 @@ class EventMatcher:
         df["start_time"] = _parse_full_timestamp_column(df, "start_time", path)
         df["peak_time"] = _parse_full_timestamp_column(df, "peak_time", path)
         df["end_time"] = _parse_full_timestamp_column(df, "end_time", path)
+        _validate_time_order(df, path, hhmm=False)
         validate_goes_class_column(df["goes_class"], path)
 
         return df.sort_values("peak_time").reset_index(drop=True)

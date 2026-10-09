@@ -214,6 +214,24 @@ def test_end_to_end_synthetic_hhmm_catalog(tmp_path):
     assert flux["label"].tolist() == pytest.approx([2e-5, 3e-6, 0.0])
 
 
+def test_end_to_end_hhmm_midnight_crossing_event_is_rejected(tmp_path):
+    # 2350 / 0005 / 0020 on one date: peak and end would fall ~24 h before
+    # the start. The row is rejected, never shifted to the next day.
+    catalog_path = tmp_path / "catalog.csv"
+    catalog_path.write_text(SYNTHETIC_HHMM_CATALOG_PATH.read_text() + "2030-01-11,2350,0005,0020,X1.5,90002\n")
+    index_path = _write_index(tmp_path / "index.csv", ["2030-01-11T00:00:00"])
+
+    with pytest.raises(ValueError) as excinfo:
+        DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy("M")).build(index_path, catalog_path)
+
+    message = str(excinfo.value)
+    assert "data row 3" in message
+    assert "start_time > peak_time" in message
+    assert "start_time=2030-01-11 23:50:00, peak_time=2030-01-11 00:05:00, end_time=2030-01-11 00:20:00" in message
+    assert "crosses midnight" in message
+    assert "full-timestamp schema" in message and "explicit dates" in message
+
+
 def test_end_to_end_full_timestamp_midnight_crossing_event(tmp_path):
     assert _times(EventMatcher(SYNTHETIC_FULL_TIMESTAMP_CATALOG_PATH)) == [
         {"goes_class": "X1.5",

@@ -323,6 +323,46 @@ def test_load_catalog_full_timestamp_schema_preserves_dates_crossing_midnight(tm
     assert results[0].end_time == pd.Timestamp("2020-01-02 00:10:00")
 
 
+FULL_HEADER = "start_time,peak_time,end_time,class,active_region\n"
+VALID_FULL_ROW = "2030-01-11 23:50:00,2030-01-12 00:05:00,2030-01-12 00:20:00,X1.5,90002\n"
+
+
+@pytest.mark.parametrize("row, earlier, later", [
+    ("2030-01-12 00:10:00,2030-01-12 00:05:00,2030-01-12 00:20:00,M1.0,90002\n", "start_time", "peak_time"),
+    ("2030-01-11 23:50:00,2030-01-12 00:05:00,2030-01-11 00:20:00,M1.0,90002\n", "peak_time", "end_time"),
+    # Blank peak: start and end are still compared.
+    ("2030-01-12 00:30:00,,2030-01-12 00:20:00,M1.0,90002\n", "start_time", "end_time"),
+])
+def test_load_catalog_full_timestamp_rejects_times_out_of_order(tmp_path, row, earlier, later):
+    catalog_path = tmp_path / "catalog.csv"
+    catalog_path.write_text(FULL_HEADER + VALID_FULL_ROW + row)
+
+    with pytest.raises(ValueError) as excinfo:
+        EventMatcher(catalog_path)
+
+    message = str(excinfo.value)
+    assert "data row 2" in message
+    assert f"{earlier} > {later}" in message
+    assert "start <= peak <= end" in message
+    assert "HHMM" not in message
+
+
+def test_load_catalog_full_timestamp_allows_equal_and_missing_times(tmp_path):
+    catalog_path = tmp_path / "catalog.csv"
+    catalog_path.write_text(
+        FULL_HEADER
+        + "2030-01-12 12:00:00,2030-01-12 12:00:00,2030-01-12 12:00:00,C3.0,90003\n"
+        + "2030-01-13 01:00:00,2030-01-13 01:10:00,,C1.0,90004\n"
+        + ",2030-01-14 02:10:00,2030-01-14 02:20:00,C2.0,90005\n"
+    )
+
+    catalog = EventMatcher(catalog_path)._catalog
+
+    assert catalog["goes_class"].tolist() == ["C3.0", "C1.0", "C2.0"]
+    assert catalog["end_time"].isna().tolist() == [False, True, False]
+    assert catalog["start_time"].isna().tolist() == [False, False, True]
+
+
 def test_full_timestamp_schema_takes_priority_error_message_when_ambiguous(tmp_path):
     # Missing "active_region" with otherwise full-timestamp-shaped columns
     # should report against the full-timestamp schema, not the legacy one.

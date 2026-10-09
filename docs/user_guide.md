@@ -56,9 +56,16 @@ Two schemas are accepted and detected from the column names.
 **Legacy HHMM schema** – the scraper output: `date, start, peak, end,
 class, active_region`, where `start/peak/end` are 4-digit `HHMM` times
 combined with `date`. All three times get the same calendar date, so a
-flare that crosses midnight is represented incorrectly in this schema;
-use the full-timestamp schema for such catalogs. If a file has the
-columns of both schemas, the legacy schema is used.
+flare that crosses midnight cannot be written in this schema: its peak
+or end would come before its start, and loading the file raises a
+`ValueError` naming the row (dates are never shifted automatically). Use
+the full-timestamp schema for such catalogs. If a file has the columns of
+both schemas, the legacy schema is used.
+
+In both schemas every row must satisfy `start <= peak <= end` (equal
+times are fine); a row that does not is rejected with a `ValueError`. In
+the full-timestamp schema a blank time is skipped and the remaining times
+are still compared.
 
 `class` must be a GOES class: a letter `A, B, C, M, X` (any case) followed
 by an optional positive number (`M`, `M2`, `M2.3`, `X10`); surrounding
@@ -282,7 +289,8 @@ DataFrame with these columns.
 | Two images with the same timestamp | Loader: per `duplicate_policy`. Full-disk sequence modes: `ValueError`. Active-region sequence modes: allowed in different regions, `ValueError` within one region. Single-image mode: both kept. |
 | Flare with a missing or invalid class (`""`, NaN, `Q2.0`, `M0`) | `InvalidGOESClassError` when the catalog is loaded, listing the bad lines (§1.2). |
 | Time the catalog may not cover | Labeled from whatever the catalog contains, i.e. 0 if it lists no flare (§8.1). |
-| Flare that crosses midnight | Correct in the full-timestamp schema; wrong in the HHMM schema. |
+| Flare that crosses midnight | Correct in the full-timestamp schema; rejected with a `ValueError` in the HHMM schema (never shifted). |
+| Row with times out of order (`start > peak`, `peak > end` or `start > end`) | `ValueError` naming the data row, in both schemas. |
 | Different time scales | Not converted. HMI SHARP filenames are in TAI, GOES times in UTC (TAI − UTC = 34–37 s in 2010–2018), which only matters for flares within seconds of a window edge. |
 
 ### 8.1 Catalog coverage

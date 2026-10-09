@@ -142,8 +142,11 @@ column:
 This is what `flare_indexer.loaders.adapt_goes_catalog` produces (see
 "Real-world data" below) and exists specifically so that a flare whose
 start, peak, and end fall on *different* calendar dates (e.g. one that
-starts just before midnight) is represented correctly — re-encoding into a
-single `date` + HHMM would silently corrupt it onto one date.
+starts just before midnight) is represented correctly. In the `date` +
+HHMM schema all three times share one date, so such a flare would have its
+peak or end before its start; loading rejects it with a `ValueError`
+naming the row (dates are never shifted automatically). Both schemas
+require `start <= peak <= end` in every row (equal times allowed).
 
 ## Image index CSV
 

@@ -19,7 +19,9 @@ from `date`.
 
 A flare that crosses midnight cannot be written in this format: with
 `2350 / 0005 / 0020` on one date, the peak and end would come before the
-start. Such events belong in the full-timestamp format below.
+start. Loading such a row raises a `ValueError` naming the row; dates are
+never shifted automatically. That case is built inside the test, not
+stored here.
 
 ### synthetic_full_timestamp_catalog.csv
 

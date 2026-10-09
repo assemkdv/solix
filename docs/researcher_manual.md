@@ -199,8 +199,15 @@ sequences also need them sorted ascending.
 **Legacy scraper schema:** `date, start, peak, end, class, active_region`,
 where `start/peak/end` are 4-digit `HHMM` times (e.g. `0309`) combined
 with `date`. All three get the same date, so a flare that crosses
-midnight is wrong in this schema; use the full-timestamp schema for such
-data. If a file has the columns of both schemas, the legacy schema wins.
+midnight cannot be written in this schema: loading fails with a
+`ValueError` naming the row, because its peak or end would come before
+its start (dates are never shifted). Use the full-timestamp schema for
+such data. If a file has the columns of both schemas, the legacy schema
+wins.
+
+**Time order:** in both schemas every row must satisfy
+`start <= peak <= end` (equal times allowed), otherwise loading raises a
+`ValueError` naming the data row. Blank full-timestamp cells are skipped.
 
 **GOES class rules:** a letter `A`–`X` (any case), optionally followed by
 a positive number; spaces around it are ignored. Blank or malformed

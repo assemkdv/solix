@@ -101,6 +101,19 @@ Not yet released; version in `setup.cfg` is still 0.2.1.
   it used to overwrite the computed label silently.
 - `prediction_window=True`, `inf` or `nan` now raise `ValueError`
   (`True` was previously taken as 1 hour).
+- Loading a catalog now checks that each row's available times satisfy
+  `start <= peak <= end` (equal times allowed; blank full-timestamp cells
+  are skipped) and raises `ValueError` naming the data row otherwise, in
+  both schemas. Before, such rows loaded silently. In the `date` + HHMM
+  schema a flare that crosses midnight (e.g. `2350 / 0005 / 0020`) got
+  its peak and end about 24 h before its start, which could put it in
+  the wrong prediction window; it is now rejected (dates are never
+  shifted) and the message points to the full-timestamp schema. The
+  cached lab GOES catalog used by `scripts/validate_full_disk.py` and
+  `scripts/validate_active_region.py` has 7 such rows (all C-class,
+  2011–2017, peak recorded as 00:00 on the start date), so those scripts
+  stop with this error until the data is corrected.
+
 ### Since v0.2.1 (already on main before this branch)
 - Package renamed to `flare_indexer`; `FluxConverter` split from
   `FlareClassifier`; real-data loaders; configurable `event_time` and

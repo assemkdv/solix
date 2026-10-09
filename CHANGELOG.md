@@ -77,6 +77,13 @@ Not yet released; version in `setup.cfg` is still 0.2.1.
   the 298 distinct catalog classes and 14,552 of 63,649 `max_flux` values
   (24h) differ by at most 2 ulp, and the order of all classes is unchanged.
 
+### Removed
+- `data/solar_events.csv`, a sample catalog with undocumented provenance
+  that was used only by an end-to-end smoke test. The test now uses
+  `tests/fixtures/synthetic_hhmm_catalog.csv` and
+  `tests/fixtures/synthetic_full_timestamp_catalog.csv` (invented events,
+  see `tests/fixtures/README.md`) and checks exact timestamps and labels.
+
 ### Compatibility notes (behavior that differs from v0.2.1 / main)
 - Active-region sequences: an index whose region changes along the series
   no longer raises "mixed active_region values"; each region gets its own
@@ -94,7 +101,6 @@ Not yet released; version in `setup.cfg` is still 0.2.1.
   it used to overwrite the computed label silently.
 - `prediction_window=True`, `inf` or `nan` now raise `ValueError`
   (`True` was previously taken as 1 hour).
-
 ### Since v0.2.1 (already on main before this branch)
 - Package renamed to `flare_indexer`; `FluxConverter` split from
   `FlareClassifier`; real-data loaders; configurable `event_time` and

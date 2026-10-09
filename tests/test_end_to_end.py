@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from flare_indexer.builder import DatasetBuilder
 from flare_indexer.events import EventMatcher
@@ -162,33 +163,80 @@ def test_end_to_end_active_region_sequences_against_real_fixture_catalog(tmp_pat
     assert result["active_region"].tolist() == ["11111", "22222"]
 
 
-def test_end_to_end_smoke_test_against_real_catalog(tmp_path):
-    # Not the main correctness test — labels here aren't hardcoded since
-    # the real development catalog can change over time. This just
-    # confirms the full pipeline runs cleanly against actual data, now that
-    # data/solar_events.csv has been converted to the real date+HHMM
-    # scraper format.
-    repo_root = Path(__file__).parent.parent
-    real_catalog = repo_root / "data" / "solar_events.csv"
+# The two synthetic catalogs hold INVENTED events, not solar observations;
+# see tests/fixtures/README.md.
+SYNTHETIC_HHMM_CATALOG_PATH = FIXTURES_DIR / "synthetic_hhmm_catalog.csv"
+SYNTHETIC_FULL_TIMESTAMP_CATALOG_PATH = FIXTURES_DIR / "synthetic_full_timestamp_catalog.csv"
 
-    # EventMatcher must be able to load the converted file at all (this
-    # also validates every start/peak/end value is a real 4-digit HHMM
-    # time, since _load_catalog raises ValueError on anything else).
-    matcher = EventMatcher(real_catalog)
-    assert len(matcher._catalog) > 0
 
-    # Regression check: none of the converted peak_times were misparsed
-    # into the ~1970-01-01 Unix-epoch bug this file's format fix addressed.
-    assert (matcher._catalog["peak_time"].dt.year > 2000).all()
+def _write_index(path, timestamps):
+    pd.DataFrame({"timestamp": pd.to_datetime(timestamps)}).to_csv(path, index=False)
+    return path
 
-    index_path = tmp_path / "smoke_index.csv"
-    pd.DataFrame({
-        "timestamp": pd.to_datetime(["2026-06-06T00:00:00", "2026-06-10T00:00:00"]),
-    }).to_csv(index_path, index=False)
 
-    builder = DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy())
-    result = builder.build(index_path, real_catalog)
+def _times(matcher):
+    return matcher._catalog[["goes_class", "start_time", "peak_time", "end_time"]].to_dict("records")
 
-    assert list(result.columns) == ["timestamp", "label"]
-    assert len(result) == 2
-    assert set(result["label"].tolist()) <= {0, 1}
+
+def test_end_to_end_synthetic_hhmm_catalog(tmp_path):
+    # Every HHMM time takes the calendar date from the row's `date` column.
+    assert _times(EventMatcher(SYNTHETIC_HHMM_CATALOG_PATH)) == [
+        {"goes_class": "M2.0",
+         "start_time": pd.Timestamp("2030-01-10 09:40"),
+         "peak_time": pd.Timestamp("2030-01-10 09:52"),
+         "end_time": pd.Timestamp("2030-01-10 10:05")},
+        # Equal start, peak and end are allowed.
+        {"goes_class": "C3.0",
+         "start_time": pd.Timestamp("2030-01-12 12:00"),
+         "peak_time": pd.Timestamp("2030-01-12 12:00"),
+         "end_time": pd.Timestamp("2030-01-12 12:00")},
+    ]
+
+    index_path = _write_index(tmp_path / "index.csv",
+                              ["2030-01-10T00:00:00", "2030-01-12T00:00:00", "2030-01-13T00:00:00"])
+
+    # Defaults: event_time="peak", interval_mode="left_closed" -> [t, t + 24h).
+    #   2030-01-10 00:00: M2.0 (peak 09:52) -> 1, max flux 2e-5
+    #   2030-01-12 00:00: only C3.0 (peak 12:00), below M -> 0, max flux 3e-6
+    #   2030-01-13 00:00: nothing -> 0, 0.0
+    binary = DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy("M")) \
+        .build(index_path, SYNTHETIC_HHMM_CATALOG_PATH)
+    assert list(binary.columns) == ["timestamp", "label"]
+    assert binary["timestamp"].tolist() == [
+        pd.Timestamp("2030-01-10T00:00:00"),
+        pd.Timestamp("2030-01-12T00:00:00"),
+        pd.Timestamp("2030-01-13T00:00:00"),
+    ]
+    assert binary["label"].tolist() == [1, 0, 0]
+
+    flux = DatasetBuilder(prediction_window=24, strategy=MaxFlareStrategy()) \
+        .build(index_path, SYNTHETIC_HHMM_CATALOG_PATH)
+    assert flux["label"].tolist() == pytest.approx([2e-5, 3e-6, 0.0])
+
+
+def test_end_to_end_full_timestamp_midnight_crossing_event(tmp_path):
+    assert _times(EventMatcher(SYNTHETIC_FULL_TIMESTAMP_CATALOG_PATH)) == [
+        {"goes_class": "X1.5",
+         "start_time": pd.Timestamp("2030-01-11 23:50"),
+         "peak_time": pd.Timestamp("2030-01-12 00:05"),
+         "end_time": pd.Timestamp("2030-01-12 00:20")},
+    ]
+
+    index_path = _write_index(tmp_path / "index.csv",
+                              ["2030-01-11T00:00:00", "2030-01-12T00:00:00", "2030-01-13T00:00:00"])
+
+    # Windows [t, t + 24h) (default interval_mode):
+    #   2030-01-11 00:00: start 01-11 23:50 inside; peak 01-12 00:05 outside
+    #   2030-01-12 00:00: start before t; peak 01-12 00:05 inside
+    #   2030-01-13 00:00: neither
+    labels = {}
+    for event_time in ("start", "peak"):
+        result = DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy("M"), event_time=event_time) \
+            .build(index_path, SYNTHETIC_FULL_TIMESTAMP_CATALOG_PATH)
+        assert result["timestamp"].tolist() == [
+            pd.Timestamp("2030-01-11T00:00:00"),
+            pd.Timestamp("2030-01-12T00:00:00"),
+            pd.Timestamp("2030-01-13T00:00:00"),
+        ]
+        labels[event_time] = result["label"].tolist()
+    assert labels == {"start": [1, 0, 0], "peak": [0, 1, 0]}

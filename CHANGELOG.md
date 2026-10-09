@@ -5,6 +5,8 @@
 Not yet released; version in `setup.cfg` is still 0.2.1.
 
 ### Added
+- Minimum event-flux reduction and all-event per-class counts/presence,
+  composable through the existing pipeline; cumulative formula remains open.
 - `prediction_window` accepts a pandas duration as well as hours
   (e.g. `"23h59min59s"`), in `DatasetBuilder` and `EventMatcher.query`.
 - `DatasetBuilder(missing_active_region="negative" | "drop" | "error")`.

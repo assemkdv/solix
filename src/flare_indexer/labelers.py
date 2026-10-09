@@ -1,5 +1,6 @@
 import math
 import numbers
+from collections.abc import Mapping
 from typing import Protocol
 
 from .classifier import FluxConverter
@@ -106,3 +107,34 @@ class MulticlassLabeler:
             f"{_flux_converter.FLUX_MAP['A']!r} W/m^2. The GOES scale has no class for it, and it is not "
             "'NF' (no flare). Check the catalog for classes below A1.0 (e.g. 'A0.5')."
         )
+
+
+class ClassCountLabeler:
+    """Return a validated copy of A/B/C/M/X event counts.
+
+    Expects exactly those five keys and nonnegative integer values. No
+    NF bin: an empty window is represented by five zero counts.
+    """
+
+    def assign(self, counts) -> dict[str, int]:
+        if not isinstance(counts, Mapping):
+            raise TypeError("Class counts must be a mapping, not a reduced scalar flux.")
+        classes = MulticlassLabeler.CLASSES[1:]
+        if set(counts) != set(classes):
+            raise ValueError("Class counts must contain exactly A, B, C, M, X.")
+        result = {}
+        for letter in classes:
+            value = counts[letter]
+            if isinstance(value, bool) or not isinstance(value, numbers.Integral):
+                raise TypeError(f"Count for {letter} must be an integer.")
+            if value < 0:
+                raise ValueError(f"Count for {letter} must be nonnegative.")
+            result[letter] = int(value)
+        return result
+
+
+class ClassPresenceLabeler(ClassCountLabeler):
+    """Convert each validated class count to 0/1 presence; all zeros if empty."""
+
+    def assign(self, counts) -> dict[str, int]:
+        return {letter: int(count > 0) for letter, count in super().assign(counts).items()}

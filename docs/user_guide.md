@@ -336,3 +336,13 @@ When publishing labels, record:
 - sequence parameters and the `SequenceBuildReport` counts;
 - how the image index was built (`strict`, `duplicate_policy`, the
   `ImageIndexReport` counts).
+
+## Minimum flux, counts and presence
+
+`MinFluxReducer` selects the weakest recorded event (0.0 when empty).
+`ClassCountReducer` counts all matched events into A/B/C/M/X bins; pair it
+with `ClassCountLabeler` for counts or `ClassPresenceLabeler` for 0/1
+presence. Empty windows have five zero values. These dictionary-valued
+labels need explicit JSON serialization or expansion into five columns.
+See the API reference and `examples/12_minimum_and_counts.py`.
+Cumulative indexing still requires a defined scientific formula.

@@ -95,7 +95,7 @@ and who receives it.
 | `pipeline.py` | Run and inspect the three steps separately | `DatasetBuildingPipeline`, `PipelineResult` | matcher, `t`, window; or events; or a value | calls `query`, then `reducer.reduce`, then `labeler.assign` | events / value / label / `PipelineResult` → researcher, or label → `DatasetBuilder` |
 | `builder.py` | Label a whole image index | `DatasetBuilder`, `SequenceBuildReport` | image index CSV, catalog CSV, settings | validates settings and index; picks the mode; loops over reference times; groups by region for AR sequences | `DataFrame` (+ report) → researcher |
 | `loaders.py` | Convert lab file formats | `build_image_index_from_filenames`, `adapt_goes_catalog`, `ImageIndexReport` | HMI path list; GOES catalog CSV | parse file names; rename/normalize columns; validate classes | `DataFrame` (+ report, optional CSV) → `DatasetBuilder` |
-| `__init__.py` | Public entry point | re-exports 19 names | – | – | `import flare_indexer as fidx` |
+| `__init__.py` | Public entry point | re-exports 24 names | – | – | `import flare_indexer as fidx` |
 
 Supporting scripts outside the package: `scripts/validate_full_disk.py`
 and `scripts/validate_active_region.py` compare package output with the
@@ -477,3 +477,12 @@ python docs/architecture/build_diagrams.py            # add --png DIR for previe
 You can also open the `.drawio` file in [diagrams.net](https://app.diagrams.net)
 (File → Open from → Device) and edit it by hand, but the next run of the
 script overwrites manual edits.
+
+## Additional reducer outputs
+
+The same pipeline accepts `MinFluxReducer` (minimum recorded event flux),
+`ClassCountReducer` (all-event A/B/C/M/X mapping), and the matching
+`ClassCountLabeler` or `ClassPresenceLabeler`. Count-based outputs never
+pass through a maximum-flux reducer. DatasetBuilder stores mappings in
+its label column; callers expand them to ordered vectors or serialize
+them as JSON for downstream use. No cumulative formula has been assumed.

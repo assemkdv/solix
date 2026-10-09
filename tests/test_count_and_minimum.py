@@ -1,0 +1,76 @@
+import pandas as pd
+import pytest
+
+import flare_indexer as f
+
+
+def events(classes):
+    return [f.FlareEvent(pd.Timestamp('2024-01-01 01:05'), c,
+                        pd.Timestamp('2024-01-01 01:00'), '100') for c in classes]
+
+
+def test_minimum_numeric_and_empty():
+    assert f.MinFluxReducer().reduce(events(['M10', 'M9', 'C10'])) == 1e-5
+    assert f.MinFluxReducer().reduce([]) == 0.0
+    assert f.MinFluxReducer().reduce(events(['C4'])) == 4e-6
+
+
+def test_counts_retain_every_event_and_normalize_class():
+    assert f.ClassCountReducer().reduce(events(['C2'] * 10 + ['X1', 'C10', 'M10'])) == {
+        'A': 0, 'B': 0, 'C': 10, 'M': 1, 'X': 2}
+    assert f.ClassCountReducer().reduce([]) == dict.fromkeys('ABCMX', 0)
+    with pytest.raises(ValueError):
+        f.ClassCountReducer().reduce(events(['A0.5']))
+
+
+def test_labelers_copy_and_presence():
+    counts = dict(zip('ABCMX', [0, 2, 10, 0, 1]))
+    result = f.ClassCountLabeler().assign(counts)
+    result['B'] = 9
+    assert counts['B'] == 2
+    assert f.ClassPresenceLabeler().assign(counts) == dict(zip('ABCMX', [0, 1, 1, 0, 1]))
+    assert f.ClassPresenceLabeler().assign(dict.fromkeys('ABCMX', 0)) == dict.fromkeys('ABCMX', 0)
+
+
+@pytest.mark.parametrize('value,error', [
+    (1e-5, TypeError), ({'M': 1}, ValueError),
+    (dict.fromkeys('ABCMX', -1), ValueError),
+    (dict.fromkeys('ABCMX', True), TypeError),
+    (dict.fromkeys('ABCMX', 1.5), TypeError),
+])
+@pytest.mark.parametrize('labeler', [f.ClassCountLabeler, f.ClassPresenceLabeler])
+def test_invalid_counts(value, error, labeler):
+    with pytest.raises(error):
+        labeler().assign(value)
+
+
+@pytest.mark.parametrize('target', ['full_disk', 'active_region'])
+@pytest.mark.parametrize('mode', ['single', 'row', 'time'])
+@pytest.mark.parametrize('labeler', [f.ClassCountLabeler, f.ClassPresenceLabeler])
+def test_builder_all_modes(tmp_path, target, mode, labeler):
+    index = tmp_path / 'images.csv'
+    catalog = tmp_path / 'catalog.csv'
+    pd.DataFrame({'timestamp': ['2024-01-01 00:00', '2024-01-01 01:00'],
+                  'active_region': [100, 100]}).to_csv(index, index=False)
+    pd.DataFrame({'start_time': ['2024-01-01 00:30', '2024-01-01 01:30', '2024-01-01 01:30'],
+                  'peak_time': ['2024-01-01 00:35', '2024-01-01 01:35', '2024-01-01 01:35'],
+                  'end_time': ['2024-01-01 00:40', '2024-01-01 01:40', '2024-01-01 01:40'],
+                  'class': ['B2', 'C2', 'X1'], 'active_region': [100, 100, 200]}).to_csv(catalog, index=False)
+    options = {} if mode == 'single' else ({'sequence_length': 2} if mode == 'row' else
+                {'cadence': '1h', 'observation_window': '2h', 'sliding_window': '1h'})
+    pipeline = f.DatasetBuildingPipeline(f.ClassCountReducer(), labeler())
+    result = f.DatasetBuilder('1h', pipeline, target=target, event_time='start', **options).build(index, catalog)
+    assert len(result) == (2 if mode == 'single' else 1)
+    assert result.iloc[-1].label == {'A': 0, 'B': 0, 'C': 1, 'M': 0, 'X': int(target == 'full_disk')}
+    if mode == 'single':
+        assert result.iloc[0].label == {'A': 0, 'B': 1, 'C': 0, 'M': 0, 'X': 0}
+
+
+def test_minimum_pipeline_builder(tmp_path):
+    index, catalog = tmp_path / 'images.csv', tmp_path / 'catalog.csv'
+    pd.DataFrame({'timestamp': ['2024-01-01']}).to_csv(index, index=False)
+    pd.DataFrame({'start_time': ['2024-01-01 01:00'] * 2,
+                  'peak_time': ['2024-01-01 01:05'] * 2, 'end_time': ['2024-01-01 01:10'] * 2,
+                  'class': ['C2', 'X1'], 'active_region': [100, 100]}).to_csv(catalog, index=False)
+    pipeline = f.DatasetBuildingPipeline(f.MinFluxReducer(), f.RegressionLabeler())
+    assert f.DatasetBuilder(24, pipeline).build(index, catalog).iloc[0].label == 2e-6

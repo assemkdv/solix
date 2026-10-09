@@ -512,15 +512,14 @@ claim of scikit-learn estimator-API compatibility (no `fit`/`transform`,
 no `Pipeline` object from `sklearn`).
 
 - **`EventReducer`** — a `typing.Protocol` for anything with a
-  `reduce(events: list[FlareEvent])` method. `MaxFluxReducer` (the only
-  one provided so far) reduces to the numeric maximum flux, always via
+  `reduce(events: list[FlareEvent])` method. `MaxFluxReducer` reduces to the numeric maximum flux, always via
   `FluxConverter` — never by comparing `goes_class` strings lexically.
   Returns `0.0` for an empty event list. Cumulative or other scientific
   reducers can be added later as new classes implementing this same
   `reduce()` method, with no changes to `DatasetBuilder` or
   `DatasetBuildingPipeline` required.
 - **`LabelAssigner`** — a `typing.Protocol` for anything with an
-  `assign(reduced_value)` method. Three are provided:
+  `assign(reduced_value)` method. The three flux labelers are:
   - **`BinaryThresholdLabeler(threshold="M")`** — `1` if the reduced value
     meets or exceeds the threshold's flux, else `0`. `threshold` may be a
     plain letter (`"M"`) or a full GOES class with a number (`"C4.2"`).
@@ -892,3 +891,13 @@ a conclusion.
 pip install -e ".[dev]"
 pytest
 ```
+
+## Minimum flux, counts and presence
+
+`MinFluxReducer` selects the weakest recorded event (0.0 when empty).
+`ClassCountReducer` counts all matched events into A/B/C/M/X bins; pair it
+with `ClassCountLabeler` for counts or `ClassPresenceLabeler` for 0/1
+presence. Empty windows have five zero values. These dictionary-valued
+labels need explicit JSON serialization or expansion into five columns.
+See the API reference and `examples/12_minimum_and_counts.py`.
+Cumulative indexing still requires a defined scientific formula.

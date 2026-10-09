@@ -1,6 +1,6 @@
 # API reference
 
-Every public name exported by `flare_indexer` (the 20 names in
+Every public name exported by `flare_indexer` (the 24 names in
 `flare_indexer.__all__`), every public method of those classes, and the
 public module-level helpers that are not exported. A developer appendix
 at the end describes private helpers; researchers should not depend on
@@ -26,6 +26,10 @@ package uses flux numbers, never class text.
 | `EventMatcher` | class | `events` | [link](#eventmatcher) |
 | `EventReducer` | Protocol (contract) | `reducers` | [link](#eventreducer) |
 | `MaxFluxReducer` | class | `reducers` | [link](#maxfluxreducer) |
+| `MinFluxReducer` | class | `reducers` | [link](#minfluxreducer) |
+| `ClassCountReducer` | class | `reducers` | [link](#classcountreducer) |
+| `ClassCountLabeler` | class | `labelers` | [link](#classcountlabeler) |
+| `ClassPresenceLabeler` | class | `labelers` | [link](#classpresencelabeler) |
 | `LabelAssigner` | Protocol (contract) | `labelers` | [link](#labelassigner) |
 | `BinaryThresholdLabeler` | class | `labelers` | [link](#binarythresholdlabeler) |
 | `RegressionLabeler` | class | `labelers` | [link](#regressionlabeler) |
@@ -42,7 +46,8 @@ package uses flux numbers, never class text.
 
 Public methods: `FluxConverter.to_flux`, `FlareClassifier.is_strong`,
 `EventMatcher.query`, `EventReducer.reduce` (contract),
-`MaxFluxReducer.reduce`, `LabelAssigner.assign` (contract),
+`MaxFluxReducer.reduce`, `MinFluxReducer.reduce`, `ClassCountReducer.reduce`,
+`ClassCountLabeler.assign`, `ClassPresenceLabeler.assign`, `LabelAssigner.assign` (contract),
 `BinaryThresholdLabeler.assign`, `RegressionLabeler.assign`,
 `MulticlassLabeler.assign`, `BinaryThresholdStrategy.label`, `MaxFlareStrategy.label`,
 `DatasetBuildingPipeline.extract_events`, `.reduce_events`,
@@ -1192,6 +1197,59 @@ Flare catalog at example.csv has 1 missing or invalid GOES class value(s) in col
 and `GOES_CATALOG_OPTIONAL_COLUMNS` (columns read by `adapt_goes_catalog`).
 
 ---
+
+## Minimum flux and per-class outputs
+
+### `MinFluxReducer`
+Selects the weakest recorded event's numeric peak flux, in W/m². This is
+not background-flux sampling. Pair with `RegressionLabeler` for numeric
+output or `MulticlassLabeler` for the selected event's class.
+
+### `MinFluxReducer.reduce`
+`reduce(events: list[FlareEvent]) -> float`: minimum flux, or `0.0` if empty.
+With binary labeling this asks whether the weakest event meets the threshold,
+not whether any event does. Below-A numeric flux is accepted by the reducer,
+but rejected when paired with the existing multiclass labeler.
+
+### `ClassCountReducer`
+Counts all matched events by numeric class, in stable `A/B/C/M/X` order.
+`C10.0` counts as M and `M10.0` as X. Each supplied event counts once;
+deduplication is an input-preparation responsibility. Below-A events raise
+an error consistently with `MulticlassLabeler`.
+
+### `ClassCountReducer.reduce`
+`reduce(events: list[FlareEvent]) -> dict[str, int]`: all five keys, with
+zero values for an empty window. It does not consume a maximum-flux scalar.
+
+### `ClassCountLabeler`
+Validates and copies a mapping of per-class counts. Pair with
+`ClassCountReducer`, not a flux reducer.
+
+### `ClassCountLabeler.assign`
+`assign(counts) -> dict[str, int]`: requires exactly A/B/C/M/X and nonnegative
+integer counts; rejects booleans. Missing/extra keys raise `ValueError`,
+noninteger inputs raise `TypeError`. Returns a fresh mapping.
+
+### `ClassPresenceLabeler`
+Produces a multi-label presence mapping from the same full-event counts.
+
+### `ClassPresenceLabeler.assign`
+`assign(counts) -> dict[str, int]`: the same validation, then 1 for each
+positive count and 0 otherwise. No NF bin: an empty window is all zeros.
+
+```python
+from flare_indexer import (DatasetBuildingPipeline, MinFluxReducer,
+    RegressionLabeler, ClassCountReducer, ClassCountLabeler, ClassPresenceLabeler)
+minimum = DatasetBuildingPipeline(MinFluxReducer(), RegressionLabeler())
+counts = DatasetBuildingPipeline(ClassCountReducer(), ClassCountLabeler())
+presence = DatasetBuildingPipeline(ClassCountReducer(), ClassPresenceLabeler())
+```
+
+Pass any of these as `DatasetBuilder(..., strategy=...)`. Counts/presence
+are dictionary values in the `label` column; export them explicitly as
+JSON or expand to five columns before CSV/framework use. Plain CSV does
+not preserve Python mappings. Cumulative indexing is not implemented:
+its formula remains to be specified.
 
 ## Developer appendix: private helpers
 

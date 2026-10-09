@@ -19,7 +19,7 @@ REAL_DATA_EXAMPLES = {
     "07_pytorch_full_disk_images.py", "08_pytorch_full_disk_sequences.py",
     "10_tensorflow_full_disk_images.py", "11_tensorflow_full_disk_sequences.py",
 }
-EXAMPLE_SCRIPTS = sorted(p for p in EXAMPLES_DIR.glob("0*.py") if p.name not in REAL_DATA_EXAMPLES)
+EXAMPLE_SCRIPTS = sorted(p for p in EXAMPLES_DIR.glob("[0-9][0-9]_*.py") if p.name not in REAL_DATA_EXAMPLES)
 
 pytestmark = pytest.mark.skipif(not EXAMPLES_DIR.is_dir(), reason="examples/ not available (installed package)")
 

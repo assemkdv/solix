@@ -25,6 +25,8 @@ jobs:
       - name: Install package with dev dependencies
         run: pip install -e ".[dev]"
 
+      # Framework and real-image tests skip here; the framework-examples
+      # job below runs them and fails on any unexpected skip.
       - name: Run tests
         run: pytest tests/ -v
 
@@ -43,3 +45,101 @@ jobs:
           python -m pip install --upgrade pip build twine
           python -m build
           twine check dist/*
+
+      - name: Check sdist contents
+        shell: bash
+        run: |
+          tar tzf dist/*.tar.gz > sdist.txt
+          if grep -E 'examples/output/|\.jp2$|\.part$|__pycache__|\.pyc$' sdist.txt; then
+            echo "::error::generated outputs, downloaded images or byte code in the sdist"; exit 1
+          fi
+          for required in LICENSE examples/real_data/image_manifest.csv examples/real_data/flare_catalog.csv \
+                          examples/real_data/catalog_provenance.json examples/real_data/README.md; do
+            grep -q "/$required\$" sdist.txt || { echo "::error::$required missing from the sdist"; exit 1; }
+          done
+
+      - name: Install the wheel and import it outside the checkout
+        shell: bash
+        run: |
+          python -m venv "$RUNNER_TEMP/wheel-env"
+          "$RUNNER_TEMP/wheel-env/bin/pip" install dist/*.whl
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/wheel-env/bin/python" -c "import flare_indexer, sys; print(flare_indexer.__file__); assert 'site-packages' in flare_indexer.__file__; assert 'MulticlassLabeler' in flare_indexer.__all__"
+
+  # Real-image PyTorch / TensorFlow examples, run against the built wheel
+  # (not an editable install) with the pinned images replayed from
+  # examples/real_data/image_manifest.csv. Every image is checked against
+  # its recorded SHA-256; a failed download, a hash mismatch, a missing
+  # dependency or an unexpected test skip fails this job.
+  framework-examples:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        framework: [pytorch, tensorflow]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build the wheel
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --wheel
+
+      - name: Install the wheel with the ${{ matrix.framework }}-examples extra
+        shell: bash
+        run: |
+          wheel=$(ls dist/*.whl)
+          # CPU-only PyTorch keeps the job small. The TensorFlow job installs it
+          # too, so the TensorFlow examples are compared with the PyTorch ones.
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install "${wheel}[${{ matrix.framework }}-examples]" pytest
+          python -c "import flare_indexer; assert 'site-packages' in flare_indexer.__file__, flare_indexer.__file__"
+
+      - name: Restore the image cache
+        uses: actions/cache@v4
+        with:
+          path: examples/real_data/images
+          key: hmi-jp2-${{ hashFiles('examples/real_data/image_manifest.csv') }}
+
+      # Replay only: recorded ids, URLs and SHA-256; cached files are verified
+      # too. Never --refresh here.
+      - name: Replay and verify the pinned example images
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            if python examples/real_data/fetch_real_data.py; then ok=1; break; fi
+            echo "attempt $attempt failed"; sleep 30
+          done
+          test "${ok:-0}" = 1
+          git diff --exit-code -- examples/real_data/image_manifest.csv examples/real_data/flare_catalog.csv
+
+      - name: Run the ${{ matrix.framework }} examples
+        shell: bash
+        run: |
+          if [ "${{ matrix.framework }}" = pytorch ]; then
+            python examples/07_pytorch_full_disk_images.py
+            python examples/08_pytorch_full_disk_sequences.py
+          else
+            python examples/10_tensorflow_full_disk_images.py
+            python examples/11_tensorflow_full_disk_sequences.py
+          fi
+
+      - name: Run the real-image tests and fail on unexpected skips
+        shell: bash
+        run: |
+          if [ "${{ matrix.framework }}" = pytorch ]; then
+            files="tests/test_pytorch_examples.py tests/test_fetch_real_data.py"
+          else
+            files="tests/test_tensorflow_examples.py"
+          fi
+          pytest $files -v -rs -p no:cacheprovider | tee pytest.log
+          # The only allowed skip: the lab catalog in scripts/.cache is not public.
+          if grep '^SKIPPED' pytest.log | grep -v 'lab catalog scripts/.cache/goes_flares_integrated.csv'; then
+            echo "::error::real-image tests were skipped"; exit 1
+          fi

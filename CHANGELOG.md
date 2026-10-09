@@ -51,7 +51,17 @@ Not yet released; version in `setup.cfg` is still 0.2.1.
   labels from the four `-90_to_90` fold files at a pinned commit and
   compares both `label` and `goes_class`.
 
+- CI job `framework-examples` (PyTorch and TensorFlow): installs the built
+  wheel with the extra, replays the pinned example images with SHA-256
+  checks, runs examples 07/08 or 10/11 and their tests, and fails on any
+  unexpected skip. The `build` job also checks the sdist contents and
+  imports the installed wheel. Not yet run on GitHub.
+- `docs/release_verification.md`: what was verified for the built
+  artifacts and what remains open.
+
 ### Changed
+- The sdist no longer includes generated `examples/output/` files or the
+  downloaded image cache (`MANIFEST.in` prunes them).
 - Images with no active region are still labeled 0 by default, but no
   longer silently: a warning reports how many.
 - `FluxConverter.to_flux` multiplies in decimal arithmetic from the class

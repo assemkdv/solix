@@ -33,6 +33,13 @@ cd flare-indexer
 pip install .
 ```
 
+Optional extras for the real-image examples (`examples/real_data/README.md`):
+`pip install ".[pytorch-examples]"` (torch, pillow) or
+`pip install ".[tensorflow-examples]"` (tensorflow, pillow; Python 3.10–3.13).
+The base package needs only pandas and numpy. What was verified for the
+built wheel and sdist is recorded in
+[docs/release_verification.md](docs/release_verification.md).
+
 ## Where the data comes from
 
 This package does not fetch or maintain flare data itself. Flare catalogs

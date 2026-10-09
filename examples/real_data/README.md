@@ -63,6 +63,12 @@ python examples/11_tensorflow_full_disk_sequences.py
 pytest tests/test_tensorflow_examples.py          # add torch to also compare with 07/08
 ```
 
+On macOS with a python.org interpreter, downloads can fail with
+`CERTIFICATE_VERIFY_FAILED` until "Install Certificates.command" (in the
+Python application folder) has been run, or with
+`SSL_CERT_FILE=$(python -m certifi)` set. The script then stops without
+changing the manifest or writing partial files.
+
 Without the package installed, prefix the commands with
 `PYTHONPATH=$PWD/src`. Outputs go to `examples/output/` (or `--output DIR`).
 Without PyTorch, Pillow or the downloaded images the examples stop with a

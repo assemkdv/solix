@@ -5,3 +5,8 @@ include CHANGELOG.md
 recursive-include examples *.py *.csv *.txt *.json *.md
 recursive-include docs *.md *.json *.txt *.drawio *.pdf *.py *.csv
 recursive-include scripts *.py
+# Never ship generated example outputs, the downloaded image cache,
+# partial downloads or byte code.
+prune examples/output
+prune examples/real_data/images
+global-exclude __pycache__ *.py[cod] *.part .DS_Store

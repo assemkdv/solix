@@ -12,6 +12,7 @@
 | See how the code is organized | [architecture/architecture.md](architecture/architecture.md) (+ `.drawio`, `.pdf`) |
 | Check the real-data validation | [validation/full_disk.md](validation/full_disk.md), [validation/active_region.md](validation/active_region.md) |
 | See which choices still need a scientific decision | [decisions.md](decisions.md) |
+| See what was verified for the built wheel and sdist | [release_verification.md](release_verification.md) |
 
 Runnable examples with synthetic data are in [`../examples`](../examples).
 Examples 07–08 (PyTorch) and 10–11 (TensorFlow) label real SDO/HMI

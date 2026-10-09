@@ -1,55 +1,58 @@
 # Architecture
 
-Editable diagrams: [`flare_indexer_architecture.drawio`](flare_indexer_architecture.drawio)
-(open in [diagrams.net](https://app.diagrams.net) or the draw.io desktop app;
-one tab per page). Vector PDF: [`flare_indexer_architecture.pdf`](flare_indexer_architecture.pdf).
-Both are generated from [`build_diagrams.py`](build_diagrams.py); edit that
-script rather than the outputs, then run
-`python docs/architecture/build_diagrams.py` (needs `matplotlib`).
-
-| Page | Shows |
-|---|---|
-| 1 Overview | Inputs, loaders, `DatasetBuilder`, `EventMatcher`, strategy chain, outputs |
-| 2 build() flow | Validation steps, mode dispatch, per-region grouping, per-reference-time loop |
-| 3 Time windows | `[t, t+w)`, `(t, t+w]`, `(t, t+23:59:59]`, and the AR look-back window |
-| 4 Sequences | Row-based vs. time-based construction, skipped candidates, per-region grids |
-| 5 Active regions | Region normalization and grouping, missing-region policy, HARP/NOAA mapping, real-data facts |
-| 6 Modules and tests | Module dependencies, scripts, examples, tests |
+Overview of the package components, labeling choices, and limitations.
+For the data flow and a worked example, see [system_design.md](system_design.md).
 
 ## Modules
 
 | Module | Responsibility | Public names |
 |---|---|---|
-| `classifier.py` | GOES class parsing/validation, class → flux (W/m²) | `FluxConverter`, `FlareClassifier`, `InvalidGOESClassError` |
-| `events.py` | Load/validate catalog (two schemas, GOES classes), window query | `EventMatcher`, `FlareEvent` |
-| `reducers.py` | Flares → one value | `EventReducer` (protocol), `MaxFluxReducer` |
-| `labelers.py` | Value → label | `LabelAssigner` (protocol), `BinaryThresholdLabeler`, `RegressionLabeler`, `MulticlassLabeler` |
-| `strategies.py` | Ready-made reducer + labeler pairs | `BinaryThresholdStrategy`, `MaxFlareStrategy` |
-| `pipeline.py` | Stage-by-stage, inspectable labeling | `DatasetBuildingPipeline`, `PipelineResult` |
-| `builder.py` | Image index → labeled table; sequences (grouped by region in AR mode); missing-region policy | `DatasetBuilder`, `SequenceBuildReport` |
-| `loaders.py` | Real-world input conversion | `build_image_index_from_filenames`, `adapt_goes_catalog`, `ImageIndexReport` |
+| `classifier.py` | Validate GOES classes and convert strength to flux, e.g. M2.0 → `2e-5 W/m²` | `FluxConverter`, `FlareClassifier`, `InvalidGOESClassError` |
+| `events.py` | Read the catalog, check classes and timestamp order, find flares in a time window | `EventMatcher`, `FlareEvent` |
+| `reducers.py` | Select maximum/minimum event flux or count events by class | `EventReducer` (protocol), `MaxFluxReducer`, `MinFluxReducer`, `ClassCountReducer` |
+| `labelers.py` | Turn the summary into binary, numerical, multiclass, count, or presence labels | `LabelAssigner` (protocol), `BinaryThresholdLabeler`, `RegressionLabeler`, `MulticlassLabeler`, `ClassCountLabeler`, `ClassPresenceLabeler` |
+| `strategies.py` | Ready-made maximum-flux combinations for binary or numerical labels | `BinaryThresholdStrategy`, `MaxFlareStrategy` |
+| `pipeline.py` | Combine a reducer and labeler; inspect events, summary, and final label | `DatasetBuildingPipeline`, `PipelineResult` |
+| `builder.py` | Build a labeled table for images or sequences; group AR sequences by region; handle missing regions | `DatasetBuilder`, `SequenceBuildReport` |
+| `loaders.py` | Extract image timestamps from supported filenames and adapt lab GOES catalogs | `build_image_index_from_filenames`, `adapt_goes_catalog`, `ImageIndexReport` |
+| `__init__.py` | Export the public tools for imports from `flare_indexer` | Names listed above |
+
+## Labeling choices
+
+- **Binary:** `BinaryThresholdStrategy("M")` — 1 if an M-or-stronger event occurs.
+- **Maximum flux:** `MaxFlareStrategy()` — strongest event's flux.
+- **Minimum flux:** `MinFluxReducer` + `RegressionLabeler` — weakest event's flux.
+- **Multiclass:** `MaxFluxReducer` + `MulticlassLabeler` — strongest event's class.
+- **Counts:** `ClassCountReducer` + `ClassCountLabeler` — event count per class.
+- **Presence:** `ClassCountReducer` + `ClassPresenceLabeler` — 0/1 per class.
+
+The last four use `DatasetBuildingPipeline(reducer=..., labeler=...)` as
+`DatasetBuilder`'s strategy. Counts and presence use all matched events.
 
 ## Design notes
 
-- **One query per reference time.** `EventMatcher` keeps a sorted copy of
-  the catalog per `event_time` and uses binary search (`numpy.searchsorted`)
-  for the window, so the full-disk validation (63,649 images, two
-  strategies) runs in about 30 s on a laptop.
-- **Strategies are duck-typed.** Anything with `label(flares)` works as a
-  `strategy`; anything with `reduce(events)` / `assign(value)` works in a
-  `DatasetBuildingPipeline`.
-- **No silent fallbacks.** A missing active region never falls back to
-  full-disk matching; incomplete time-based sequences are skipped and
-  reported, never interpolated.
-- **Pure functions of the inputs.** No network access, no global state;
-  the same CSVs and parameters always give the same labels.
+- **Efficient event matching.** `EventMatcher` caches sorted start/peak times
+  and uses `numpy.searchsorted` to find window boundaries.
+- **Replaceable components.** Any object with `label(flares)` can be a
+  strategy; `reduce(events)` and `assign(value)` define pipeline components.
+- **Explicit missing-data handling.** Missing regions never become full-disk
+  queries. Incomplete time-based sequences are skipped and reported,
+  never interpolated.
+- **Timestamp checks.** Available times must satisfy `start <= peak <= end`.
+  Midnight-crossing events require full timestamps with explicit dates.
+- **Repeatable labeling.** Core labeling uses local inputs; with deterministic
+  components, the same files and settings produce the same labels.
+- **Separate research corrections.** Both validation scripts use
+  `scripts/catalog_corrections.py` for seven documented lab-catalog peak-time
+  corrections. The original catalog and start-time results are unchanged.
 
 ## Known limitations
 
-- Windows only look forward from the reference time.
+- Cumulative indexing is not implemented; its formula is still undefined.
+- Core windows only look forward. AR look-back is a validation-script comparison.
 - No time-scale conversion (TAI vs UTC).
-- No catalog-coverage check: a catalog does not state its coverage, and
-  the package does not infer it from recorded flares.
-- In AR sequence modes with the default `missing_active_region="negative"`,
-  several unknown-region patches at the same time raise `ValueError`
-  (use `"drop"`).
+- No catalog-coverage check: an empty window does not prove observations were available.
+- Time-based sequences require exact cadence; no timestamp tolerance.
+- Multiclass and counts reject positive flux below A1.0; the policy is under review.
+- In AR sequence modes with `missing_active_region="negative"`, multiple
+  unknown-region patches at the same time raise `ValueError` (use `"drop"`).

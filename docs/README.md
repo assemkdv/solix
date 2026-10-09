@@ -9,7 +9,7 @@
 | Install and label a dataset in ten minutes | [getting_started.md](getting_started.md) |
 | Look up an input column, parameter, window rule, output column or error (compact reference) | [user_guide.md](user_guide.md) |
 | Label active-region patches | [active_region_workflow.md](active_region_workflow.md) |
-| See how the code is organized | [architecture/architecture.md](architecture/architecture.md) (+ `.drawio`, `.pdf`) |
+| See how the code is organized | [architecture/architecture.md](architecture/architecture.md) |
 | Check the real-data validation | [validation/full_disk.md](validation/full_disk.md), [validation/active_region.md](validation/active_region.md) |
 | See which choices still need a scientific decision | [decisions.md](decisions.md) |
 | See what was verified for the built wheel and sdist | [release_verification.md](release_verification.md) |

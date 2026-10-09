@@ -9,7 +9,7 @@ ready-to-train table of image/sequence -> label pairs.
 **Start here:**
 
 - **[Researcher manual](docs/researcher_manual.md)** — how to install and use the package, with verified examples
-- **[System design](docs/architecture/system_design.md)** — how the code works inside, with a traced example
+- **[System design](docs/architecture/system_design.md)** — how the code works inside, with a small labeling example
 - **[API reference](docs/api_reference.md)** — every public class, function and method, with verified examples
 - **[Meeting walkthrough](docs/meeting_walkthrough.md)** — what is done, what is open, and a demo command
 
@@ -19,7 +19,7 @@ More:
 - [Real-image PyTorch and TensorFlow examples](examples/real_data/README.md) — SDO/HMI images labeled and loaded as `[B,C,H,W]`/`[B,T,C,H,W]` (PyTorch) and `[B,H,W,C]`/`[B,T,H,W,C]` (`tf.data`) batches
 - [User guide](docs/user_guide.md): input/output schemas, parameters, window boundaries, errors
 - [Active-region workflow](docs/active_region_workflow.md)
-- [Architecture](docs/architecture/architecture.md) (editable `.drawio` + vector PDF)
+- [Architecture](docs/architecture/architecture.md)
 - Real-data validation: [full disk](docs/validation/full_disk.md), [active region](docs/validation/active_region.md)
 - [Open decisions](docs/decisions.md) that need a scientific sign-off
 

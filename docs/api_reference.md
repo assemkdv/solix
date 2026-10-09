@@ -932,7 +932,7 @@ DatasetBuilder(...).build(image_index_path, event_catalog_path, return_report=Fa
 
 **What it does.** Reads the index, loads the catalog, and for every
 reference time calls `EventMatcher.query` then `strategy.label`
-(details: [system design §4](architecture/system_design.md#4-how-datasetbuilder-connects-the-components)).
+(details: [system design: processing](architecture/system_design.md#processing)).
 **Returns.** `pandas.DataFrame`, or `(DataFrame, SequenceBuildReport)`.
 Columns are described in the [researcher manual §6](researcher_manual.md#6-output-formats).
 

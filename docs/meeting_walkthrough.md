@@ -14,8 +14,8 @@ All paths are relative to the repository root
 | 1 | [`docs/validation/full_disk.md`](validation/full_disk.md) | 63,649 / 63,649 labels reproduced with a 23h59min59s window; the six 24-hour boundary cases. |
 | 2 | [`docs/validation/active_region.md`](validation/active_region.md) | Section A: all 511,421 published AR rows are reproduced by a look-back window. Section B: what could not be validated. |
 | 3 | [`docs/decisions.md`](decisions.md) | The questions (D1–D6), starting with D2. |
-| 4 | [`docs/architecture/system_design.md`](architecture/system_design.md) | How the code works, with a traced example. |
-| 5 | [`docs/architecture/flare_indexer_architecture.pdf`](architecture/flare_indexer_architecture.pdf) | Pages 1 (overview) and 3 (time windows) if asked. |
+| 4 | [`docs/architecture/system_design.md`](architecture/system_design.md) | How the code works, with a small labeling example. |
+| 5 | [`docs/architecture/architecture.md`](architecture/architecture.md) | Module roles and available labeling choices. |
 | 6 | [`docs/researcher_manual.md`](researcher_manual.md) | How a researcher would use the package. |
 | 7 | [`docs/api_reference.md`](api_reference.md) | Reference only. |
 
@@ -24,7 +24,7 @@ On a Mac:
 ```bash
 cd /Users/assemkadirova/Developer/flare-indexer
 open -e docs/validation/full_disk.md docs/validation/active_region.md docs/decisions.md
-open docs/architecture/flare_indexer_architecture.pdf
+open docs/architecture/system_design.md
 ```
 
 ## One working demo

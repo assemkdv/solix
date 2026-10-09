@@ -14,6 +14,8 @@
 | See which choices still need a scientific decision | [decisions.md](decisions.md) |
 
 Runnable examples with synthetic data are in [`../examples`](../examples).
+Examples 07 and 08 label real SDO/HMI images and load them with PyTorch;
+see [`../examples/real_data/README.md`](../examples/real_data/README.md).
 
 Examples in `researcher_manual.md`, `api_reference.md` and
 `architecture/system_design.md` run

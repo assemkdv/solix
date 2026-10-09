@@ -2,6 +2,6 @@ include tests/fixtures/*.csv
 include data/*.csv
 prune src/flare_indexer.egg-info
 include CHANGELOG.md
-recursive-include examples *.py *.csv *.txt
+recursive-include examples *.py *.csv *.txt *.json *.md
 recursive-include docs *.md *.json *.txt *.drawio *.pdf *.py *.csv
 recursive-include scripts *.py

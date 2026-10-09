@@ -26,6 +26,14 @@ Not yet released; version in `setup.cfg` is still 0.2.1.
   `0.0` is `"NF"`; a positive flux below A1.0 and negative, non-finite or
   non-numeric values raise errors. Boundaries are exact (no tolerance).
   Example: `examples/09_multiclass_labels.py`.
+- `examples/07_pytorch_full_disk_images.py` and
+  `examples/08_pytorch_full_disk_sequences.py`: real SDO/HMI images
+  (Helioviewer) labeled with the HEK/SWPC GOES flare list and loaded with a
+  PyTorch `Dataset`/`DataLoader`; download script and provenance in
+  `examples/real_data/`. Image timestamps are the full-precision header
+  `DATE_OBS`; the fetch script replays the recorded manifest (ids, URLs,
+  SHA-256) by default and rediscovers images only with `--refresh`.
+  Optional extra `pytorch-examples` (torch, pillow).
 
 - Active-region sequences are built per region: the index is grouped by
   region first, so several regions may share timestamps.

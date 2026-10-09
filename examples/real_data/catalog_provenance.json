@@ -1,0 +1,10 @@
+{
+  "source": "Heliophysics Event Knowledgebase (HEK), FRM_NAME=SWPC (NOAA SWPC GOES X-ray flare list)",
+  "query_url": "https://www.lmsal.com/hek/her?cosec=2&cmd=search&type=column&event_type=FL&event_starttime=2017-09-01T00%3A00%3A00&event_endtime=2017-09-06T00%3A00%3A00&event_coordsys=helioprojective&x1=-5000&x2=5000&y1=-5000&y2=5000&param0=FRM_NAME&op0=%3D&value0=SWPC&return=event_starttime%2Cevent_peaktime%2Cevent_endtime%2Cfl_goescls%2Car_noaanum%2Cfrm_name%2Ckb_archivid&result_limit=1000",
+  "query_start": "2017-09-01 00:00:00",
+  "query_end": "2017-09-06 00:00:00",
+  "raw_rows": 55,
+  "rows_without_goes_class_dropped": 0,
+  "catalog_rows": 55,
+  "note": "HEK returns events overlapping [query_start, query_end]. The list records flares; it does not certify that GOES observed without gaps (docs/decisions.md, D4)."
+}

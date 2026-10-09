@@ -225,3 +225,6 @@ scripts/output/
 
 # Example outputs
 examples/output/
+
+# Real images downloaded by examples/real_data/fetch_real_data.py (cache)
+examples/real_data/images/

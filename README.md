@@ -16,6 +16,7 @@ ready-to-train table of image/sequence -> label pairs.
 More:
 
 - [Getting started](docs/getting_started.md) and runnable [examples](examples/) with synthetic data
+- [Real-image PyTorch examples](examples/real_data/README.md) — SDO/HMI images labeled and loaded as `[B,C,H,W]` and `[B,T,C,H,W]` batches
 - [User guide](docs/user_guide.md): input/output schemas, parameters, window boundaries, errors
 - [Active-region workflow](docs/active_region_workflow.md)
 - [Architecture](docs/architecture/architecture.md) (editable `.drawio` + vector PDF)

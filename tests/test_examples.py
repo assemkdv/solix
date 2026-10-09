@@ -12,7 +12,10 @@ from pathlib import Path
 import pytest
 
 EXAMPLES_DIR = Path(__file__).resolve().parent.parent / "examples"
-EXAMPLE_SCRIPTS = sorted(EXAMPLES_DIR.glob("0*.py"))
+# Examples 07 and 08 need downloaded real images and PyTorch; they are
+# checked in test_pytorch_examples.py instead.
+REAL_DATA_EXAMPLES = {"07_pytorch_full_disk_images.py", "08_pytorch_full_disk_sequences.py"}
+EXAMPLE_SCRIPTS = sorted(p for p in EXAMPLES_DIR.glob("0*.py") if p.name not in REAL_DATA_EXAMPLES)
 
 pytestmark = pytest.mark.skipif(not EXAMPLES_DIR.is_dir(), reason="examples/ not available (installed package)")
 

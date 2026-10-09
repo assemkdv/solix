@@ -70,6 +70,9 @@ and each step is 10x stronger (a log scale). `to_flux()` converts that text
 into a real number (e.g. "M2.3" -> 2.3e-5) so flares can be compared
 **numerically**, not lexically (a plain string sort would incorrectly rank
 "M9.0" above "M10.0" — see "Numerical vs. lexical GOES ordering" below).
+The multiplication is done in decimal arithmetic from the text, so equal
+values written differently give the identical number: "C10.0" and "M1.0"
+are both exactly 1e-05.
 
 **`FlareClassifier`** — classification checks built on `FluxConverter`.
 Answers "is this flare strong enough to matter?" (`is_strong`, default

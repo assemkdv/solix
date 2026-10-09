@@ -64,7 +64,7 @@
         "image_path": "/data/hmi_jpgs_512/2011/08/07/HMI.m2011.08.07_18.00.00.jpg",
         "generated_label": 1,
         "legacy_label": 0,
-        "generated_max_flux": 3.5000000000000004e-05,
+        "generated_max_flux": 3.5e-05,
         "legacy_goes_class": "C2.2"
       },
       {
@@ -72,7 +72,7 @@
         "image_path": "/data/hmi_jpgs_512/2013/07/02/HMI.m2013.07.02_07.00.00.jpg",
         "generated_label": 1,
         "legacy_label": 0,
-        "generated_max_flux": 1.5000000000000002e-05,
+        "generated_max_flux": 1.5e-05,
         "legacy_goes_class": "C7.2"
       },
       {
@@ -80,7 +80,7 @@
         "image_path": "/data/hmi_jpgs_512/2014/08/23/HMI.m2014.08.23_12.00.00.jpg",
         "generated_label": 1,
         "legacy_label": 0,
-        "generated_max_flux": 5.900000000000001e-05,
+        "generated_max_flux": 5.9e-05,
         "legacy_goes_class": "C6.0"
       },
       {
@@ -96,7 +96,7 @@
         "image_path": "/data/hmi_jpgs_512/2014/12/03/HMI.m2014.12.03_08.00.00.jpg",
         "generated_label": 1,
         "legacy_label": 0,
-        "generated_max_flux": 1.3000000000000001e-05,
+        "generated_max_flux": 1.3e-05,
         "legacy_goes_class": "C3.8"
       }
     ]

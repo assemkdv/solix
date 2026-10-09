@@ -40,3 +40,28 @@ def test_to_flux_numeric_ordering_not_lexical():
     assert converter.to_flux("M9.0") < converter.to_flux("M10.0")
     assert converter.to_flux("M10.0") == converter.to_flux("X1.0")
     assert sorted(["M10.0", "M9.0", "X1.0"], key=converter.to_flux) == ["M9.0", "M10.0", "X1.0"]
+
+
+@pytest.mark.parametrize("text, equivalent", [
+    ("A10.0", "B1.0"), ("B10.0", "C1.0"), ("C10.0", "M1.0"), ("M10.0", "X1.0"), ("C100", "X1"), ("m2.30", "M2.3"),
+])
+def test_equivalent_class_text_gives_identical_flux(text, equivalent):
+    # Decimal arithmetic from the class text: identical floats, not merely close
+    # ones (multiplying floats gives 1e-6 * 10.0 = 9.999999999999999e-06).
+    converter = FluxConverter()
+    assert converter.to_flux(text) == converter.to_flux(equivalent)
+
+
+def test_binary_m_threshold_at_c10_and_adjacent_floats():
+    import math
+
+    from flare_indexer import BinaryThresholdLabeler, FlareClassifier
+
+    converter = FluxConverter()
+    labeler = BinaryThresholdLabeler("M")
+    assert converter.to_flux("C10.0") == 1e-05
+    assert labeler.assign(converter.to_flux("C10.0")) == 1
+    assert FlareClassifier().is_strong("C10.0", "M")
+    # The threshold comparison itself stays exact, with no tolerance.
+    assert labeler.assign(math.nextafter(1e-05, 0.0)) == 0
+    assert labeler.assign(math.nextafter(1e-05, math.inf)) == 1

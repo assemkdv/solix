@@ -1,4 +1,5 @@
 import re
+from decimal import Decimal
 
 import pandas as pd
 
@@ -34,6 +35,12 @@ def parse_goes_class(goes_class) -> tuple[str, float]:
     InvalidGOESClassError for a missing value (None/NaN/blank), an unknown
     letter, a malformed number ("M2.3.4"), or a multiplier of zero.
     """
+    letter, multiplier = _parse_goes_class_decimal(goes_class)
+    return letter, float(multiplier)
+
+
+def _parse_goes_class_decimal(goes_class) -> tuple[str, Decimal]:
+    """parse_goes_class, with the multiplier as the exact Decimal written in the text."""
     if not isinstance(goes_class, str):
         if goes_class is None or pd.isna(goes_class):
             raise InvalidGOESClassError("GOES class is missing (empty or NaN); expected e.g. 'M2.3'.")
@@ -49,7 +56,7 @@ def parse_goes_class(goes_class) -> tuple[str, float]:
             "optional positive number, e.g. 'M2.3'."
         )
     letter = match.group(1).upper()
-    multiplier = float(match.group(2)) if match.group(2) is not None else 1.0
+    multiplier = Decimal(match.group(2)) if match.group(2) is not None else Decimal(1)
     if multiplier <= 0:
         raise InvalidGOESClassError(f"Invalid GOES class {goes_class!r}: the number must be positive.")
     return letter, multiplier
@@ -92,6 +99,13 @@ class FluxConverter:
         C → 1e-6
         M → 1e-5
         X → 1e-4
+
+    to_flux() multiplies in decimal arithmetic, from the class text, and
+    rounds to a float only once at the end. Equal values written
+    differently therefore give the identical float: "C10.0" and "M1.0" are
+    both exactly 1e-05, "M10.0" and "X1.0" both 1e-04. (Multiplying the
+    floats instead, 1e-6 * 10.0 = 9.999999999999999e-06, is just below
+    1e-05 and would fall below an M1.0 threshold.)
     """
 
     FLUX_MAP = {
@@ -106,13 +120,18 @@ class FluxConverter:
         """
         Convert a GOES class string to numeric flux.
 
-        Examples: "M2.3" → 2.3e-5,  "C4" → 4e-6,  "m2.3" → 2.3e-5
+        Examples: "M2.3" → 2.3e-5,  "C4" → 4e-6,  "m2.3" → 2.3e-5,
+        "C10.0" → 1e-5 (identical to "M1.0").
+
+        The result is the float nearest to the exact decimal product
+        multiplier × FLUX_MAP[letter] (FLUX_MAP values taken as the
+        decimals they are written as, e.g. 1e-05).
 
         Raises InvalidGOESClassError (a ValueError) for a missing or
         malformed class -- see parse_goes_class().
         """
-        letter, multiplier = parse_goes_class(goes_class)
-        return self.FLUX_MAP[letter] * multiplier
+        letter, multiplier = _parse_goes_class_decimal(goes_class)
+        return float(multiplier * Decimal(repr(self.FLUX_MAP[letter])))
 
 
 class FlareClassifier:

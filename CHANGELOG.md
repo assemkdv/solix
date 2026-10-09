@@ -32,6 +32,16 @@ Not yet released; version in `setup.cfg` is still 0.2.1.
 ### Changed
 - Images with no active region are still labeled 0 by default, but no
   longer silently: a warning reports how many.
+- `FluxConverter.to_flux` multiplies in decimal arithmetic from the class
+  text and rounds to `float` once, so equivalent classes give identical
+  floats (`"C10.0"` and `"M1.0"` → `1e-05`; `"M10.0"` and `"X1.0"` →
+  `0.0001`). Before, `"C10.0"` gave `9.999999999999999e-06` and was below
+  an M1.0 threshold (`BinaryThresholdLabeler("M")` → 0, now 1). Other
+  values can change in the last 1–2 bits (`"M9.9"`:
+  `9.900000000000001e-05` → `9.9e-05`). On the cached 2010–2018 data no
+  label changed (full-disk 24h and 23h59min59s, published AR labels); 99 of
+  the 298 distinct catalog classes and 14,552 of 63,649 `max_flux` values
+  (24h) differ by at most 2 ulp, and the order of all classes is unchanged.
 
 ### Compatibility notes (behavior that differs from v0.2.1 / main)
 - Active-region sequences: an index whose region changes along the series

@@ -106,8 +106,12 @@ FluxConverter().to_flux(goes_class: str) -> float
 |---|---|---|
 | `goes_class` | `str` | letter `A`, `B`, `C`, `M` or `X` (any case), optionally followed by a positive number; surrounding spaces ignored. `"M"` means `"M1.0"`. |
 
-**What it does.** Parses the class with `parse_goes_class`, then returns
-`FLUX_MAP[letter] × number`.
+**What it does.** Parses the class, multiplies `FLUX_MAP[letter] × number`
+in decimal arithmetic using the number exactly as written, and rounds to a
+`float` once at the end. Equal values written differently give the
+identical float: `"C10.0"` and `"M1.0"` are both exactly `1e-05`, `"M10.0"`
+and `"X1.0"` both `0.0001`. (Multiplying floats, `1e-6 * 10.0`, would give
+`9.999999999999999e-06`, just below an M1.0 threshold.)
 **Returns.** `float`, W/m².
 
 Run (requires Setup):
@@ -115,8 +119,9 @@ Run (requires Setup):
 <!-- example: to_flux -->
 ```python
 converter = fidx.FluxConverter()
-for text in ["M2.0", "m2.0", "X1.2", "C4", "M"]:
+for text in ["M2.0", "m2.0", "X1.2", "C4", "M", "C10.0", "M10.0"]:
     print(text, "->", converter.to_flux(text))
+print(converter.to_flux("C10.0") == converter.to_flux("M1.0"))
 ```
 <!-- output: to_flux -->
 ```text
@@ -125,10 +130,14 @@ m2.0 -> 2e-05
 X1.2 -> 0.00012
 C4 -> 4e-06
 M -> 1e-05
+C10.0 -> 1e-05
+M10.0 -> 0.0001
+True
 ```
 
 **Output explained.** `M` is 1e-5, so `M2.0` is 2e-5; case does not
-matter; a bare letter means multiplier 1.
+matter; a bare letter means multiplier 1; `C10.0` is exactly M1.0 and
+`M10.0` exactly X1.0.
 **Errors.** `InvalidGOESClassError` for blank, NaN, unknown letters
 (`"Z5.0"`), malformed numbers (`"M2.3.4"`) or zero (`"M0"`).
 **Limitations.** Does not check physical plausibility (e.g. `"A900"` is
@@ -1056,6 +1065,7 @@ accounted for.
 |---|---|---|
 | `_GOES_CLASS_PATTERN` | regular expression for a class | `parse_goes_class` |
 | `_MAX_INVALID_EXAMPLES` | int (5) | `validate_goes_class_column` |
+| `_parse_goes_class_decimal` | class text → (letter, multiplier as exact `Decimal`); `InvalidGOESClassError` on bad input | `parse_goes_class`, `FluxConverter.to_flux` |
 
 ### `events.py`
 

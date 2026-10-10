@@ -1,3 +1,4 @@
+import math
 import pytest
 from flare_indexer.classifier import FluxConverter
 
@@ -65,3 +66,48 @@ def test_binary_m_threshold_at_c10_and_adjacent_floats():
     # The threshold comparison itself stays exact, with no tolerance.
     assert labeler.assign(math.nextafter(1e-05, 0.0)) == 0
     assert labeler.assign(math.nextafter(1e-05, math.inf)) == 1
+
+
+# ── FluxConverter.to_class (flux -> letter) ─────────────────────────────
+
+
+def test_to_class_boundaries_belong_to_the_higher_class():
+    converter = FluxConverter()
+    for letter in FluxConverter.CLASS_LETTERS:
+        boundary = FluxConverter.FLUX_MAP[letter]
+        assert converter.to_class(boundary) == letter
+        assert converter.to_class(boundary * 2) == letter
+        below = math.nextafter(boundary, 0)
+        if letter == "A":
+            with pytest.raises(ValueError, match="below the A-class boundary"):
+                converter.to_class(below)
+        else:
+            lower = FluxConverter.CLASS_LETTERS[FluxConverter.CLASS_LETTERS.index(letter) - 1]
+            assert converter.to_class(below) == lower
+    assert converter.to_class(1.0) == "X"
+
+
+@pytest.mark.parametrize("text, letter", [("C10.0", "M"), ("M1.0", "M"), ("M10.0", "X"), ("X1.0", "X"),
+                                          ("M9.9", "M"), ("A1.0", "A"), ("B99", "C")])
+def test_to_class_round_trips_equivalent_class_text(text, letter):
+    converter = FluxConverter()
+    assert converter.to_class(converter.to_flux(text)) == letter
+
+
+@pytest.mark.parametrize("value", [0, 0.0, -1e-6, float("nan"), float("inf")])
+def test_to_class_rejects_values_that_are_not_a_flare_flux(value):
+    with pytest.raises(ValueError):
+        FluxConverter().to_class(value)
+
+
+@pytest.mark.parametrize("value", ["M2.0", None, True, [1e-5]])
+def test_to_class_rejects_non_numbers(value):
+    with pytest.raises(TypeError, match="expects a flux number"):
+        FluxConverter().to_class(value)
+
+
+def test_class_letters_match_flux_map_in_increasing_order():
+    letters = FluxConverter.CLASS_LETTERS
+    assert letters == tuple(FluxConverter.FLUX_MAP) == ("A", "B", "C", "M", "X")
+    fluxes = [FluxConverter.FLUX_MAP[l] for l in letters]
+    assert fluxes == sorted(fluxes)

@@ -44,7 +44,7 @@ package uses flux numbers, never class text.
 | `adapt_goes_catalog` | function | `loaders` | [link](#adapt_goes_catalog) |
 | `ImageIndexReport` | report container | `loaders` | [link](#imageindexreport) |
 
-Public methods: `FluxConverter.to_flux`, `FlareClassifier.is_strong`,
+Public methods: `FluxConverter.to_flux`, `FluxConverter.to_class`, `FlareClassifier.is_strong`,
 `EventMatcher.query`, `EventReducer.reduce` (contract),
 `MaxFluxReducer.reduce`, `MinFluxReducer.reduce`, `ClassCountReducer.reduce`,
 `ClassCountLabeler.assign`, `ClassPresenceLabeler.assign`, `LabelAssigner.assign` (contract),
@@ -97,8 +97,11 @@ FluxConverter()
 
 **Purpose.** Converts GOES class text to X-ray flux in W/m².
 **Inputs.** None.
-**Public attribute.** `FLUX_MAP` (dict): letter → base flux,
-`{"A": 1e-8, "B": 1e-7, "C": 1e-6, "M": 1e-5, "X": 1e-4}`.
+**Public attributes.** `FLUX_MAP` (dict): letter → base flux,
+`{"A": 1e-8, "B": 1e-7, "C": 1e-6, "M": 1e-5, "X": 1e-4}`;
+`CLASS_LETTERS` (tuple): `("A", "B", "C", "M", "X")`, weakest to strongest.
+This class is the only place that knows the GOES scale; `MulticlassLabeler`
+and `ClassCountReducer` call it rather than repeating the boundaries.
 
 ### `FluxConverter.to_flux`
 
@@ -148,6 +151,52 @@ matter; a bare letter means multiplier 1; `C10.0` is exactly M1.0 and
 (`"Z5.0"`), malformed numbers (`"M2.3.4"`) or zero (`"M0"`).
 **Limitations.** Does not check physical plausibility (e.g. `"A900"` is
 accepted).
+
+### `FluxConverter.to_class`
+
+```python
+FluxConverter().to_class(flux) -> str
+```
+
+**Purpose.** The opposite direction of `to_flux`: the class letter of a
+flux value.
+
+| Parameter | Type | Accepted values |
+|---|---|---|
+| `flux` | number | positive, finite flux in W/m² |
+
+**What it does.** Compares the flux with the lower boundary of each class
+in `FLUX_MAP`, from `X` down: `A ≥ 1e-8`, `B ≥ 1e-7`, `C ≥ 1e-6`,
+`M ≥ 1e-5`, `X ≥ 1e-4` (no upper bound). Each boundary belongs to the
+higher class and the comparison is exact: one float step below `1e-5` is
+`"C"`.
+**Returns.** One of `"A"`, `"B"`, `"C"`, `"M"`, `"X"`.
+
+Run (requires Setup):
+
+<!-- example: to_class -->
+```python
+converter = fidx.FluxConverter()
+for flux in [2e-05, 1e-05, 9.999999999999999e-06, 1e-08, 0.00012]:
+    print(flux, "->", converter.to_class(flux))
+print(converter.to_class(converter.to_flux("C10.0")))
+```
+<!-- output: to_class -->
+```text
+2e-05 -> M
+1e-05 -> M
+9.999999999999999e-06 -> C
+1e-08 -> A
+0.00012 -> X
+M
+```
+
+**Output explained.** Exactly `1e-05` is `M`; the float just below it is
+`C`; `C10.0` converts to exactly `1e-05`, so it is `M`.
+**Errors.** `ValueError` for zero (no flare is not a class), a negative,
+NaN or infinite value, or a positive flux below `1e-8` (the scale has no
+letter for it); `TypeError` for a non-number, including class text and
+booleans.
 
 ### `FlareClassifier`
 

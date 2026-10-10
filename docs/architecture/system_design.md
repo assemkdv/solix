@@ -38,6 +38,57 @@ flowchart LR
 `DatasetBuildingPipeline` connects other reducers and labelers. Its `run_one()`
 returns events, reduced value, and label for inspection.
 
+## Module dependencies
+
+The package is eight modules in `src/flare_indexer/`, arranged in layers.
+An arrow means "imports from"; a module only imports from layers below it,
+so there are no cycles. `tests/test_module_dependencies.py` checks this
+table against the actual import statements.
+
+```mermaid
+flowchart BT
+    classifier["classifier<br/>GOES class ↔ flux"]
+    events["events<br/>catalog, FlareEvent, query()"]
+    labelers["labelers<br/>value → label"]
+    reducers["reducers<br/>events → value"]
+    strategies["strategies<br/>ready-made pairs"]
+    pipeline["pipeline<br/>query → reduce → assign"]
+    builder["builder<br/>DatasetBuilder, modes"]
+    loaders["loaders<br/>input adapters"]
+    events --> classifier
+    labelers --> classifier
+    reducers --> classifier
+    reducers --> events
+    strategies --> events
+    strategies --> labelers
+    strategies --> reducers
+    pipeline --> events
+    builder --> events
+    loaders --> classifier
+    loaders --> events
+    builder -. "calls strategy.label()" .-> strategies
+```
+
+| Layer | Modules | Knows about |
+|---|---|---|
+| 0 | `classifier` | only the GOES scale: `to_flux` (text → W/m²), `to_class` (W/m² → letter), `is_strong` |
+| 1 | `events`, `labelers` | `classifier` |
+| 2 | `reducers` | `classifier`, `events` |
+| 3 | `strategies`, `pipeline`, `builder` | the layers below; `builder` imports only `events` |
+| side | `loaders` | `classifier`, `events`; converts lab files into the two input CSVs |
+
+Two consequences of this shape:
+
+- Everything about GOES classes (the boundaries, decimal conversion,
+  `C10.0 == M1.0`) is in `classifier`. `MulticlassLabeler` and
+  `ClassCountReducer` call `FluxConverter.to_class` instead of repeating
+  the rule.
+- `builder` does not import `strategies`, `pipeline` or `reducers`. It
+  receives `strategy=` as an object and calls `.label(flares)` on it, so
+  any object with that method works (the dotted arrow). This is what lets
+  a user plug in a custom reducer/labeler pair without changing the
+  builder.
+
 ## Labeling choices
 
 - **Binary:** maximum flux + binary threshold; M means M1.0 or stronger.

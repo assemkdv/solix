@@ -1,3 +1,5 @@
+import math
+import numbers
 import re
 from decimal import Decimal
 
@@ -108,6 +110,8 @@ class FluxConverter:
     1e-05 and would fall below an M1.0 threshold.)
     """
 
+    CLASS_LETTERS = ("A", "B", "C", "M", "X")   # weakest to strongest
+
     FLUX_MAP = {
         "A": 1e-8,
         "B": 1e-7,
@@ -132,6 +136,36 @@ class FluxConverter:
         """
         letter, multiplier = _parse_goes_class_decimal(goes_class)
         return float(multiplier * Decimal(repr(self.FLUX_MAP[letter])))
+
+    def to_class(self, flux) -> str:
+        """
+        The GOES class letter of a flux value: the opposite direction of
+        to_flux(), decided by the lower boundary of each class in FLUX_MAP.
+
+        A >= 1e-8, B >= 1e-7, C >= 1e-6, M >= 1e-5, X >= 1e-4 (no upper
+        bound); each boundary belongs to the higher class, and the
+        comparison is exact (one float step below 1e-5 is "C").
+        Examples: 2e-5 → "M", 1e-5 → "M", 9.999999999999999e-06 → "C".
+
+        Raises ValueError for a positive flux below the A boundary (the
+        scale has no letter for it), for zero (no flare, not a class), and
+        for a negative, NaN or infinite value; TypeError for a non-number
+        (including text and booleans).
+        """
+        if isinstance(flux, bool) or not isinstance(flux, numbers.Real):
+            raise TypeError(f"FluxConverter.to_class expects a flux number in W/m^2, got {flux!r} "
+                            f"({type(flux).__name__}).")
+        value = float(flux)
+        if not math.isfinite(value):
+            raise ValueError(f"FluxConverter.to_class got a non-finite flux {flux!r}.")
+        if value <= 0:
+            raise ValueError(f"FluxConverter.to_class got {value!r}; a GOES class needs a positive flux "
+                             "(0.0 means no flare, and X-ray flux cannot be negative).")
+        for letter in reversed(self.CLASS_LETTERS):
+            if value >= self.FLUX_MAP[letter]:
+                return letter
+        raise ValueError(f"FluxConverter.to_class got a positive flux {value!r} W/m^2 below the A-class "
+                         f"boundary {self.FLUX_MAP['A']!r} W/m^2; the GOES scale has no class for it.")
 
 
 class FlareClassifier:

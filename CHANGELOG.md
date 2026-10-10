@@ -63,6 +63,13 @@ Not yet released; version in `setup.cfg` is still 0.2.1.
   that runs the framework examples and fails on unexpected skips.
 
 ### Changed
+- `FluxConverter.to_class(flux)` is the one place that turns a flux into a
+  GOES class letter; `MulticlassLabeler` and `ClassCountReducer` call it.
+  `reducers` no longer imports `labelers`, so the modules form strict
+  layers (classifier → events/labelers → reducers → strategies/pipeline/
+  builder), documented in `docs/architecture/system_design.md` and checked
+  by `tests/test_module_dependencies.py`. Labels and error messages are
+  unchanged; `FluxConverter.CLASS_LETTERS` is new.
 - The sdist no longer includes generated `examples/output/` files or the
   downloaded image cache (`MANIFEST.in` prunes them).
 - Images with no active region are still labeled 0 by default, but no

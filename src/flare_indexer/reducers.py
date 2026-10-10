@@ -2,7 +2,6 @@ from typing import Protocol
 
 from .classifier import FluxConverter
 from .events import FlareEvent
-from .labelers import MulticlassLabeler
 
 _flux_converter = FluxConverter()
 
@@ -49,13 +48,13 @@ class ClassCountReducer:
     """Count every matched event by numeric GOES class, in A/B/C/M/X order.
 
     Empty windows return all zeros. Equivalent strengths (C10.0/M1.0)
-    share a bin. Below-A flux follows MulticlassLabeler's rejection policy.
-    Each input event is counted once; this component does not deduplicate.
+    share a bin (FluxConverter.to_class). A class below A1.0 (e.g. "A0.5")
+    raises ValueError there, as MulticlassLabeler does. Each input event
+    is counted once; this component does not deduplicate.
     """
 
     def reduce(self, events: list[FlareEvent]) -> dict[str, int]:
-        counts = dict.fromkeys(MulticlassLabeler.CLASSES[1:], 0)
-        classifier = MulticlassLabeler()
+        counts = dict.fromkeys(FluxConverter.CLASS_LETTERS, 0)
         for event in events:
-            counts[classifier.assign(_flux_converter.to_flux(event.goes_class))] += 1
+            counts[_flux_converter.to_class(_flux_converter.to_flux(event.goes_class))] += 1
         return counts

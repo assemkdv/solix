@@ -83,7 +83,7 @@ class MulticlassLabeler:
       raises TypeError.
     """
 
-    CLASSES = ("NF", "A", "B", "C", "M", "X")
+    CLASSES = ("NF",) + FluxConverter.CLASS_LETTERS
 
     def assign(self, reduced_flux) -> str:
         if isinstance(reduced_flux, bool) or not isinstance(reduced_flux, numbers.Real):
@@ -98,15 +98,13 @@ class MulticlassLabeler:
             raise ValueError(f"MulticlassLabeler.assign got a negative flux {flux!r}; X-ray flux cannot be negative.")
         if flux == 0:
             return "NF"
-        for letter in reversed(self.CLASSES[1:]):
-            boundary = _flux_converter.FLUX_MAP[letter]
-            if flux >= boundary:
-                return letter
-        raise ValueError(
-            f"MulticlassLabeler.assign got a positive flux {flux!r} W/m^2 below the A-class boundary "
-            f"{_flux_converter.FLUX_MAP['A']!r} W/m^2. The GOES scale has no class for it, and it is not "
-            "'NF' (no flare). Check the catalog for classes below A1.0 (e.g. 'A0.5')."
-        )
+        if flux < _flux_converter.FLUX_MAP["A"]:
+            raise ValueError(
+                f"MulticlassLabeler.assign got a positive flux {flux!r} W/m^2 below the A-class boundary "
+                f"{_flux_converter.FLUX_MAP['A']!r} W/m^2. The GOES scale has no class for it, and it is not "
+                "'NF' (no flare). Check the catalog for classes below A1.0 (e.g. 'A0.5')."
+            )
+        return _flux_converter.to_class(flux)   # the boundary rule lives in classifier.py
 
 
 class ClassCountLabeler:
@@ -119,7 +117,7 @@ class ClassCountLabeler:
     def assign(self, counts) -> dict[str, int]:
         if not isinstance(counts, Mapping):
             raise TypeError("Class counts must be a mapping, not a reduced scalar flux.")
-        classes = MulticlassLabeler.CLASSES[1:]
+        classes = FluxConverter.CLASS_LETTERS
         if set(counts) != set(classes):
             raise ValueError("Class counts must contain exactly A, B, C, M, X.")
         result = {}

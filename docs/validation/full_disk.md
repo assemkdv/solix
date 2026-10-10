@@ -253,7 +253,7 @@ M-class flare starts **exactly** 24 hours later:
 The legacy window stops one second short of 24 hours, so these flares are
 outside it. Setting `prediction_window="23h59min59s"` removes every
 difference. Which boundary is intended is decision
-[D1](../decisions.md#d1-24-hour-window-boundary).
+[Q3](../decisions.md#q3-default-flare-time-and-window-boundaries).
 
 Positive labels per year (24h window): 2010 0/562, 2011 1,237/6,528,
 2012 1,358/6,515, 2013 1,437/7,657, 2014 2,707/8,408, 2015 1,664/8,511,
@@ -269,7 +269,7 @@ Positive labels per year (24h window): 2010 0/562, 2011 1,237/6,528,
   the flares the catalog lists. That latest flare is not taken as the end
   of coverage – near solar minimum a long flare-free period is plausible –
   so whether these 0 labels reflect quiet Sun or missing coverage is
-  unknown (decision [D4](../decisions.md#d4-catalog-coverage)).
+  unknown (decision [Q5](../decisions.md#q5-does-an-empty-window-mean-no-flare)).
 - Both the package and the legacy script read the same catalog, so
   agreement says nothing about flares missing from it.
 - Times are compared as given; no TAI/UTC conversion.

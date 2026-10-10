@@ -38,7 +38,7 @@ fidx.DatasetBuilder(
 ```
 
 The window edge (`24h` vs `23h59min59s`) and catalog coverage are open
-questions D1 and D4 in [`docs/decisions.md`](../../docs/decisions.md);
+questions Q3 and Q5 in [`docs/decisions.md`](../../docs/decisions.md);
 these examples do not settle them.
 
 ## Setup and run
@@ -147,7 +147,7 @@ period it lists the same 55 (start time, class) pairs as the lab catalog
 Before labeling, the examples stop unless every window `(t, t + 24h]`
 lies inside the queried interval (last window ends 2017-09-04 09:59:50).
 A flare list cannot show that GOES observed without gaps, so a 0 label
-means "no M/X flare in this list", as discussed in D4.
+means "no M/X flare in this list", as discussed in Q5.
 
 ## Preprocessing
 
@@ -277,8 +277,8 @@ strings.
   from calibrated FITS (e.g. JSOC `hmi.M_720s`), which needs a registered
   JSOC export e-mail and was not used here.
 - `QUALITY` flags are recorded, not interpreted.
-- Catalog coverage is the query interval only (D4). The window edge `24h`
-  is the example's explicit choice, not a resolution of D1.
+- Catalog coverage is the query interval only (Q5). The window edge `24h`
+  is the example's explicit choice, not a resolution of Q3.
 - The grid uses exact timestamps. HMI observation times here drift by
   0.1 s, which is enough to break the hourly grid. Building longer
   sequences from such data would need an explicit, documented tolerance

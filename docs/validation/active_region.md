@@ -183,7 +183,7 @@ Two independent columns (`label` and the full `goes_class` string) are
 reproduced exactly on every row. This is strong evidence that the
 published labels were computed with the look-back window as written in
 `step3_labeling.py`. It does not tell us whether that window was
-*intended*; that is decision [D2](../decisions.md#d2-active-region-window-direction).
+*intended*; that is decision [Q2](../decisions.md#q2-active-region-labels-flares-before-or-after-the-image).
 
 Example: HARP 362 (NOAA 11153). An M1.9 flare starts 2011-02-09 01:23.
 In `train.csv` the patches from 2011-02-09 02:00 to 2011-02-10 01:00 are
@@ -217,7 +217,7 @@ downloaded. The counts, hashes and corrections are in
   are later than that, and 8 are earlier than the first recorded flare.
   The catalog does not state its observation coverage, so whether those
   patches had no flares or were simply not covered is unknown
-  ([D4](../decisions.md#d4-catalog-coverage)).
+  ([Q5](../decisions.md#q5-does-an-empty-window-mean-no-flare)).
 
 ---
 

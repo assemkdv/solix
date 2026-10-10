@@ -101,7 +101,7 @@ python examples/01_full_disk_single_image.py
 
 ```bash
 pip install -e ".[dev]"
-pytest                                   # 460 tests; framework tests skip without torch/tensorflow
+pytest                                   # 488 tests; framework tests skip without torch/tensorflow
 python scripts/check_doc_examples.py     # documentation examples
 ```
 

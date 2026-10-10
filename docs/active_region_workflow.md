@@ -60,7 +60,7 @@ builder = fidx.DatasetBuilder(
     target="active_region",
     event_time="start",
     interval_mode="right_closed",
-    missing_active_region="error",   # see decision D3
+    missing_active_region="error",   # see decision Q4
     include_metadata=True,           # keeps active_region and image_path
 )
 with warnings.catch_warnings(record=True) as caught:
@@ -125,9 +125,9 @@ known in advance.
 3. **Times the catalog may not cover.** A catalog lists flares, not its
    observation periods, so the package cannot tell "no flare" from "not
    covered". It does not guess coverage from the first or last recorded
-   flare. See [decisions.md](decisions.md) D4.
+   flare. See [decisions.md](decisions.md) Q5.
 
-See [decisions.md](decisions.md) D3, D4 and D6.
+See [decisions.md](decisions.md) Q4 and Q5.
 
 ## 6. Status
 
@@ -139,4 +139,4 @@ See [decisions.md](decisions.md) D3, D4 and D6.
 - **Validation of the complete original patch dataset: not possible
   yet.** The unfiltered SHARP patch table (`meta_data_updated.csv`, read
   by `step2_data_filtering.py`) is not public.
-- **Open:** which window direction is intended (decision D2).
+- **Open:** which window direction is intended (decision Q2).

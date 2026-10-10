@@ -79,7 +79,7 @@ def check_catalog_coverage(reference_times, prediction_window) -> dict:
     Stop unless every prediction window (t, t + prediction_window] lies
     inside the interval the catalog was queried for. This is the only
     coverage the example can establish: a flare list cannot show that the
-    instrument observed without gaps (docs/decisions.md, D4).
+    instrument observed without gaps (docs/decisions.md, Q5).
     """
     provenance = json.loads(CATALOG_PROVENANCE.read_text())
     query_start, query_end = pd.Timestamp(provenance["query_start"]), pd.Timestamp(provenance["query_end"])

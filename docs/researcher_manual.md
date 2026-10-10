@@ -76,7 +76,7 @@ python -c "import flare_indexer as f; print(len(f.__all__), 'public names'); pri
 Expected:
 
 ```text
-19 public names
+24 public names
 <class 'flare_indexer.builder.DatasetBuilder'>
 ```
 
@@ -274,7 +274,7 @@ Only the last image (18:00) changes. The M1.0 flare *starts* at exactly
 `t + 6h` and *peaks* 20 minutes later, so it counts only for the
 start-based, right-closed 6-hour window. On real full-disk data the same
 effect (with 24 hours) explains all six differences from the legacy
-labels; see [decision D1](decisions.md#d1-24-hour-window-boundary).
+labels; see [decision Q3](decisions.md#q3-default-flare-time-and-window-boundaries).
 
 ## 8. Strategies: binary labels and flux values
 
@@ -444,7 +444,7 @@ images whose region is blank:
 | `"error"` | `ValueError` | `ValueError` before any sequence is built |
 
 A 0 produced by `"negative"` is a result of the policy, not an observed
-absence of flares (see [decision D3](decisions.md#d3-images-without-an-active-region)).
+absence of flares (see [decision Q4](decisions.md#q4-missing-region-numbers)).
 
 `include_metadata=True` keeps the other index columns (and, in AR mode,
 the normalized `active_region`) in single-image output. Without it the
@@ -711,15 +711,19 @@ uses NOAA numbers, both files must use the same key; see
 **Scientific assumptions that are not settled** (see
 [decisions.md](decisions.md))
 
-- Whether the window should end at `t + 24h` or `t + 23:59:59` (D1).
-- Whether active-region labels should look forward or back (D2).
-- How to treat images without a region (D3) and catalog flares without a
-  NOAA region (D6). Both can cause false negatives (a 0 where 1 would be
+- What cumulative indexing should compute; it is not implemented (Q1).
+- Whether active-region labels should look forward or back (Q2).
+- Which flare time (start or peak) and which window edges should be the
+  defaults; `t + 24h` or `t + 23:59:59` (Q3).
+- How to treat images without a region and catalog flares without a
+  NOAA region (Q4). Both can cause false negatives (a 0 where 1 would be
   correct); which rows are affected is unknown.
 - Whether a 0 in a period the catalog may not cover means "quiet Sun" or
-  "no data" (D4).
-- Whether image and catalog times share a time scale (SHARP file names
-  are TAI; the GOES catalog is assumed to be UTC).
+  "no data" (Q5).
+- Whether image times may deviate from the cadence grid, and whether
+  SHARP file-name times (TAI) should be converted to UTC before matching
+  the GOES catalog (Q6).
+- What label a flux below A1.0 should get (Q7).
 
 Matching published labels shows how they were computed, not that they are
 scientifically correct.

@@ -308,7 +308,7 @@ def fetch_catalog() -> pd.DataFrame:
         "rows_without_goes_class_dropped": int(no_class.sum()),
         "catalog_rows": int(len(catalog)),
         "note": "HEK returns events overlapping [query_start, query_end]. The list records flares; "
-                "it does not certify that GOES observed without gaps (docs/decisions.md, D4).",
+                "it does not certify that GOES observed without gaps (docs/decisions.md, Q5).",
     }, indent=2) + "\n")
     print(f"HEK SWPC flares {CATALOG_START} .. {CATALOG_END}: {len(raw)} rows, "
           f"{int(no_class.sum())} without a GOES class dropped, {len(catalog)} written to {CATALOG.name}")

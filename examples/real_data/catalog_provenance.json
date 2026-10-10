@@ -6,5 +6,5 @@
   "raw_rows": 55,
   "rows_without_goes_class_dropped": 0,
   "catalog_rows": 55,
-  "note": "HEK returns events overlapping [query_start, query_end]. The list records flares; it does not certify that GOES observed without gaps (docs/decisions.md, D4)."
+  "note": "HEK returns events overlapping [query_start, query_end]. The list records flares; it does not certify that GOES observed without gaps (docs/decisions.md, Q5)."
 }

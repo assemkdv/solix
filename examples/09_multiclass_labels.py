@@ -9,7 +9,7 @@ i.e. the strongest flare in the window. It does not record which other
 classes occurred or how many flares there were.
 
 The active-region part warns that two sample flares have no region: they
-cannot match any patch (see docs/decisions.md, D6).
+cannot match any patch (see docs/decisions.md, Q4).
 
 Run:  python examples/09_multiclass_labels.py
 """

@@ -70,6 +70,9 @@ this package only labels.
   and method.
 - **[System design](docs/architecture/system_design.md)** — how the code
   works inside, with one inspectable example.
+- [Interactive walkthrough](docs/walkthrough.html) — open in a browser:
+  the example inputs, the five settings, the window for each of the 118
+  images, and the output table, with the matching code locations.
 - [Active-region workflow](docs/active_region_workflow.md) — labeling
   SHARP/HARP patches step by step.
 - [Open decisions](docs/decisions.md) — labeling choices that still need a

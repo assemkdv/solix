@@ -5,7 +5,6 @@
 | **Learn to use the package, step by step (main guide)** | **[researcher_manual.md](researcher_manual.md)** |
 | **Look up any public class, function or method** | **[api_reference.md](api_reference.md)** |
 | **Understand how the code works inside** | **[architecture/system_design.md](architecture/system_design.md)** |
-| See the labeling happen one image at a time (interactive page) | [walkthrough.html](walkthrough.html) — open the file in a browser |
 | Label active-region patches | [active_region_workflow.md](active_region_workflow.md) |
 | Check the real-data validation | [validation/full_disk.md](validation/full_disk.md), [validation/active_region.md](validation/active_region.md) |
 | See which choices still need a scientific decision | [decisions.md](decisions.md) |

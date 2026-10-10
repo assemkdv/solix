@@ -54,7 +54,7 @@ def test_end_to_end_max_flare_strategy():
 
 
 def test_end_to_end_sequences_against_real_fixture_catalog(tmp_path):
-    # Uses the same real-format (date + HHMM) tests/fixtures/catalog.csv as
+    # Uses the same tests/fixtures/catalog.csv as
     # the tests above, but drives it through sequence labeling rather than
     # single-image labeling.
     index_path = tmp_path / "sequence_index.csv"
@@ -165,7 +165,7 @@ def test_end_to_end_active_region_sequences_against_real_fixture_catalog(tmp_pat
 
 # The two synthetic catalogs hold INVENTED events, not solar observations;
 # see tests/fixtures/README.md.
-SYNTHETIC_HHMM_CATALOG_PATH = FIXTURES_DIR / "synthetic_hhmm_catalog.csv"
+SYNTHETIC_SAME_DAY_CATALOG_PATH = FIXTURES_DIR / "synthetic_same_day_catalog.csv"
 SYNTHETIC_FULL_TIMESTAMP_CATALOG_PATH = FIXTURES_DIR / "synthetic_full_timestamp_catalog.csv"
 
 
@@ -178,9 +178,8 @@ def _times(matcher):
     return matcher._catalog[["goes_class", "start_time", "peak_time", "end_time"]].to_dict("records")
 
 
-def test_end_to_end_synthetic_hhmm_catalog(tmp_path):
-    # Every HHMM time takes the calendar date from the row's `date` column.
-    assert _times(EventMatcher(SYNTHETIC_HHMM_CATALOG_PATH)) == [
+def test_end_to_end_synthetic_same_day_catalog(tmp_path):
+    assert _times(EventMatcher(SYNTHETIC_SAME_DAY_CATALOG_PATH)) == [
         {"goes_class": "M2.0",
          "start_time": pd.Timestamp("2030-01-10 09:40"),
          "peak_time": pd.Timestamp("2030-01-10 09:52"),
@@ -200,7 +199,7 @@ def test_end_to_end_synthetic_hhmm_catalog(tmp_path):
     #   2030-01-12 00:00: only C3.0 (peak 12:00), below M -> 0, max flux 3e-6
     #   2030-01-13 00:00: nothing -> 0, 0.0
     binary = DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy("M")) \
-        .build(index_path, SYNTHETIC_HHMM_CATALOG_PATH)
+        .build(index_path, SYNTHETIC_SAME_DAY_CATALOG_PATH)
     assert list(binary.columns) == ["timestamp", "label"]
     assert binary["timestamp"].tolist() == [
         pd.Timestamp("2030-01-10T00:00:00"),
@@ -210,29 +209,11 @@ def test_end_to_end_synthetic_hhmm_catalog(tmp_path):
     assert binary["label"].tolist() == [1, 0, 0]
 
     flux = DatasetBuilder(prediction_window=24, strategy=MaxFlareStrategy()) \
-        .build(index_path, SYNTHETIC_HHMM_CATALOG_PATH)
+        .build(index_path, SYNTHETIC_SAME_DAY_CATALOG_PATH)
     assert flux["label"].tolist() == pytest.approx([2e-5, 3e-6, 0.0])
 
 
-def test_end_to_end_hhmm_midnight_crossing_event_is_rejected(tmp_path):
-    # 2350 / 0005 / 0020 on one date: peak and end would fall ~24 h before
-    # the start. The row is rejected, never shifted to the next day.
-    catalog_path = tmp_path / "catalog.csv"
-    catalog_path.write_text(SYNTHETIC_HHMM_CATALOG_PATH.read_text() + "2030-01-11,2350,0005,0020,X1.5,90002\n")
-    index_path = _write_index(tmp_path / "index.csv", ["2030-01-11T00:00:00"])
-
-    with pytest.raises(ValueError) as excinfo:
-        DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy("M")).build(index_path, catalog_path)
-
-    message = str(excinfo.value)
-    assert "data row 3" in message
-    assert "start_time > peak_time" in message
-    assert "start_time=2030-01-11 23:50:00, peak_time=2030-01-11 00:05:00, end_time=2030-01-11 00:20:00" in message
-    assert "crosses midnight" in message
-    assert "full-timestamp schema" in message and "explicit dates" in message
-
-
-def test_end_to_end_full_timestamp_midnight_crossing_event(tmp_path):
+def test_end_to_end_midnight_crossing_event(tmp_path):
     assert _times(EventMatcher(SYNTHETIC_FULL_TIMESTAMP_CATALOG_PATH)) == [
         {"goes_class": "X1.5",
          "start_time": pd.Timestamp("2030-01-11 23:50"),

@@ -46,8 +46,8 @@ def test_query_preserves_non_empty_active_region():
 def test_load_catalog_does_not_print(tmp_path, capsys):
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
-        "date,start,peak,end,class,active_region\n"
-        "2024-01-01,0020,0030,0040,M2.3,4456\n"
+        "start_time,peak_time,end_time,class,active_region\n"
+        "2024-01-01 00:20:00,2024-01-01 00:30:00,2024-01-01 00:40:00,M2.3,4456\n"
     )
 
     EventMatcher(catalog_path)
@@ -56,40 +56,13 @@ def test_load_catalog_does_not_print(tmp_path, capsys):
     assert captured.out == ""
 
 
-def test_load_catalog_parses_hhmm_with_date(tmp_path):
-    # The exact scraper example row: NOAA-style bare HHMM times combined
-    # with the date column, not a full ISO timestamp per field.
-    catalog_path = tmp_path / "catalog.csv"
-    catalog_path.write_text(
-        "date,start,peak,end,class,active_region\n"
-        "2024-01-23,0309,0331,0338,M5.1,3559\n"
-    )
-
-    matcher = EventMatcher(catalog_path)
-
-    assert matcher._catalog.loc[0, "peak_time"] == pd.Timestamp("2024-01-23 03:31:00")
-    assert matcher._catalog.loc[0, "start_time"] == pd.Timestamp("2024-01-23 03:09:00")
-
-
-def test_load_catalog_never_reproduces_1970_epoch_bug(tmp_path):
-    # Regression test: pd.to_datetime() called directly on a bare HHMM value
-    # like 331 used to be misread as a Unix timestamp near 1970-01-01.
-    catalog_path = tmp_path / "catalog.csv"
-    catalog_path.write_text(
-        "date,start,peak,end,class,active_region\n"
-        "2024-01-23,0309,0331,0338,M5.1,3559\n"
-    )
-
-    matcher = EventMatcher(catalog_path)
-
-    assert matcher._catalog.loc[0, "peak_time"].year == 2024
 
 
 def test_load_catalog_parses_midnight(tmp_path):
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
-        "date,start,peak,end,class,active_region\n"
-        "2024-01-23,0000,0000,0005,C1.0,3559\n"
+        "start_time,peak_time,end_time,class,active_region\n"
+        "2024-01-23 00:00:00,2024-01-23 00:00:00,2024-01-23 00:05:00,C1.0,3559\n"
     )
 
     matcher = EventMatcher(catalog_path)
@@ -97,38 +70,12 @@ def test_load_catalog_parses_midnight(tmp_path):
     assert matcher._catalog.loc[0, "peak_time"] == pd.Timestamp("2024-01-23 00:00:00")
 
 
-def test_load_catalog_rejects_invalid_hour(tmp_path):
-    catalog_path = tmp_path / "catalog.csv"
-    catalog_path.write_text(
-        "date,start,peak,end,class,active_region\n"
-        "2024-01-23,2460,0331,0338,M5.1,3559\n"
-    )
-
-    with pytest.raises(ValueError) as excinfo:
-        EventMatcher(catalog_path)
-
-    message = str(excinfo.value)
-    assert "2460" in message
-    assert str(catalog_path) in message
-
-
-def test_load_catalog_rejects_invalid_minute(tmp_path):
-    catalog_path = tmp_path / "catalog.csv"
-    catalog_path.write_text(
-        "date,start,peak,end,class,active_region\n"
-        "2024-01-23,0309,1267,0338,M5.1,3559\n"
-    )
-
-    with pytest.raises(ValueError) as excinfo:
-        EventMatcher(catalog_path)
-
-    assert "1267" in str(excinfo.value)
 
 
 def test_load_catalog_rejects_non_numeric_time(tmp_path):
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
-        "date,start,peak,end,class,active_region\n"
+        "start_time,peak_time,end_time,class,active_region\n"
         "2024-01-23,0309,abc,0338,M5.1,3559\n"
     )
 
@@ -212,24 +159,12 @@ def test_query_active_region_missing_catalog_active_region_does_not_match():
     assert results == []
 
 
-def test_load_catalog_rejects_missing_time_value(tmp_path):
-    catalog_path = tmp_path / "catalog.csv"
-    catalog_path.write_text(
-        "date,start,peak,end,class,active_region\n"
-        "2024-01-23,0309,,0338,M5.1,3559\n"
-    )
-
-    with pytest.raises(ValueError) as excinfo:
-        EventMatcher(catalog_path)
-
-    assert "missing" in str(excinfo.value).lower()
-
 
 def test_load_catalog_missing_one_required_column(tmp_path):
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
-        "date,start,peak,end,class\n"
-        "2024-01-01,2024-01-01T00:20:00,2024-01-01T00:30:00,2024-01-01T00:40:00,M2.3\n"
+        "start_time,peak_time,end_time,class\n"
+        "2024-01-01 00:20:00,2024-01-01 00:30:00,2024-01-01 00:40:00,M2.3\n"
     )
 
     with pytest.raises(ValueError) as excinfo:
@@ -268,7 +203,7 @@ def test_load_catalog_completely_empty_file_raises(tmp_path):
 
 def test_load_catalog_header_only_is_valid_and_empty(tmp_path):
     catalog_path = tmp_path / "catalog.csv"
-    catalog_path.write_text("date,start,peak,end,class,active_region\n")
+    catalog_path.write_text("start_time,peak_time,end_time,class,active_region\n")
 
     matcher = EventMatcher(catalog_path)
     results = matcher.query(pd.Timestamp("2024-01-01"), prediction_window_hours=24)
@@ -276,10 +211,10 @@ def test_load_catalog_header_only_is_valid_and_empty(tmp_path):
     assert results == []
 
 
-# ── Full-timestamp catalog schema (adapt_goes_catalog-shaped) ──────────
+# ── Catalog schema details ───────────────────────────────────────────────
 
 
-def test_load_catalog_full_timestamp_schema_is_recognized(tmp_path):
+def test_load_catalog_parses_full_timestamps(tmp_path):
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
         "start_time,peak_time,end_time,class,active_region\n"
@@ -294,10 +229,9 @@ def test_load_catalog_full_timestamp_schema_is_recognized(tmp_path):
     assert matcher._catalog.loc[0, "goes_class"] == "M5.1"
 
 
-def test_load_catalog_full_timestamp_schema_preserves_dates_crossing_midnight(tmp_path):
+def test_load_catalog_preserves_dates_crossing_midnight(tmp_path):
     # A flare that starts just before midnight and peaks/ends just after it
-    # must keep three DIFFERENT calendar dates -- not get flattened onto a
-    # single date the way the old date+HHMM schema would require.
+    # keeps its different calendar dates.
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
         "start_time,peak_time,end_time,class,active_region\n"
@@ -344,7 +278,6 @@ def test_load_catalog_full_timestamp_rejects_times_out_of_order(tmp_path, row, e
     assert "data row 2" in message
     assert f"{earlier} > {later}" in message
     assert "start <= peak <= end" in message
-    assert "HHMM" not in message
 
 
 def test_load_catalog_full_timestamp_allows_equal_and_missing_times(tmp_path):
@@ -362,20 +295,6 @@ def test_load_catalog_full_timestamp_allows_equal_and_missing_times(tmp_path):
     assert catalog["end_time"].isna().tolist() == [False, True, False]
     assert catalog["start_time"].isna().tolist() == [False, False, True]
 
-
-def test_full_timestamp_schema_takes_priority_error_message_when_ambiguous(tmp_path):
-    # Missing "active_region" with otherwise full-timestamp-shaped columns
-    # should report against the full-timestamp schema, not the legacy one.
-    catalog_path = tmp_path / "catalog.csv"
-    catalog_path.write_text(
-        "start_time,peak_time,end_time,class\n"
-        "2024-01-23 03:09:00,2024-01-23 03:31:00,2024-01-23 03:38:00,M5.1\n"
-    )
-
-    with pytest.raises(ValueError) as excinfo:
-        EventMatcher(catalog_path)
-
-    assert "active_region" in str(excinfo.value)
 
 
 # ── event_time (start vs. peak matching) ────────────────────────────────

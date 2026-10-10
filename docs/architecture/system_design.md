@@ -8,8 +8,8 @@ and the [API reference](../api_reference.md) for every public name.
 
 - **Image index:** a CSV containing `timestamp`, optionally `image_path` and
   other metadata. Active-region mode also requires an `active_region` column.
-- **Flare catalog:** full start/peak/end timestamps, class, and region, or
-  the supported date + HHMM schema. Loaders adapt supported external formats.
+- **Flare catalog:** full start/peak/end timestamps, class, and region.
+  Loaders adapt supported external formats.
 - **Output:** a pandas DataFrame with one row per image or sequence and a
   `label` column. Metadata can be preserved with `include_metadata=True`.
 
@@ -123,10 +123,10 @@ It records candidate, emitted, and skipped counts and samples of missing times.
 ## Input checks and missing data
 
 Catalog loading validates GOES classes and available `start <= peak <= end`
-times. Equal times are allowed. Full timestamps can represent missing times
-and midnight-crossing events. Date + HHMM cannot represent different dates
-inside one event; out-of-order records are rejected, not automatically shifted.
-An event missing the selected start or peak cannot be matched by that basis.
+times. Equal times are allowed; a missing time is skipped; out-of-order
+records are rejected, not shifted. Every time carries its own date, so
+midnight-crossing events are represented as written. An event missing the
+selected start or peak cannot be matched by that basis.
 
 For images without a region, `missing_active_region` chooses a negative/empty
 result with a warning, exclusion, or an error. Catalog events without a region

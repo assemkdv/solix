@@ -36,8 +36,7 @@ def test_error_type_stays_backward_compatible():
 @pytest.mark.parametrize("header, row", [
     ("start_time,peak_time,end_time,class,active_region",
      "2024-01-01 05:00:00,2024-01-01 05:10:00,2024-01-01 05:20:00,{cls},100"),
-    ("date,start,peak,end,class,active_region", "2024-01-01,0500,0510,0520,{cls},100"),
-])
+    ])
 def test_catalog_with_invalid_classes_fails_at_load(tmp_path, header, row):
     lines = [header, row.format(cls="M2.0"), row.format(cls=""), row.format(cls="Q3"), row.format(cls="C1.0")]
     path = tmp_path / "catalog.csv"

@@ -213,12 +213,9 @@ def adapt_goes_catalog(
     ignored. `noaa_active_region` is normalized to the same string-or-None
     convention as `events._normalize_active_region`.
 
-    Unlike earlier versions of this function, timestamps are NOT re-encoded
-    into a single date plus bare HHMM times: that round-trip assumed
-    start/peak/end always share one calendar date, which silently corrupts
-    any flare that crosses midnight (e.g. start_time on one date,
-    peak_time/end_time on the next). Each timestamp keeps its own complete,
-    independent date.
+    Each timestamp keeps its own complete date, so a flare that crosses
+    midnight (start_time on one date, peak_time/end_time on the next) is
+    written as it happened.
     """
     input_path = Path(input_path)
 

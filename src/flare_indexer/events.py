@@ -64,68 +64,14 @@ def _normalize_active_region(value) -> str | None:
     return str(value)
 
 
-def _normalize_hhmm(value, column: str, path) -> str:
-    """
-    Validate and zero-pad a raw start/peak/end cell into a 4-digit HHMM
-    string (e.g. 331 -> "0331"), raising a clear ValueError for anything
-    that isn't a real time of day.
-    """
-    if pd.isna(value):
-        raise ValueError(
-            f"Flare catalog at {path} has a missing value in column '{column}': "
-            "expected a 4-digit HHMM time (e.g. 0309)."
-        )
-
-    if isinstance(value, float):
-        if not value.is_integer():
-            raise ValueError(
-                f"Flare catalog at {path} has an invalid value {value!r} in "
-                f"column '{column}': expected a 4-digit HHMM time (e.g. 0309)."
-            )
-        value = int(value)
-
-    text = str(value).strip()
-    if not text.isdigit() or len(text) > 4:
-        raise ValueError(
-            f"Flare catalog at {path} has an invalid value {text!r} in "
-            f"column '{column}': expected a 4-digit HHMM time (e.g. 0309)."
-        )
-
-    text = text.zfill(4)
-    hour, minute = int(text[:2]), int(text[2:])
-    if not (0 <= hour <= 23 and 0 <= minute <= 59):
-        raise ValueError(
-            f"Flare catalog at {path} has an invalid time {text!r} in column "
-            f"'{column}': hour must be 00-23 and minute must be 00-59."
-        )
-
-    return text
-
-
-def _combine_date_and_hhmm(df: pd.DataFrame, date_col: str, time_col: str, path) -> pd.Series:
-    """
-    Build full timestamps from a date column and an HHMM time-of-day column.
-
-    NOAA-style catalogs give start/peak/end as bare 4-digit times with no
-    date attached (e.g. "0309" for 03:09). Calling pd.to_datetime() on that
-    value alone misreads it as a Unix timestamp near 1970-01-01, so the date
-    and time must always be combined and parsed together with an explicit
-    format, never pandas' automatic inference.
-    """
-    normalized_times = df[time_col].apply(lambda v: _normalize_hhmm(v, time_col, path))
-    combined = df[date_col].astype(str).str.strip() + " " + normalized_times
-    return pd.to_datetime(combined, format="%Y-%m-%d %H%M")
-
-
 def _parse_full_timestamp_column(df: pd.DataFrame, column: str, path) -> pd.Series:
     """
     Parse a column of full datetime strings (e.g. "2010-05-01 01:39:00"),
     raising a clear ValueError naming the file/column/value on failure.
 
-    Unlike the legacy date+HHMM schema, these columns already carry their
-    own complete calendar date, so no date-combination step is needed --
-    and none must be applied, or events that cross midnight (start_time on
-    one date, peak_time/end_time on the next) would be silently corrupted.
+    Each cell carries its own complete calendar date, so a flare that
+    crosses midnight (start_time on one date, peak_time/end_time on the
+    next) is represented as written. A blank cell becomes NaT.
     """
     try:
         return pd.to_datetime(df[column])
@@ -136,15 +82,14 @@ def _parse_full_timestamp_column(df: pd.DataFrame, column: str, path) -> pd.Seri
         ) from None
 
 
-def _validate_time_order(df: pd.DataFrame, path, hhmm: bool) -> None:
+def _validate_time_order(df: pd.DataFrame, path) -> None:
     """
     Reject rows whose available times violate start <= peak <= end.
 
-    Equal times are allowed. A missing time (NaT, possible only in the
-    full-timestamp schema) is skipped, and the remaining times are still
-    compared with each other. Must run before the catalog is re-sorted, so
-    the reported data row matches the CSV (row 1 = first row after the
-    header).
+    Equal times are allowed. A missing time (NaT) is skipped, and the
+    remaining times are still compared with each other. Must run before
+    the catalog is re-sorted, so the reported data row matches the CSV
+    (row 1 = first row after the header).
     """
     columns = ["start_time", "peak_time", "end_time"]
     for earlier, later in [("start_time", "peak_time"), ("peak_time", "end_time"), ("start_time", "end_time")]:
@@ -154,18 +99,10 @@ def _validate_time_order(df: pd.DataFrame, path, hhmm: bool) -> None:
         position = int(np.flatnonzero(bad.to_numpy())[0])
         row = df.iloc[position]
         times = ", ".join(f"{c}={row[c]}" for c in columns)
-        message = (
+        raise ValueError(
             f"Flare catalog at {path}, data row {position + 1}: times must satisfy "
             f"start <= peak <= end, but {earlier} > {later} ({times})."
         )
-        if hhmm:
-            message += (
-                " In the date + HHMM format all three times take the date from the "
-                "'date' column, so a flare that crosses midnight cannot be represented; "
-                "use the full-timestamp schema (start_time, peak_time, end_time with "
-                "explicit dates) for such events."
-            )
-        raise ValueError(message)
 
 
 class EventMatcher:
@@ -173,23 +110,15 @@ class EventMatcher:
     Given an image timestamp, finds all flares that happened
     within a certain number of hours after that image was taken.
 
-    Accepts either of two catalog schemas, auto-detected from the CSV's
-    columns:
-
-    - The legacy scraper schema: date, start, peak, end, class,
-      active_region -- start/peak/end are bare 4-digit HHMM times combined
-      with the date column.
-    - The full-timestamp schema: start_time, peak_time, end_time, class,
-      active_region (optionally fl_lon, fl_lat) -- each already a complete
-      datetime string, used as-is with no date-combination step. This is
-      the schema `flare_indexer.loaders.adapt_goes_catalog` produces from
-      the lab's integrated GOES catalog, and it's what to reach for when a
-      flare's start/peak/end may fall on different calendar dates (e.g. a
-      flare that starts just before midnight).
+    The catalog is a CSV with the columns start_time, peak_time, end_time,
+    class, active_region (optionally fl_lon, fl_lat). Every time cell is a
+    complete date-time string, so a flare whose start, peak and end fall on
+    different calendar dates is written as it happened. This is the schema
+    `flare_indexer.loaders.adapt_goes_catalog` produces from the lab's
+    integrated GOES catalog.
     """
 
-    REQUIRED_CATALOG_COLUMNS = {"date", "start", "peak", "end", "class", "active_region"}
-    FULL_TIMESTAMP_CATALOG_COLUMNS = {"start_time", "peak_time", "end_time", "class", "active_region"}
+    REQUIRED_CATALOG_COLUMNS = {"start_time", "peak_time", "end_time", "class", "active_region"}
 
     def __init__(self, catalog_path: str | Path):
         # Load the catalog once when the object is created
@@ -204,10 +133,9 @@ class EventMatcher:
         Load and validate the flare catalog CSV.
 
         Raises ValueError if the file has no columns at all (completely
-        empty file) or if it matches neither recognized schema. A catalog
-        with a header row but zero data rows is valid: it produces an
-        empty catalog, so every query() call against it simply returns no
-        flares.
+        empty file) or lacks a required column. A catalog with a header
+        row but zero data rows is valid: it produces an empty catalog, so
+        every query() call against it simply returns no flares.
         """
         try:
             df = pd.read_csv(path)
@@ -216,51 +144,18 @@ class EventMatcher:
                 f"Flare catalog at {path} is empty: no header row / columns found."
             ) from None
 
-        columns = set(df.columns)
-        legacy_missing = self.REQUIRED_CATALOG_COLUMNS - columns
-        full_missing = self.FULL_TIMESTAMP_CATALOG_COLUMNS - columns
-
-        if not legacy_missing:
-            return self._load_legacy_hhmm_catalog(df, path)
-        if not full_missing:
-            return self._load_full_timestamp_catalog(df, path)
-
-        # Neither schema is fully satisfied -- report whichever the caller
-        # most likely intended (fewer missing columns), preferring the
-        # legacy schema on a tie for backward-compatible error messages.
-        if len(legacy_missing) <= len(full_missing):
+        missing = self.REQUIRED_CATALOG_COLUMNS - set(df.columns)
+        if missing:
             raise ValueError(
                 f"Flare catalog at {path} is missing required column(s): "
-                f"{', '.join(sorted(legacy_missing))}"
+                f"{', '.join(sorted(missing))}"
             )
-        raise ValueError(
-            f"Flare catalog at {path} is missing required column(s): "
-            f"{', '.join(sorted(full_missing))}"
-        )
 
-    def _load_legacy_hhmm_catalog(self, df: pd.DataFrame, path) -> pd.DataFrame:
-        # Rename to the internal names, then build real timestamps by
-        # combining each HHMM time-of-day value with the date column.
-        df = df.rename(columns={
-            "peak": "peak_time",
-            "start": "start_time",
-            "end": "end_time",
-            "class": "goes_class",
-        })
-        df["peak_time"] = _combine_date_and_hhmm(df, "date", "peak_time", path)
-        df["start_time"] = _combine_date_and_hhmm(df, "date", "start_time", path)
-        df["end_time"] = _combine_date_and_hhmm(df, "date", "end_time", path)
-        _validate_time_order(df, path, hhmm=True)
-        validate_goes_class_column(df["goes_class"], path)
-
-        return df.sort_values("peak_time").reset_index(drop=True)
-
-    def _load_full_timestamp_catalog(self, df: pd.DataFrame, path) -> pd.DataFrame:
         df = df.rename(columns={"class": "goes_class"})
         df["start_time"] = _parse_full_timestamp_column(df, "start_time", path)
         df["peak_time"] = _parse_full_timestamp_column(df, "peak_time", path)
         df["end_time"] = _parse_full_timestamp_column(df, "end_time", path)
-        _validate_time_order(df, path, hhmm=False)
+        _validate_time_order(df, path)
         validate_goes_class_column(df["goes_class"], path)
 
         return df.sort_values("peak_time").reset_index(drop=True)

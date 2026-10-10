@@ -86,9 +86,15 @@ Not yet released; version in `setup.cfg` is still 0.2.1.
   (24h) differ by at most 2 ulp, and the order of all classes is unchanged.
 
 ### Removed
+- The `date, start, peak, end, class, active_region` catalog schema with
+  `HHMM` times. `EventMatcher` reads one schema: `start_time, peak_time,
+  end_time, class, active_region`, every time with its full date. The old
+  schema could not represent a flare that crosses midnight; convert such
+  files to full timestamps before use. The package no longer references
+  the `solar-event-scraper` repository.
 - `data/solar_events.csv`, a sample catalog with undocumented provenance
   that was used only by an end-to-end smoke test. The test now uses
-  `tests/fixtures/synthetic_hhmm_catalog.csv` and
+  `tests/fixtures/synthetic_same_day_catalog.csv` and
   `tests/fixtures/synthetic_full_timestamp_catalog.csv` (invented events,
   see `tests/fixtures/README.md`) and checks exact timestamps and labels.
 
@@ -110,14 +116,9 @@ Not yet released; version in `setup.cfg` is still 0.2.1.
 - `prediction_window=True`, `inf` or `nan` now raise `ValueError`
   (`True` was previously taken as 1 hour).
 - Loading a catalog now checks that each row's available times satisfy
-  `start <= peak <= end` (equal times allowed; blank full-timestamp cells
-  are skipped) and raises `ValueError` naming the data row otherwise, in
-  both schemas. Before, such rows loaded silently. In the `date` + HHMM
-  schema a flare that crosses midnight (e.g. `2350 / 0005 / 0020`) got
-  its peak and end about 24 h before its start, which could put it in
-  the wrong prediction window; it is now rejected (dates are never
-  shifted) and the message points to the full-timestamp schema. The
-  cached lab GOES catalog used by `scripts/validate_full_disk.py` and
+  `start <= peak <= end` (equal times allowed; blank cells are skipped)
+  and raises `ValueError` naming the data row otherwise. Before, such
+  rows loaded silently. The cached lab GOES catalog used by `scripts/validate_full_disk.py` and
   `scripts/validate_active_region.py` has 7 such rows (all C-class,
   2011–2017, peak recorded as 00:00 on the start date); the validation
   scripts therefore apply documented corrections to a copy of that

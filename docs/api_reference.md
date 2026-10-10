@@ -332,22 +332,17 @@ EventMatcher(catalog_path: str | pathlib.Path)
 
 | Parameter | Type | Meaning |
 |---|---|---|
-| `catalog_path` | `str` or `Path` | CSV in the full-timestamp schema (`start_time, peak_time, end_time, class, active_region` [+ `fl_lon, fl_lat`]) or the legacy schema (`date, start, peak, end, class, active_region`, `HHMM` times) |
+| `catalog_path` | `str` or `Path` | CSV with `start_time, peak_time, end_time, class, active_region` [+ `fl_lon, fl_lat`]; every time a full date-time |
 
-**What it does.** Reads the CSV; detects the schema (legacy wins if both
-match); builds full timestamps (legacy: date + `HHMM`); checks that each
-row's available times satisfy `start <= peak <= end` (equal times allowed;
-a blank full-timestamp cell is skipped); validates every class; sorts by
-`peak_time`.
-**Public class attributes.** `REQUIRED_CATALOG_COLUMNS` (legacy schema
-columns) and `FULL_TIMESTAMP_CATALOG_COLUMNS` (full-timestamp columns),
-both `set` of `str`.
-**Errors.** `ValueError` for an empty file, missing columns, invalid
-`HHMM` values, unparsable timestamps, or times out of order (the message
-names the data row, 1 = first row after the header; for the legacy schema
-it explains that a flare crossing midnight needs the full-timestamp
-schema, because dates are never shifted); `InvalidGOESClassError` for bad
-classes. A header-only file is valid (every query returns `[]`).
+**What it does.** Reads the CSV; parses the three time columns (a blank
+cell becomes missing); checks that each row's available times satisfy
+`start <= peak <= end` (equal times allowed); validates every class;
+sorts by `peak_time`.
+**Public class attribute.** `REQUIRED_CATALOG_COLUMNS` (`set` of `str`).
+**Errors.** `ValueError` for an empty file, missing columns, unparsable
+timestamps, or times out of order (the message names the data row, 1 =
+first row after the header); `InvalidGOESClassError` for bad classes. A
+header-only file is valid (every query returns `[]`).
 
 ### `EventMatcher.query`
 
@@ -1325,13 +1320,9 @@ accounted for.
 |---|---|---|---|
 | `_parse_prediction_window` | read a window | number (hours) or duration → positive `Timedelta`; `ValueError` otherwise | `EventMatcher.query`, `DatasetBuilder.__init__`, validation script |
 | `_normalize_active_region` | one spelling per region | value → `str` or `None` (`13700.0` → `"13700"`) | `EventMatcher`, `DatasetBuilder`, `adapt_goes_catalog` |
-| `_normalize_hhmm` | check one legacy time cell | value → 4-digit `"HHMM"` text or `ValueError` | `_combine_date_and_hhmm` |
-| `_combine_date_and_hhmm` | legacy date + time | DataFrame, column names → `Series` of timestamps | `EventMatcher._load_legacy_hhmm_catalog` |
-| `_parse_full_timestamp_column` | parse a time column with a clear error | DataFrame, column → `Series` of timestamps | `EventMatcher._load_full_timestamp_catalog` |
-| `_validate_time_order` | reject rows with start > peak, peak > end or start > end (missing times skipped) | DataFrame, path, `hhmm` flag → `None` or `ValueError` naming the data row | `EventMatcher._load_legacy_hhmm_catalog`, `EventMatcher._load_full_timestamp_catalog` |
-| `EventMatcher._load_catalog` | read CSV and pick a schema | path → sorted DataFrame | `EventMatcher.__init__` |
-| `EventMatcher._load_legacy_hhmm_catalog` | load the legacy schema | DataFrame → DataFrame | `_load_catalog` |
-| `EventMatcher._load_full_timestamp_catalog` | load the full-timestamp schema | DataFrame → DataFrame | `_load_catalog` |
+| `_parse_full_timestamp_column` | parse a time column with a clear error | DataFrame, column → `Series` of timestamps | `EventMatcher._load_catalog` |
+| `_validate_time_order` | reject rows with start > peak, peak > end or start > end (missing times skipped) | DataFrame, path → `None` or `ValueError` naming the data row | `EventMatcher._load_catalog` |
+| `EventMatcher._load_catalog` | read, check and sort the catalog | path → sorted DataFrame | `EventMatcher.__init__` |
 | `EventMatcher._sorted_view` | cached sorted times for binary search | `event_time` → (sorted values, original positions) | `EventMatcher.query` |
 
 ### `reducers.py`, `labelers.py`, `strategies.py`, `pipeline.py`, `loaders.py`

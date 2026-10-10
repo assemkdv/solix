@@ -53,13 +53,10 @@ print(labels)
 
 Inputs are two CSV files: an **image index** (`timestamp`, plus
 `active_region` and any identifier columns you want back) and a **flare
-catalog** (`start_time, peak_time, end_time, class, active_region`, or the
-legacy `date, start, peak, end, class, active_region` with `HHMM` times).
-Every labeling choice (window length, which flare time, boundary rule,
-threshold) is an explicit parameter; the defaults are listed in the
-researcher manual. Flare catalogs come from the companion
-[solar-event-scraper](https://github.com/assemkdv/solar-event-scraper);
-this package only labels.
+catalog** (`start_time, peak_time, end_time, class, active_region`, every
+time with its full date). Every labeling choice (window length, which
+flare time, boundary rule, threshold) is an explicit parameter; the
+defaults are listed in the researcher manual.
 
 ## Documentation
 

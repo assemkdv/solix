@@ -7,8 +7,8 @@ from flare_indexer.strategies import BinaryThresholdStrategy, MaxFlareStrategy
 def _write_valid_catalog(tmp_path):
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
-        "date,start,peak,end,class,active_region\n"
-        "2024-01-01,0020,0030,0040,M2.3,4456\n"
+        "start_time,peak_time,end_time,class,active_region\n"
+        "2024-01-01 00:20:00,2024-01-01 00:30:00,2024-01-01 00:40:00,M2.3,4456\n"
     )
     return catalog_path
 
@@ -18,9 +18,9 @@ def _write_two_flare_catalog(tmp_path):
     # Flare B: C3.0 at 2024-01-03T02:00 (does not qualify, flux=3e-6)
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
-        "date,start,peak,end,class,active_region\n"
-        "2024-01-01,0150,0200,0210,M5.0,4456\n"
-        "2024-01-03,0150,0200,0210,C3.0,4456\n"
+        "start_time,peak_time,end_time,class,active_region\n"
+        "2024-01-01 01:50:00,2024-01-01 02:00:00,2024-01-01 02:10:00,M5.0,4456\n"
+        "2024-01-03 01:50:00,2024-01-03 02:00:00,2024-01-03 02:10:00,C3.0,4456\n"
     )
     return catalog_path
 
@@ -217,8 +217,8 @@ def test_sequences_non_overlapping_with_stride_equal_length(tmp_path):
 def test_sequence_prediction_window_starts_at_final_image(tmp_path):
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
-        "date,start,peak,end,class,active_region\n"
-        "2024-01-01,0824,0824,0829,M1.0,4456\n"
+        "start_time,peak_time,end_time,class,active_region\n"
+        "2024-01-01 08:24:00,2024-01-01 08:24:00,2024-01-01 08:29:00,M1.0,4456\n"
     )
     index_path = tmp_path / "index.csv"
     index_path.write_text(
@@ -249,8 +249,8 @@ def test_sequence_prediction_window_starts_at_final_image(tmp_path):
 def test_sequence_boundary_flare_excluded_at_far_edge(tmp_path):
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
-        "date,start,peak,end,class,active_region\n"
-        "2024-01-01,0900,0900,0905,X1.0,4456\n"
+        "start_time,peak_time,end_time,class,active_region\n"
+        "2024-01-01 09:00:00,2024-01-01 09:00:00,2024-01-01 09:05:00,X1.0,4456\n"
     )
     index_path = tmp_path / "index.csv"
     index_path.write_text(
@@ -442,9 +442,9 @@ def test_sequences_preserve_extra_columns(tmp_path):
 def test_active_region_works_with_max_flare_strategy(tmp_path):
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
-        "date,start,peak,end,class,active_region\n"
-        "2024-01-23,0250,0300,0310,M5.1,3559\n"
-        "2024-01-23,0250,0300,0310,X9.0,9999\n"
+        "start_time,peak_time,end_time,class,active_region\n"
+        "2024-01-23 02:50:00,2024-01-23 03:00:00,2024-01-23 03:10:00,M5.1,3559\n"
+        "2024-01-23 02:50:00,2024-01-23 03:00:00,2024-01-23 03:10:00,X9.0,9999\n"
     )
     index_path = tmp_path / "index.csv"
     index_path.write_text(
@@ -463,8 +463,8 @@ def test_active_region_works_with_max_flare_strategy(tmp_path):
 def test_active_region_image_side_values_normalize_to_match_catalog(tmp_path):
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
-        "date,start,peak,end,class,active_region\n"
-        "2024-01-23,0250,0300,0310,M5.1,3559\n"
+        "start_time,peak_time,end_time,class,active_region\n"
+        "2024-01-23 02:50:00,2024-01-23 03:00:00,2024-01-23 03:10:00,M5.1,3559\n"
     )
     index_path = tmp_path / "index.csv"
     # Mixing a real value with a later missing row forces pandas to read
@@ -486,8 +486,8 @@ def test_active_region_image_side_values_normalize_to_match_catalog(tmp_path):
 def test_active_region_missing_image_side_value_matches_nothing(tmp_path):
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
-        "date,start,peak,end,class,active_region\n"
-        "2024-01-23,0250,0300,0310,X1.0,3559\n"
+        "start_time,peak_time,end_time,class,active_region\n"
+        "2024-01-23 02:50:00,2024-01-23 03:00:00,2024-01-23 03:10:00,X1.0,3559\n"
     )
     index_path = tmp_path / "index.csv"
     index_path.write_text(
@@ -559,8 +559,8 @@ def test_full_disk_target_explicit_matches_default(tmp_path):
 def test_active_region_sequence_labels_correctly(tmp_path):
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
-        "date,start,peak,end,class,active_region\n"
-        "2024-01-01,0840,0840,0845,M1.0,3559\n"
+        "start_time,peak_time,end_time,class,active_region\n"
+        "2024-01-01 08:40:00,2024-01-01 08:40:00,2024-01-01 08:45:00,M1.0,3559\n"
     )
     index_path = tmp_path / "index.csv"
     index_path.write_text(
@@ -592,9 +592,9 @@ def test_active_region_sequence_labels_correctly(tmp_path):
 def test_active_region_sequence_stronger_flare_from_other_region_ignored(tmp_path):
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
-        "date,start,peak,end,class,active_region\n"
-        "2024-01-01,0840,0840,0845,M5.1,3559\n"
-        "2024-01-01,0840,0840,0845,X9.0,9999\n"
+        "start_time,peak_time,end_time,class,active_region\n"
+        "2024-01-01 08:40:00,2024-01-01 08:40:00,2024-01-01 08:45:00,M5.1,3559\n"
+        "2024-01-01 08:40:00,2024-01-01 08:40:00,2024-01-01 08:45:00,X9.0,9999\n"
     )
     index_path = tmp_path / "index.csv"
     index_path.write_text(
@@ -623,9 +623,9 @@ def test_active_region_sequence_stronger_flare_from_other_region_ignored(tmp_pat
 def test_active_region_sequence_max_flare_strategy_uses_only_matching_region(tmp_path):
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
-        "date,start,peak,end,class,active_region\n"
-        "2024-01-01,0840,0840,0845,M5.1,3559\n"
-        "2024-01-01,0840,0840,0845,X9.0,9999\n"
+        "start_time,peak_time,end_time,class,active_region\n"
+        "2024-01-01 08:40:00,2024-01-01 08:40:00,2024-01-01 08:45:00,M5.1,3559\n"
+        "2024-01-01 08:40:00,2024-01-01 08:40:00,2024-01-01 08:45:00,X9.0,9999\n"
     )
     index_path = tmp_path / "index.csv"
     index_path.write_text(
@@ -680,8 +680,8 @@ def test_active_region_sequence_regions_are_never_mixed(tmp_path):
 def test_active_region_sequence_missing_active_region_matches_nothing(tmp_path):
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
-        "date,start,peak,end,class,active_region\n"
-        "2024-01-01,0840,0840,0845,X1.0,3559\n"
+        "start_time,peak_time,end_time,class,active_region\n"
+        "2024-01-01 08:40:00,2024-01-01 08:40:00,2024-01-01 08:45:00,X1.0,3559\n"
     )
     index_path = tmp_path / "index.csv"
     index_path.write_text(
@@ -801,8 +801,8 @@ def test_active_region_sequence_stride_behavior(tmp_path):
 def test_active_region_sequence_label_uses_final_image_timestamp(tmp_path):
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
-        "date,start,peak,end,class,active_region\n"
-        "2024-01-01,0824,0824,0829,M1.0,3559\n"
+        "start_time,peak_time,end_time,class,active_region\n"
+        "2024-01-01 08:24:00,2024-01-01 08:24:00,2024-01-01 08:29:00,M1.0,3559\n"
     )
     index_path = tmp_path / "index.csv"
     index_path.write_text(
@@ -833,8 +833,8 @@ def test_active_region_sequence_label_uses_final_image_timestamp(tmp_path):
 def test_active_region_sequence_boundary_flare_excluded_at_far_edge(tmp_path):
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
-        "date,start,peak,end,class,active_region\n"
-        "2024-01-01,0900,0900,0905,X1.0,3559\n"
+        "start_time,peak_time,end_time,class,active_region\n"
+        "2024-01-01 09:00:00,2024-01-01 09:00:00,2024-01-01 09:05:00,X1.0,3559\n"
     )
     index_path = tmp_path / "index.csv"
     index_path.write_text(
@@ -904,8 +904,8 @@ def test_event_time_start_vs_peak_produce_different_labels(tmp_path):
     # A flare that starts inside the window but peaks just after it closes.
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
-        "date,start,peak,end,class,active_region\n"
-        "2024-01-01,0830,0901,0905,M1.0,4456\n"
+        "start_time,peak_time,end_time,class,active_region\n"
+        "2024-01-01 08:30:00,2024-01-01 09:01:00,2024-01-01 09:05:00,M1.0,4456\n"
     )
     index_path = tmp_path / "index.csv"
     index_path.write_text("timestamp\n2024-01-01T08:00:00\n")
@@ -925,8 +925,8 @@ def test_event_time_start_vs_peak_produce_different_labels(tmp_path):
 def test_interval_mode_right_closed_includes_far_boundary(tmp_path):
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
-        "date,start,peak,end,class,active_region\n"
-        "2024-01-01,0900,0900,0905,X1.0,4456\n"
+        "start_time,peak_time,end_time,class,active_region\n"
+        "2024-01-01 09:00:00,2024-01-01 09:00:00,2024-01-01 09:05:00,X1.0,4456\n"
     )
     index_path = tmp_path / "index.csv"
     index_path.write_text("timestamp\n2024-01-01T08:00:00\n")

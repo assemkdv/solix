@@ -24,15 +24,18 @@ def _hourly(start, count):
 
 def _empty_catalog(tmp_path):
     path = tmp_path / "catalog.csv"
-    path.write_text("date,start,peak,end,class,active_region\n")
+    path.write_text("start_time,peak_time,end_time,class,active_region\n")
     return path
 
 
 def _catalog_with_flare(tmp_path, date, start, peak, end, cls, active_region):
+    # start/peak/end are "HHMM" clock times on `date`, written as full timestamps.
+    def stamp(hhmm):
+        return f"{date} {hhmm[:2]}:{hhmm[2:]}:00"
     path = tmp_path / "catalog.csv"
     path.write_text(
-        "date,start,peak,end,class,active_region\n"
-        f"{date},{start},{peak},{end},{cls},{active_region}\n"
+        "start_time,peak_time,end_time,class,active_region\n"
+        f"{stamp(start)},{stamp(peak)},{stamp(end)},{cls},{active_region}\n"
     )
     return path
 

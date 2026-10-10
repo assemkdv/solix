@@ -377,7 +377,7 @@ def test_full_disk_time_based_sequences_work_with_pipeline(tmp_path):
         "timestamp": pd.date_range("2024-01-01T00:00:00", periods=10, freq="1h"),
     }).to_csv(index_path, index=False)
     empty_catalog = tmp_path / "catalog.csv"
-    empty_catalog.write_text("date,start,peak,end,class,active_region\n")
+    empty_catalog.write_text("start_time,peak_time,end_time,class,active_region\n")
 
     pipeline = _default_pipeline()
     builder = DatasetBuilder(
@@ -400,7 +400,7 @@ def test_sequence_build_report_unaffected_by_strategy_vs_pipeline(tmp_path):
         "timestamp": pd.date_range("2024-01-01T00:00:00", periods=10, freq="1h"),
     }).to_csv(index_path, index=False)
     empty_catalog = tmp_path / "catalog.csv"
-    empty_catalog.write_text("date,start,peak,end,class,active_region\n")
+    empty_catalog.write_text("start_time,peak_time,end_time,class,active_region\n")
 
     _, legacy_report = DatasetBuilder(
         prediction_window=24, strategy=BinaryThresholdStrategy(),

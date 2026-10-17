@@ -40,6 +40,45 @@ class BinaryThresholdLabeler:
         return int(reduced_value >= self._threshold_flux)
 
 
+class NumericThresholdLabeler:
+    """
+    Returns 1 if a reduced *numeric index* meets or exceeds a numeric
+    threshold, else 0.
+
+    For dimensionless indices such as the cumulative class index
+    (CumulativeClassIndexReducer): SuryaBench binarizes it at 10, the
+    DaWaK 2023 paper's active-region study at 20. The threshold is a
+    plain number compared directly with the reduced value; it is not a
+    GOES class and is not converted to flux. For flux values in W/m^2
+    with a GOES-class threshold use BinaryThresholdLabeler instead.
+
+    The threshold must be a finite real number (not a bool, not text).
+    assign() rejects booleans and non-numbers (TypeError) and NaN or
+    infinite values (ValueError); it never guesses a label for them.
+    """
+
+    def __init__(self, threshold: float):
+        if isinstance(threshold, bool) or not isinstance(threshold, numbers.Real):
+            raise TypeError(
+                f"NumericThresholdLabeler threshold must be a real number, got {threshold!r} "
+                f"({type(threshold).__name__}). GOES-class thresholds belong to BinaryThresholdLabeler."
+            )
+        if not math.isfinite(threshold):
+            raise ValueError(f"NumericThresholdLabeler threshold must be finite, got {threshold!r}.")
+        self.threshold = float(threshold)
+
+    def assign(self, reduced_value) -> int:
+        if isinstance(reduced_value, bool) or not isinstance(reduced_value, numbers.Real):
+            raise TypeError(
+                "NumericThresholdLabeler.assign expects a number (e.g. the output of "
+                f"CumulativeClassIndexReducer), got {reduced_value!r} ({type(reduced_value).__name__})."
+            )
+        value = float(reduced_value)
+        if not math.isfinite(value):
+            raise ValueError(f"NumericThresholdLabeler.assign got a non-finite value {reduced_value!r}.")
+        return int(value >= self.threshold)
+
+
 class RegressionLabeler:
     """
     Passes a reduced numeric flux value through unchanged (0.0 for no

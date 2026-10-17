@@ -1,8 +1,8 @@
 from .classifier import FlareClassifier, FluxConverter, InvalidGOESClassError
 from .events import EventMatcher, FlareEvent
-from .reducers import EventReducer, MaxFluxReducer, MinFluxReducer, ClassCountReducer
+from .reducers import EventReducer, MaxFluxReducer, MinFluxReducer, ClassCountReducer, CumulativeClassIndexReducer
 from .labelers import LabelAssigner, BinaryThresholdLabeler, RegressionLabeler, MulticlassLabeler
-from .labelers import ClassCountLabeler, ClassPresenceLabeler
+from .labelers import ClassCountLabeler, ClassPresenceLabeler, NumericThresholdLabeler
 from .strategies import BinaryThresholdStrategy, MaxFlareStrategy
 from .pipeline import PipelineResult, DatasetBuildingPipeline
 from .builder import DatasetBuilder, SequenceBuildReport
@@ -18,10 +18,12 @@ __all__ = [
     "MaxFluxReducer",
     "MinFluxReducer",
     "ClassCountReducer",
+    "CumulativeClassIndexReducer",
     "ClassCountLabeler",
     "ClassPresenceLabeler",
     "LabelAssigner",
     "BinaryThresholdLabeler",
+    "NumericThresholdLabeler",
     "RegressionLabeler",
     "MulticlassLabeler",
     "BinaryThresholdStrategy",

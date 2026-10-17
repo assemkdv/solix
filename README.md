@@ -73,7 +73,9 @@ defaults are listed in the researcher manual.
   scientific sign-off (window edge, look-back, missing regions, coverage).
 - Real-data validation: [full disk](docs/validation/full_disk.md),
   [active region](docs/validation/active_region.md) — reproduction of the
-  lab's published labels, with the documented catalog corrections.
+  lab's published labels, with the documented catalog corrections;
+  [cumulative index](docs/validation/cumulative_index.md) — reproduction
+  of the public SuryaBench cumulative flare index.
 - [CHANGELOG](CHANGELOG.md).
 
 The examples in the manual, the API reference and the system design are
@@ -82,9 +84,10 @@ their recorded output is always current.
 
 ## Examples
 
-`examples/01`–`06`, `09` and `12` run on the synthetic data in
+`examples/01`–`06`, `09`, `12` and `13` run on the synthetic data in
 `examples/data/` (single images, window boundaries, sequences, active
-regions, real-data loaders, the modular pipeline, multiclass labels, counts).
+regions, real-data loaders, the modular pipeline, multiclass labels, counts,
+the cumulative class index).
 `examples/07`–`08` (PyTorch) and `10`–`11` (TensorFlow) label real SDO/HMI
 magnetograms and load them as `[B,C,H,W]` / `[B,T,C,H,W]` and
 `[B,H,W,C]` / `[B,T,H,W,C]` batches; see
@@ -98,13 +101,15 @@ python examples/01_full_disk_single_image.py
 
 ```bash
 pip install -e ".[dev]"
-pytest                                   # 488 tests; framework tests skip without torch/tensorflow
+pytest                                   # framework tests skip without torch/tensorflow
 python scripts/check_doc_examples.py     # documentation examples
 ```
 
 `scripts/validate_full_disk.py` and `scripts/validate_active_region.py`
 rerun the real-data validation against the lab's published files (they
-download about 90 MB into `scripts/.cache/`).
+download about 90 MB into `scripts/.cache/`);
+`scripts/validate_cumulative_index.py` compares the cumulative class index
+with the public SuryaBench labels (about 13 MB).
 
 ## License
 

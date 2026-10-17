@@ -53,6 +53,16 @@ def test_multiclass_example_shows_class_labels(tmp_path):
     assert "2024-03-01 12:00:00         13600     M               X" in output
 
 
+def test_cumulative_index_example_shows_paper_value_and_labels(tmp_path):
+    output = _run(EXAMPLES_DIR / "13_cumulative_index.py", tmp_path)
+    assert "cumulative index: 48.5" in output
+    assert "label (index >= 10): 1" in output
+    assert "label (index >= 20): 1" in output
+    assert "label (index >= 50): 0" in output
+    assert "empty window: 0.0" in output
+    assert "A/B-only window: 0.0" in output
+
+
 def test_sample_data_matches_generator(tmp_path):
     copy = tmp_path / "data"
     shutil.copytree(EXAMPLES_DIR / "data", copy)

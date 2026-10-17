@@ -297,6 +297,39 @@ max flux (W/m^2): [2e-05, 0.00012, 0.00012, 0.0, 1e-05]
 binary, >= C1.0:  [1, 1, 1, 0, 1]
 ```
 
+**Cumulative class index.** A third kind of label sums all flares in the
+window instead of picking the strongest: Σ C + 10 Σ M + 100 Σ X of the
+class numbers (Hong, Ji, Pandey, Aydin, DaWaK 2023; also the SuryaBench
+flare index). It is built from the pipeline pieces rather than a
+strategy. Run (requires `fidx` from §4):
+
+<!-- example: cumulative_strategy -->
+```python
+index = fidx.DatasetBuildingPipeline(fidx.CumulativeClassIndexReducer(), fidx.RegressionLabeler())
+binary_10 = fidx.DatasetBuildingPipeline(fidx.CumulativeClassIndexReducer(), fidx.NumericThresholdLabeler(10))
+raw = fidx.DatasetBuilder(
+    prediction_window=6, strategy=index, event_time="start", interval_mode="right_closed",
+).build("docs/fixtures/images.csv", "docs/fixtures/catalog.csv")
+cum = fidx.DatasetBuilder(
+    prediction_window=6, strategy=binary_10, event_time="start", interval_mode="right_closed",
+).build("docs/fixtures/images.csv", "docs/fixtures/catalog.csv")
+print("cumulative index:", raw["label"].tolist())
+print("index >= 10:     ", cum["label"].tolist())
+```
+<!-- output: cumulative_strategy -->
+```text
+cumulative index: [24.0, 140.0, 120.0, 0.0, 10.0]
+index >= 10:      [1, 1, 1, 0, 1]
+```
+
+The first image sees C4.0 and M2.0 in its 6-hour window: 4 + 20 = 24.
+The second sees M2.0 and X1.2: 20 + 120 = 140. The maximum-flux label of
+the same windows (§8 above) keeps only the strongest flare.
+
+The threshold of `NumericThresholdLabeler` is a plain number (10 in
+SuryaBench, 20 in the paper), not a GOES class. A and B flares add 0 under
+the selected convention; see §13 and [decisions.md](decisions.md), Q1.
+
 ## 9. Single-image and sequence workflows
 
 **Single image** (default): one row per image; `t` is the image's time.
@@ -603,6 +636,44 @@ print(text_labels["label"].tolist())
 An object without the required method is rejected when the pipeline is
 created (`TypeError`).
 
+### 13.1 The cumulative class index, step by step
+
+`CumulativeClassIndexReducer` implements the "cumulative normalized GOES
+subclass" index of Hong, Ji, Pandey and Aydin (*Beyond Traditional Flare
+Forecasting: A Data-driven Labeling Approach for High-fidelity
+Predictions*, DaWaK 2023, Sec. 2.2), which is also the `cumulative_index`
+of the NASA-IMPACT SuryaBench flare dataset (`flare/flare_index_creator.py`):
+
+    index = Σ C_i + 10 · Σ M_j + 100 · Σ X_k
+
+The terms are the numbers written in the class text, so the unit is "one
+C1.0 flare". The paper's worked window (M1.5, C2.6, C1.4, M2.1, C2.8, C4.2,
+C1.5) gives (1.5 + 2.1) × 10 + (2.6 + 1.4 + 2.8 + 4.2 + 1.5) = 48.5. An
+empty window gives 0.0.
+
+Conventions this package follows for reference compatibility, which are
+**not** settled scientific choices:
+
+- **A and B flares add 0.** The paper's formula lists only C, M and X;
+  SuryaBench maps A/B to `None` and the sum skips them. So `C10.0` and
+  `M1.0` both add 10, while `B15.0` adds 0 although its flux equals C1.5.
+- **Window.** The lab notebooks and SuryaBench count flares with
+  `t < start_time ≤ t + 23:59:59`, i.e. `event_time="start"`,
+  `interval_mode="right_closed"`, `prediction_window="23h59min59s"`. The
+  paper text writes the window as `[t, t+24h]`, closed at both ends; that
+  interval is not one of the two `interval_mode` options (`[t, t+w)` and
+  `(t, t+w]`). Choose the window explicitly; the package defaults
+  (`peak`, `[t, t+w)`) are unchanged and are not the reference convention.
+- **Thresholds.** `NumericThresholdLabeler(10)` reproduces SuryaBench's
+  `label_cum`; the paper's active-region study used 20 (and 10..100 in
+  steps of 5). The threshold is a plain number, kept separate from the
+  GOES-class thresholds of `BinaryThresholdLabeler`.
+
+The same paper defines two relative-flux indices (max and sum of a
+per-flare "relative X-ray flux increase", peak flux divided by a 24-hour
+background from 1-minute GOES XRS data). They need a per-flare value the
+catalogs do not carry and are not implemented.
+
 ## 14. Preparing real data
 
 Two helpers convert common lab formats:
@@ -704,7 +775,11 @@ uses NOAA numbers, both files must use the same key; see
 **Scientific assumptions that are not settled** (see
 [decisions.md](decisions.md))
 
-- What cumulative indexing should compute; it is not implemented (Q1).
+- Cumulative indexing: the cumulative class index (Σ C + 10 Σ M + 100 Σ X)
+  is implemented after the reference formula. Whether A and B flares
+  should count, whether the window is the paper's `[t, t+24h]` or the
+  reference code's `(t, t+23:59:59]`, and whether the relative-flux
+  indices (rxfi) are needed, are not settled (Q1).
 - Whether active-region labels should look forward or back (Q2).
 - Which flare time (start or peak) and which window edges should be the
   defaults; `t + 24h` or `t + 23:59:59` (Q3).

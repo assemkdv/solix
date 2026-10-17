@@ -5,8 +5,17 @@
 Not yet released; version in `setup.cfg` is still 0.2.1.
 
 ### Added
+- `CumulativeClassIndexReducer`: the cumulative normalized GOES subclass
+  index Σ C + 10 Σ M + 100 Σ X of Hong, Ji, Pandey, Aydin (DaWaK 2023)
+  and SuryaBench, summed in decimal arithmetic; A/B add 0 (selected
+  convention, pending confirmation); empty window 0.0.
+  `NumericThresholdLabeler(threshold)`: binary label from a plain numeric
+  threshold, separate from GOES-class thresholds. Example:
+  `examples/13_cumulative_index.py`; validation against the public
+  SuryaBench labels: `scripts/validate_cumulative_index.py`,
+  `docs/validation/cumulative_index.md`.
 - Minimum event-flux reduction and all-event per-class counts/presence,
-  composable through the existing pipeline; cumulative formula remains open.
+  composable through the existing pipeline.
 - `prediction_window` accepts a pandas duration as well as hours
   (e.g. `"23h59min59s"`), in `DatasetBuilder` and `EventMatcher.query`.
 - `DatasetBuilder(missing_active_region="negative" | "drop" | "error")`.

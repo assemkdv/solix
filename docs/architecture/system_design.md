@@ -31,7 +31,8 @@ flowchart LR
 1. The builder validates inputs and creates image or sequence examples.
 2. The matcher selects events inside the prediction window. In active-region
    mode, it also filters by the example's region.
-3. The reducer selects maximum/minimum flux or counts all events by class.
+3. The reducer selects maximum/minimum flux, counts all events by class,
+   or sums weighted class numbers (cumulative class index).
 4. The labeler returns the requested answer. The builder collects the rows.
 
 `BinaryThresholdStrategy` and `MaxFlareStrategy` provide ready-made combinations.
@@ -97,10 +98,17 @@ Two consequences of this shape:
 - **Multiclass:** maximum flux + NF/A/B/C/M/X labeler.
 - **Counts:** all-event class counts + count labeler.
 - **Presence:** all-event class counts + presence labeler (0/1 per class).
+- **Cumulative class index:** Σ C + 10 Σ M + 100 Σ X of the class numbers
+  (Hong, Ji, Pandey, Aydin, DaWaK 2023; SuryaBench) + regression labeler
+  for the raw index, or numeric threshold labeler (10 in SuryaBench, 20 in
+  the paper) for a binary label. A and B add 0 (selected convention,
+  pending confirmation).
 
 Flux is compared numerically, not by sorting class text. C10.0 and M1.0
 convert to the same strength. Counts do not remove duplicate records.
-Empty windows give zero flux, zero counts/presence, or NF for multiclass.
+Empty windows give zero flux, zero counts/presence, a zero index, or NF
+for multiclass. Index thresholds are plain numbers; GOES-class thresholds
+are converted to flux. The two labelers are separate on purpose.
 
 ## Time and sequences
 
@@ -142,8 +150,12 @@ against the original record and reported. The source file remains unchanged.
 
 Start-time results remain unchanged: 63,649/63,649 full-disk labels agree under
 the legacy window; AR look-back reproduces 511,421/511,421 published rows.
-The package's forward AR labels agree on 499,009 rows. Details and evidence:
-[full disk](../validation/full_disk.md), [active regions](../validation/active_region.md).
+The package's forward AR labels agree on 499,009 rows. The cumulative class
+index reproduces all 128,328 published SuryaBench `label_cum` values when
+run on SuryaBench's catalog, and all 75,638 within the lab catalog's
+recorded-event bounds when run on the lab catalog. Details and evidence:
+[full disk](../validation/full_disk.md), [active regions](../validation/active_region.md),
+[cumulative index](../validation/cumulative_index.md).
 
 The PyTorch and TensorFlow examples load real HMI pixels and pair them with
 labels. Their download helper replays recorded image IDs/URLs and checks hashes.
@@ -190,7 +202,13 @@ presence {'A': 0, 'B': 0, 'C': 1, 'M': 1, 'X': 0}
 
 ## Remaining limits
 
-Cumulative indexing needs a defined formula. Core windows only look forward.
+The cumulative class index follows the reference formula; whether A/B
+flares should contribute, and whether the window should be the paper's
+closed `[t, t+24h]` (not expressible with the two `interval_mode`
+options, which are `[t, t+w)` and `(t, t+w]`) or the reference code's
+`(t, t+23:59:59]`, await confirmation. The relative-flux indices (rxfi) of
+the same paper need a per-flare background flux the catalogs do not carry
+and are not implemented. Core windows only look forward.
 There is no TAI/UTC conversion, catalog-coverage check, or sequence timestamp
 tolerance. Multiclass and counts reject positive flux below A1.0. These choices
 and limitations are recorded in [decision notes](../decisions.md).

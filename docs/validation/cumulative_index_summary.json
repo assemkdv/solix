@@ -1,0 +1,1340 @@
+{
+  "settings": {
+    "event_time": "start",
+    "interval_mode": "right_closed",
+    "prediction_window": "23h59min59s",
+    "prediction_window_seconds": 86399.0,
+    "cadence": "1h",
+    "thresholds": [
+      10.0,
+      20.0
+    ],
+    "atol": 1e-09,
+    "paper_interval_note": "[t, t+24h] (closed) is not expressible; right_closed gives (t, t+w]."
+  },
+  "catalogs": {
+    "lab": {
+      "source": "https://raw.githubusercontent.com/chetrajpandey/explainingFullDisk/main/labeling/data_source/goes_flares_integrated.csv",
+      "sha256": "2a1c76ff6ba508fede2add75bc7d4a96a61283d676cc360ae13d5aa1d56dcf48",
+      "catalog_corrections": {
+        "source": "/Users/assemkadirova/Developer/flare-indexer/scripts/.cache/goes_flares_integrated.csv",
+        "source_sha256": "2a1c76ff6ba508fede2add75bc7d4a96a61283d676cc360ae13d5aa1d56dcf48",
+        "source_is_the_known_catalog": true,
+        "corrected_copy": "/Users/assemkadirova/Developer/flare-indexer/scripts/.cache/goes_flares_integrated_corrected.csv",
+        "ngdc_url": "https://www.ngdc.noaa.gov/stp/space-weather/solar-data/solar-features/solar-flares/x-rays/goes/xrs/",
+        "rule": "peak_time -> next-day 00:00 where NOAA max is 0000; -> missing where NOAA max is ////",
+        "corrections": [
+          {
+            "data_row": 1592,
+            "goes_class": "C2.5",
+            "noaa_active_region": 11190,
+            "start_time": "2011-04-11 23:40:00",
+            "original_peak_time": "2011-04-11 00:00:00",
+            "corrected_peak_time": null,
+            "end_time": "2011-04-12 00:03:00",
+            "ngdc_file": "goes-xrs-report_2011.txt",
+            "ngdc_line": "110411 2340 0003 ////",
+            "reason": "NOAA records no maximum time (////); the catalog's 00:00 is a fill value, so the peak is unknown."
+          },
+          {
+            "data_row": 3534,
+            "goes_class": "C1.1",
+            "noaa_active_region": 11450,
+            "start_time": "2012-04-05 23:50:00",
+            "original_peak_time": "2012-04-05 00:00:00",
+            "corrected_peak_time": "2012-04-06 00:00:00",
+            "end_time": "2012-04-06 00:05:00",
+            "ngdc_file": "goes-xrs-report_2012.txt",
+            "ngdc_line": "120405 2350 0005 0000",
+            "reason": "NOAA reports the maximum at 0000; the only midnight within the flare is the next day's."
+          },
+          {
+            "data_row": 3940,
+            "goes_class": "C1.0",
+            "noaa_active_region": 11494,
+            "start_time": "2012-06-06 23:56:00",
+            "original_peak_time": "2012-06-06 00:00:00",
+            "corrected_peak_time": "2012-06-07 00:00:00",
+            "end_time": "2012-06-07 00:05:00",
+            "ngdc_file": "goes-xrs-report_2012.txt",
+            "ngdc_line": "120606 2356 0005 0000",
+            "reason": "NOAA reports the maximum at 0000; the only midnight within the flare is the next day's."
+          },
+          {
+            "data_row": 4357,
+            "goes_class": "C6.3",
+            "noaa_active_region": 11538,
+            "start_time": "2012-07-30 23:50:00",
+            "original_peak_time": "2012-07-30 00:00:00",
+            "corrected_peak_time": "2012-07-31 00:00:00",
+            "end_time": "2012-07-31 00:04:00",
+            "ngdc_file": "goes-xrs-report_2012.txt",
+            "ngdc_line": "120730 2350 0004 0000",
+            "reason": "NOAA reports the maximum at 0000; the only midnight within the flare is the next day's."
+          },
+          {
+            "data_row": 4824,
+            "goes_class": "C1.5",
+            "noaa_active_region": 11589,
+            "start_time": "2012-10-13 23:46:00",
+            "original_peak_time": "2012-10-13 00:00:00",
+            "corrected_peak_time": "2012-10-14 00:00:00",
+            "end_time": "2012-10-14 00:18:00",
+            "ngdc_file": "goes-xrs-report_2012.txt",
+            "ngdc_line": "121013 2346 0018 0000",
+            "reason": "NOAA reports the maximum at 0000; the only midnight within the flare is the next day's."
+          },
+          {
+            "data_row": 8328,
+            "goes_class": "C3.8",
+            "noaa_active_region": 12065,
+            "start_time": "2014-05-25 23:49:00",
+            "original_peak_time": "2014-05-25 00:00:00",
+            "corrected_peak_time": "2014-05-26 00:00:00",
+            "end_time": "2014-05-26 00:04:00",
+            "ngdc_file": "goes-xrs-report_2014.txt",
+            "ngdc_line": "140525 2349 0004 0000",
+            "reason": "NOAA reports the maximum at 0000; the only midnight within the flare is the next day's."
+          },
+          {
+            "data_row": 13145,
+            "goes_class": "C1.3",
+            "noaa_active_region": 12644,
+            "start_time": "2017-03-26 23:49:00",
+            "original_peak_time": "2017-03-26 00:00:00",
+            "corrected_peak_time": "2017-03-27 00:00:00",
+            "end_time": "2017-03-27 00:08:00",
+            "ngdc_file": "goes-xrs-report_2017-ytd.txt",
+            "ngdc_line": "170326 2349 0008 0000",
+            "reason": "NOAA reports the maximum at 0000; the only midnight within the flare is the next day's."
+          }
+        ]
+      },
+      "modifications": "7 documented peak_time corrections (scripts/catalog_corrections.py), applied to a copy; start times unchanged, so start-time matching is unaffected",
+      "flares": 14401,
+      "first_start": "2010-05-01 01:34:00",
+      "last_start": "2018-12-29 13:16:00",
+      "classes": {
+        "A": 38,
+        "B": 5817,
+        "C": 7754,
+        "M": 742,
+        "X": 50
+      },
+      "coverage": "unknown: first_start/last_start are the bounds of the recorded events, not evidence of observational coverage"
+    },
+    "suryabench": {
+      "repository": "NASA-IMPACT/SuryaBench",
+      "path": "flare/flare_catalog_2010-2024.csv",
+      "revision": "bbf4f88cde7fde382451b4286c01453652f55cca",
+      "revision_date": "2025-05-24T02:11:10Z",
+      "flare_index_creator_revision": "579fc5f9519dfd437b53e504c08278f5508e4fe2",
+      "source": "https://raw.githubusercontent.com/NASA-IMPACT/SuryaBench/bbf4f88cde7fde382451b4286c01453652f55cca/flare/flare_catalog_2010-2024.csv",
+      "sha256": "2c75afd77b4a0ce88d8dfac19b1dc96e1386eed5cf4a9c7732b7aeb8ef126e64",
+      "rows": 27211,
+      "invalid_class_rows_dropped": [
+        {
+          "csv_line": 14711,
+          "start_time": "2019-08-18 18:56:00",
+          "goes_class": "A0.0",
+          "error": "Invalid GOES class 'A0.0': the number must be positive."
+        }
+      ],
+      "peak_out_of_order_blanked": 24,
+      "peak_before_start_blanked": 13,
+      "peak_after_end_blanked": 11,
+      "end_before_start_blanked": 0,
+      "blanked_rows": [
+        {
+          "start_time": "2011-04-11 23:40:00",
+          "peak_time": "2011-04-11 00:00:00",
+          "end_time": "2011-04-12 00:03:00",
+          "goes_class": "C2.5",
+          "reason": "peak before start"
+        },
+        {
+          "start_time": "2012-04-05 23:50:00",
+          "peak_time": "2012-04-05 00:00:00",
+          "end_time": "2012-04-06 00:05:00",
+          "goes_class": "C1.1",
+          "reason": "peak before start"
+        },
+        {
+          "start_time": "2012-06-06 23:56:00",
+          "peak_time": "2012-06-06 00:00:00",
+          "end_time": "2012-06-07 00:05:00",
+          "goes_class": "C1.0",
+          "reason": "peak before start"
+        },
+        {
+          "start_time": "2012-07-30 23:50:00",
+          "peak_time": "2012-07-30 00:00:00",
+          "end_time": "2012-07-31 00:04:00",
+          "goes_class": "C6.3",
+          "reason": "peak before start"
+        },
+        {
+          "start_time": "2012-10-13 23:46:00",
+          "peak_time": "2012-10-13 00:00:00",
+          "end_time": "2012-10-14 00:18:00",
+          "goes_class": "C1.5",
+          "reason": "peak before start"
+        },
+        {
+          "start_time": "2014-05-25 23:49:00",
+          "peak_time": "2014-05-25 00:00:00",
+          "end_time": "2014-05-26 00:04:00",
+          "goes_class": "C3.8",
+          "reason": "peak before start"
+        },
+        {
+          "start_time": "2017-03-26 23:49:00",
+          "peak_time": "2017-03-26 00:00:00",
+          "end_time": "2017-03-27 00:08:00",
+          "goes_class": "C1.3",
+          "reason": "peak before start"
+        },
+        {
+          "start_time": "2020-04-09 01:31:00",
+          "peak_time": "2020-04-09 09:32:00",
+          "end_time": "2020-04-09 09:18:00",
+          "goes_class": "B1.6",
+          "reason": "peak after end"
+        },
+        {
+          "start_time": "2020-05-27 02:24:00",
+          "peak_time": "2020-05-27 18:35:00",
+          "end_time": "2020-05-27 18:18:00",
+          "goes_class": "B1.4",
+          "reason": "peak after end"
+        },
+        {
+          "start_time": "2020-05-28 10:13:00",
+          "peak_time": "2020-05-28 10:36:00",
+          "end_time": "2020-05-28 10:27:00",
+          "goes_class": "B2.9",
+          "reason": "peak after end"
+        },
+        {
+          "start_time": "2020-05-29 13:22:00",
+          "peak_time": "2020-05-29 13:45:00",
+          "end_time": "2020-05-29 13:36:00",
+          "goes_class": "B2.6",
+          "reason": "peak after end"
+        },
+        {
+          "start_time": "2020-06-02 04:21:00",
+          "peak_time": "2020-06-02 04:55:00",
+          "end_time": "2020-06-02 04:39:00",
+          "goes_class": "B1.5",
+          "reason": "peak after end"
+        },
+        {
+          "start_time": "2020-06-05 12:07:00",
+          "peak_time": "2020-06-05 12:46:00",
+          "end_time": "2020-06-05 12:39:00",
+          "goes_class": "B9.0",
+          "reason": "peak after end"
+        },
+        {
+          "start_time": "2021-04-17 23:49:00",
+          "peak_time": "2021-04-12 12:17:45",
+          "end_time": "2021-04-18 00:04:00",
+          "goes_class": "B4.1",
+          "reason": "peak before start"
+        },
+        {
+          "start_time": "2021-08-27 23:55:00",
+          "peak_time": "2021-09-08 15:26:07",
+          "end_time": "2021-08-28 00:05:00",
+          "goes_class": "C1.2",
+          "reason": "peak after end"
+        },
+        {
+          "start_time": "2021-09-18 23:48:00",
+          "peak_time": "2021-09-08 15:26:07",
+          "end_time": "2021-09-19 00:06:00",
+          "goes_class": "B1.9",
+          "reason": "peak before start"
+        },
+        {
+          "start_time": "2022-08-22 23:53:00",
+          "peak_time": "2022-08-22 14:45:38",
+          "end_time": "2022-08-23 00:04:00",
+          "goes_class": "B5.6",
+          "reason": "peak before start"
+        },
+        {
+          "start_time": "2022-11-17 23:36:00",
+          "peak_time": "2022-11-30 00:51:13",
+          "end_time": "2022-11-18 00:16:00",
+          "goes_class": "C5.4",
+          "reason": "peak after end"
+        },
+        {
+          "start_time": "2023-01-03 23:43:00",
+          "peak_time": "2023-01-18 17:54:00",
+          "end_time": "2023-01-04 00:56:00",
+          "goes_class": "C2.3",
+          "reason": "peak after end"
+        },
+        {
+          "start_time": "2023-08-21 23:47:00",
+          "peak_time": "2023-08-05 14:05:09",
+          "end_time": "2023-08-22 00:07:00",
+          "goes_class": "C5.7",
+          "reason": "peak before start"
+        },
+        {
+          "start_time": "2024-02-28 23:51:00",
+          "peak_time": "2024-02-20 10:16:18",
+          "end_time": "2024-02-29 00:08:00",
+          "goes_class": "C6.5",
+          "reason": "peak before start"
+        },
+        {
+          "start_time": "2024-08-18 23:46:00",
+          "peak_time": "2024-09-06 06:27:27",
+          "end_time": "2024-08-19 00:13:00",
+          "goes_class": "M1.4",
+          "reason": "peak after end"
+        },
+        {
+          "start_time": "2024-08-22 23:54:00",
+          "peak_time": "2024-09-06 06:27:27",
+          "end_time": "2024-08-23 00:06:00",
+          "goes_class": "C9.2",
+          "reason": "peak after end"
+        },
+        {
+          "start_time": "2024-11-18 23:50:00",
+          "peak_time": "2024-10-25 23:30:15",
+          "end_time": "2024-11-19 00:04:00",
+          "goes_class": "M1.1",
+          "reason": "peak before start"
+        }
+      ],
+      "modifications": "benchmark-only: columns renamed to the lab names; peak times outside [start, end] blanked (24 rows: 13 before start, 11 after end); end times before start blanked (0 rows); rows with a class the package rejects dropped (1); ar_noaanum passed through adapt_goes_catalog as text; start times and classes of kept rows unchanged",
+      "flares": 27210,
+      "first_start": "2010-05-01 01:34:00",
+      "last_start": "2024-12-31 22:46:00",
+      "classes": {
+        "A": 96,
+        "B": 9033,
+        "C": 15773,
+        "M": 2180,
+        "X": 128
+      },
+      "coverage": "unknown: first_start/last_start are the bounds of the recorded events, not evidence of observational coverage"
+    }
+  },
+  "reference_comparison": {
+    "lab": {
+      "raw_index": {
+        "rows": 128616,
+        "rows_compared": 128616,
+        "nonfinite_excluded": 0,
+        "nonfinite_a": 0,
+        "nonfinite_b": 0,
+        "exactly_equal": 119927,
+        "within_atol": 128616,
+        "differing_beyond_atol": 0,
+        "max_abs_difference": 2.2737367544323206e-13,
+        "atol": 1e-09
+      },
+      "labels": [
+        {
+          "threshold": 10.0,
+          "rows": 128616,
+          "rows_compared": 128616,
+          "nonfinite_excluded": 0,
+          "nonfinite_a": 0,
+          "nonfinite_b": 0,
+          "agree": 128616,
+          "disagree": 0,
+          "a_positive": 20359,
+          "b_positive": 20359,
+          "a1_b0": 0,
+          "a0_b1": 0
+        },
+        {
+          "threshold": 20.0,
+          "rows": 128616,
+          "rows_compared": 128616,
+          "nonfinite_excluded": 0,
+          "nonfinite_a": 0,
+          "nonfinite_b": 0,
+          "agree": 128608,
+          "disagree": 8,
+          "a_positive": 12838,
+          "b_positive": 12830,
+          "a1_b0": 8,
+          "a0_b1": 0
+        }
+      ],
+      "threshold_flip_examples_decimal_vs_float": {
+        "10.0": [],
+        "20.0": [
+          {
+            "timestamp": "2011-09-27 03:00:00",
+            "package_index": "20.0",
+            "reference_index": "19.999999999999996"
+          },
+          {
+            "timestamp": "2011-09-27 04:00:00",
+            "package_index": "20.0",
+            "reference_index": "19.999999999999996"
+          },
+          {
+            "timestamp": "2011-09-27 05:00:00",
+            "package_index": "20.0",
+            "reference_index": "19.999999999999996"
+          },
+          {
+            "timestamp": "2011-09-27 06:00:00",
+            "package_index": "20.0",
+            "reference_index": "19.999999999999996"
+          },
+          {
+            "timestamp": "2011-09-27 07:00:00",
+            "package_index": "20.0",
+            "reference_index": "19.999999999999996"
+          },
+          {
+            "timestamp": "2014-10-03 04:00:00",
+            "package_index": "20.0",
+            "reference_index": "19.999999999999996"
+          },
+          {
+            "timestamp": "2014-10-03 05:00:00",
+            "package_index": "20.0",
+            "reference_index": "19.999999999999996"
+          },
+          {
+            "timestamp": "2014-10-03 06:00:00",
+            "package_index": "20.0",
+            "reference_index": "19.999999999999996"
+          }
+        ]
+      },
+      "grid_first": "2010-05-01 00:00:00",
+      "grid_last": "2024-12-31 23:00:00",
+      "grid_rows": 128616
+    },
+    "suryabench": {
+      "raw_index": {
+        "rows": 128616,
+        "rows_compared": 128616,
+        "nonfinite_excluded": 0,
+        "nonfinite_a": 0,
+        "nonfinite_b": 0,
+        "exactly_equal": 111547,
+        "within_atol": 128616,
+        "differing_beyond_atol": 0,
+        "max_abs_difference": 2.2737367544323206e-13,
+        "atol": 1e-09
+      },
+      "labels": [
+        {
+          "threshold": 10.0,
+          "rows": 128616,
+          "rows_compared": 128616,
+          "nonfinite_excluded": 0,
+          "nonfinite_a": 0,
+          "nonfinite_b": 0,
+          "agree": 128616,
+          "disagree": 0,
+          "a_positive": 42017,
+          "b_positive": 42017,
+          "a1_b0": 0,
+          "a0_b1": 0
+        },
+        {
+          "threshold": 20.0,
+          "rows": 128616,
+          "rows_compared": 128616,
+          "nonfinite_excluded": 0,
+          "nonfinite_a": 0,
+          "nonfinite_b": 0,
+          "agree": 128607,
+          "disagree": 9,
+          "a_positive": 30129,
+          "b_positive": 30120,
+          "a1_b0": 9,
+          "a0_b1": 0
+        }
+      ],
+      "threshold_flip_examples_decimal_vs_float": {
+        "10.0": [],
+        "20.0": [
+          {
+            "timestamp": "2011-09-27 03:00:00",
+            "package_index": "20.0",
+            "reference_index": "19.999999999999996"
+          },
+          {
+            "timestamp": "2011-09-27 04:00:00",
+            "package_index": "20.0",
+            "reference_index": "19.999999999999996"
+          },
+          {
+            "timestamp": "2011-09-27 05:00:00",
+            "package_index": "20.0",
+            "reference_index": "19.999999999999996"
+          },
+          {
+            "timestamp": "2011-09-27 06:00:00",
+            "package_index": "20.0",
+            "reference_index": "19.999999999999996"
+          },
+          {
+            "timestamp": "2011-09-27 07:00:00",
+            "package_index": "20.0",
+            "reference_index": "19.999999999999996"
+          },
+          {
+            "timestamp": "2014-10-03 04:00:00",
+            "package_index": "20.0",
+            "reference_index": "19.999999999999996"
+          },
+          {
+            "timestamp": "2014-10-03 05:00:00",
+            "package_index": "20.0",
+            "reference_index": "19.999999999999996"
+          },
+          {
+            "timestamp": "2014-10-03 06:00:00",
+            "package_index": "20.0",
+            "reference_index": "19.999999999999996"
+          },
+          {
+            "timestamp": "2023-10-10 14:00:00",
+            "package_index": "20.0",
+            "reference_index": "19.999999999999996"
+          }
+        ]
+      },
+      "grid_first": "2010-05-01 00:00:00",
+      "grid_last": "2024-12-31 23:00:00",
+      "grid_rows": 128616
+    }
+  },
+  "published_comparison": {
+    "lab": {
+      "matched_timestamps": 128328,
+      "matched_range": [
+        "2010-05-13 00:00:00",
+        "2024-12-31 23:00:00"
+      ],
+      "package_only_timestamps": 288,
+      "package_only_range": [
+        "2010-05-01 00:00:00",
+        "2010-05-12 23:00:00"
+      ],
+      "published_only_timestamps": 0,
+      "published_only_range": null,
+      "published_only_sample": [],
+      "catalog_event_bounds": [
+        "2010-05-01 01:34:00",
+        "2018-12-29 13:16:00"
+      ],
+      "coverage": "unknown (event bounds are not observational coverage)",
+      "within_bounds_definition": "first recorded start <= t and t + window <= last recorded start",
+      "within_bounds_timestamps": 75638,
+      "past_bounds_timestamps": 52690,
+      "past_bounds_range": [
+        "2018-12-28 14:00:00",
+        "2024-12-31 23:00:00"
+      ],
+      "past_bounds_package_nonzero": 0,
+      "past_bounds_published_nonzero": 29078,
+      "within_bounds": {
+        "rows": 75638,
+        "raw_index": {
+          "rows": 75638,
+          "rows_compared": 75638,
+          "nonfinite_excluded": 0,
+          "nonfinite_a": 0,
+          "nonfinite_b": 0,
+          "exactly_equal": 69940,
+          "within_atol": 75480,
+          "differing_beyond_atol": 158,
+          "max_abs_difference": 15.900000000000006,
+          "atol": 1e-09
+        },
+        "labels_recomputed_from_index": [
+          {
+            "threshold": 10.0,
+            "rows": 75638,
+            "rows_compared": 75638,
+            "nonfinite_excluded": 0,
+            "nonfinite_a": 0,
+            "nonfinite_b": 0,
+            "agree": 75638,
+            "disagree": 0,
+            "a_positive": 20309,
+            "b_positive": 20309,
+            "a1_b0": 0,
+            "a0_b1": 0
+          },
+          {
+            "threshold": 20.0,
+            "rows": 75638,
+            "rows_compared": 75638,
+            "nonfinite_excluded": 0,
+            "nonfinite_a": 0,
+            "nonfinite_b": 0,
+            "agree": 75630,
+            "disagree": 8,
+            "a_positive": 12820,
+            "b_positive": 12812,
+            "a1_b0": 8,
+            "a0_b1": 0
+          }
+        ],
+        "label_cum_published_vs_package_ge_10": {
+          "rows": 75638,
+          "agree": 75638,
+          "disagree": 0,
+          "package1_published0": 0,
+          "package0_published1": 0
+        },
+        "by_year": [
+          {
+            "year": 2010,
+            "rows": 5592,
+            "raw_beyond_atol": 24,
+            "label_disagree": 0
+          },
+          {
+            "year": 2011,
+            "rows": 8760,
+            "raw_beyond_atol": 24,
+            "label_disagree": 0
+          },
+          {
+            "year": 2012,
+            "rows": 8784,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2013,
+            "rows": 8760,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2014,
+            "rows": 8760,
+            "raw_beyond_atol": 25,
+            "label_disagree": 0
+          },
+          {
+            "year": 2015,
+            "rows": 8760,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2016,
+            "rows": 8784,
+            "raw_beyond_atol": 61,
+            "label_disagree": 0
+          },
+          {
+            "year": 2017,
+            "rows": 8760,
+            "raw_beyond_atol": 24,
+            "label_disagree": 0
+          },
+          {
+            "year": 2018,
+            "rows": 8678,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          }
+        ]
+      },
+      "all_matched": {
+        "rows": 128328,
+        "raw_index": {
+          "rows": 128328,
+          "rows_compared": 128328,
+          "nonfinite_excluded": 0,
+          "nonfinite_a": 0,
+          "nonfinite_b": 0,
+          "exactly_equal": 93552,
+          "within_atol": 99092,
+          "differing_beyond_atol": 29236,
+          "max_abs_difference": 1913.0,
+          "atol": 1e-09
+        },
+        "labels_recomputed_from_index": [
+          {
+            "threshold": 10.0,
+            "rows": 128328,
+            "rows_compared": 128328,
+            "nonfinite_excluded": 0,
+            "nonfinite_a": 0,
+            "nonfinite_b": 0,
+            "agree": 106670,
+            "disagree": 21658,
+            "a_positive": 20309,
+            "b_positive": 41967,
+            "a1_b0": 0,
+            "a0_b1": 21658
+          },
+          {
+            "threshold": 20.0,
+            "rows": 128328,
+            "rows_compared": 128328,
+            "nonfinite_excluded": 0,
+            "nonfinite_a": 0,
+            "nonfinite_b": 0,
+            "agree": 111030,
+            "disagree": 17298,
+            "a_positive": 12820,
+            "b_positive": 30102,
+            "a1_b0": 8,
+            "a0_b1": 17290
+          }
+        ],
+        "label_cum_published_vs_package_ge_10": {
+          "rows": 128328,
+          "agree": 106670,
+          "disagree": 21658,
+          "package1_published0": 0,
+          "package0_published1": 21658
+        },
+        "by_year": [
+          {
+            "year": 2010,
+            "rows": 5592,
+            "raw_beyond_atol": 24,
+            "label_disagree": 0
+          },
+          {
+            "year": 2011,
+            "rows": 8760,
+            "raw_beyond_atol": 24,
+            "label_disagree": 0
+          },
+          {
+            "year": 2012,
+            "rows": 8784,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2013,
+            "rows": 8760,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2014,
+            "rows": 8760,
+            "raw_beyond_atol": 25,
+            "label_disagree": 0
+          },
+          {
+            "year": 2015,
+            "rows": 8760,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2016,
+            "rows": 8784,
+            "raw_beyond_atol": 61,
+            "label_disagree": 0
+          },
+          {
+            "year": 2017,
+            "rows": 8760,
+            "raw_beyond_atol": 24,
+            "label_disagree": 0
+          },
+          {
+            "year": 2018,
+            "rows": 8760,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2019,
+            "rows": 8760,
+            "raw_beyond_atol": 353,
+            "label_disagree": 71
+          },
+          {
+            "year": 2020,
+            "rows": 8784,
+            "raw_beyond_atol": 857,
+            "label_disagree": 105
+          },
+          {
+            "year": 2021,
+            "rows": 8760,
+            "raw_beyond_atol": 2845,
+            "label_disagree": 1057
+          },
+          {
+            "year": 2022,
+            "rows": 8760,
+            "raw_beyond_atol": 7693,
+            "label_disagree": 5054
+          },
+          {
+            "year": 2023,
+            "rows": 8760,
+            "raw_beyond_atol": 8660,
+            "label_disagree": 7172
+          },
+          {
+            "year": 2024,
+            "rows": 8784,
+            "raw_beyond_atol": 8670,
+            "label_disagree": 8199
+          }
+        ]
+      },
+      "disagreement_examples_within_bounds": [
+        {
+          "timestamp": "2010-10-25 02:00:00",
+          "package_index": 3.4,
+          "published_index": 4.5,
+          "package_flares": [
+            "2010-10-25 03:44:00 B1.7",
+            "2010-10-25 05:55:00 B2.1",
+            "2010-10-25 08:06:00 B3.1",
+            "2010-10-25 11:52:00 B6.4",
+            "2010-10-25 13:14:00 B2.7",
+            "2010-10-25 13:33:00 B3.0",
+            "2010-10-25 21:46:00 B6.9",
+            "2010-10-25 22:06:00 C2.3",
+            "2010-10-26 00:04:00 B8.4",
+            "2010-10-26 01:06:00 C1.1"
+          ]
+        },
+        {
+          "timestamp": "2010-10-25 03:00:00",
+          "package_index": 3.4,
+          "published_index": 4.5,
+          "package_flares": [
+            "2010-10-25 03:44:00 B1.7",
+            "2010-10-25 05:55:00 B2.1",
+            "2010-10-25 08:06:00 B3.1",
+            "2010-10-25 11:52:00 B6.4",
+            "2010-10-25 13:14:00 B2.7",
+            "2010-10-25 13:33:00 B3.0",
+            "2010-10-25 21:46:00 B6.9",
+            "2010-10-25 22:06:00 C2.3",
+            "2010-10-26 00:04:00 B8.4",
+            "2010-10-26 01:06:00 C1.1",
+            "2010-10-26 02:14:00 B3.8"
+          ]
+        },
+        {
+          "timestamp": "2010-10-25 04:00:00",
+          "package_index": 3.4,
+          "published_index": 4.5,
+          "package_flares": [
+            "2010-10-25 05:55:00 B2.1",
+            "2010-10-25 08:06:00 B3.1",
+            "2010-10-25 11:52:00 B6.4",
+            "2010-10-25 13:14:00 B2.7",
+            "2010-10-25 13:33:00 B3.0",
+            "2010-10-25 21:46:00 B6.9",
+            "2010-10-25 22:06:00 C2.3",
+            "2010-10-26 00:04:00 B8.4",
+            "2010-10-26 01:06:00 C1.1",
+            "2010-10-26 02:14:00 B3.8",
+            "2010-10-26 03:11:00 B6.3"
+          ]
+        },
+        {
+          "timestamp": "2010-10-25 05:00:00",
+          "package_index": 3.4,
+          "published_index": 4.5,
+          "package_flares": [
+            "2010-10-25 05:55:00 B2.1",
+            "2010-10-25 08:06:00 B3.1",
+            "2010-10-25 11:52:00 B6.4",
+            "2010-10-25 13:14:00 B2.7",
+            "2010-10-25 13:33:00 B3.0",
+            "2010-10-25 21:46:00 B6.9",
+            "2010-10-25 22:06:00 C2.3",
+            "2010-10-26 00:04:00 B8.4",
+            "2010-10-26 01:06:00 C1.1",
+            "2010-10-26 02:14:00 B3.8",
+            "2010-10-26 03:11:00 B6.3",
+            "2010-10-26 04:25:00 B5.6"
+          ]
+        },
+        {
+          "timestamp": "2010-10-25 06:00:00",
+          "package_index": 3.4,
+          "published_index": 4.5,
+          "package_flares": [
+            "2010-10-25 08:06:00 B3.1",
+            "2010-10-25 11:52:00 B6.4",
+            "2010-10-25 13:14:00 B2.7",
+            "2010-10-25 13:33:00 B3.0",
+            "2010-10-25 21:46:00 B6.9",
+            "2010-10-25 22:06:00 C2.3",
+            "2010-10-26 00:04:00 B8.4",
+            "2010-10-26 01:06:00 C1.1",
+            "2010-10-26 02:14:00 B3.8",
+            "2010-10-26 03:11:00 B6.3",
+            "2010-10-26 04:25:00 B5.6",
+            "2010-10-26 05:29:00 B6.0"
+          ]
+        },
+        {
+          "timestamp": "2010-10-25 07:00:00",
+          "package_index": 3.4,
+          "published_index": 4.5,
+          "package_flares": [
+            "2010-10-25 08:06:00 B3.1",
+            "2010-10-25 11:52:00 B6.4",
+            "2010-10-25 13:14:00 B2.7",
+            "2010-10-25 13:33:00 B3.0",
+            "2010-10-25 21:46:00 B6.9",
+            "2010-10-25 22:06:00 C2.3",
+            "2010-10-26 00:04:00 B8.4",
+            "2010-10-26 01:06:00 C1.1",
+            "2010-10-26 02:14:00 B3.8",
+            "2010-10-26 03:11:00 B6.3",
+            "2010-10-26 04:25:00 B5.6",
+            "2010-10-26 05:29:00 B6.0",
+            "2010-10-26 06:34:00 B2.8"
+          ]
+        },
+        {
+          "timestamp": "2010-10-25 08:00:00",
+          "package_index": 3.4,
+          "published_index": 4.5,
+          "package_flares": [
+            "2010-10-25 08:06:00 B3.1",
+            "2010-10-25 11:52:00 B6.4",
+            "2010-10-25 13:14:00 B2.7",
+            "2010-10-25 13:33:00 B3.0",
+            "2010-10-25 21:46:00 B6.9",
+            "2010-10-25 22:06:00 C2.3",
+            "2010-10-26 00:04:00 B8.4",
+            "2010-10-26 01:06:00 C1.1",
+            "2010-10-26 02:14:00 B3.8",
+            "2010-10-26 03:11:00 B6.3",
+            "2010-10-26 04:25:00 B5.6",
+            "2010-10-26 05:29:00 B6.0",
+            "2010-10-26 06:34:00 B2.8",
+            "2010-10-26 07:24:00 B4.8"
+          ]
+        },
+        {
+          "timestamp": "2010-10-25 09:00:00",
+          "package_index": 4.4,
+          "published_index": 5.5,
+          "package_flares": [
+            "2010-10-25 11:52:00 B6.4",
+            "2010-10-25 13:14:00 B2.7",
+            "2010-10-25 13:33:00 B3.0",
+            "2010-10-25 21:46:00 B6.9",
+            "2010-10-25 22:06:00 C2.3",
+            "2010-10-26 00:04:00 B8.4",
+            "2010-10-26 01:06:00 C1.1",
+            "2010-10-26 02:14:00 B3.8",
+            "2010-10-26 03:11:00 B6.3",
+            "2010-10-26 04:25:00 B5.6",
+            "2010-10-26 05:29:00 B6.0",
+            "2010-10-26 06:34:00 B2.8",
+            "2010-10-26 07:24:00 B4.8",
+            "2010-10-26 08:09:00 C1.0",
+            "2010-10-26 08:26:00 B3.3"
+          ]
+        },
+        {
+          "timestamp": "2010-10-25 10:00:00",
+          "package_index": 4.4,
+          "published_index": 5.5,
+          "package_flares": [
+            "2010-10-25 11:52:00 B6.4",
+            "2010-10-25 13:14:00 B2.7",
+            "2010-10-25 13:33:00 B3.0",
+            "2010-10-25 21:46:00 B6.9",
+            "2010-10-25 22:06:00 C2.3",
+            "2010-10-26 00:04:00 B8.4",
+            "2010-10-26 01:06:00 C1.1",
+            "2010-10-26 02:14:00 B3.8",
+            "2010-10-26 03:11:00 B6.3",
+            "2010-10-26 04:25:00 B5.6",
+            "2010-10-26 05:29:00 B6.0",
+            "2010-10-26 06:34:00 B2.8",
+            "2010-10-26 07:24:00 B4.8",
+            "2010-10-26 08:09:00 C1.0",
+            "2010-10-26 08:26:00 B3.3"
+          ]
+        },
+        {
+          "timestamp": "2010-10-25 11:00:00",
+          "package_index": 4.4,
+          "published_index": 5.5,
+          "package_flares": [
+            "2010-10-25 11:52:00 B6.4",
+            "2010-10-25 13:14:00 B2.7",
+            "2010-10-25 13:33:00 B3.0",
+            "2010-10-25 21:46:00 B6.9",
+            "2010-10-25 22:06:00 C2.3",
+            "2010-10-26 00:04:00 B8.4",
+            "2010-10-26 01:06:00 C1.1",
+            "2010-10-26 02:14:00 B3.8",
+            "2010-10-26 03:11:00 B6.3",
+            "2010-10-26 04:25:00 B5.6",
+            "2010-10-26 05:29:00 B6.0",
+            "2010-10-26 06:34:00 B2.8",
+            "2010-10-26 07:24:00 B4.8",
+            "2010-10-26 08:09:00 C1.0",
+            "2010-10-26 08:26:00 B3.3"
+          ]
+        }
+      ]
+    },
+    "suryabench": {
+      "matched_timestamps": 128328,
+      "matched_range": [
+        "2010-05-13 00:00:00",
+        "2024-12-31 23:00:00"
+      ],
+      "package_only_timestamps": 288,
+      "package_only_range": [
+        "2010-05-01 00:00:00",
+        "2010-05-12 23:00:00"
+      ],
+      "published_only_timestamps": 0,
+      "published_only_range": null,
+      "published_only_sample": [],
+      "catalog_event_bounds": [
+        "2010-05-01 01:34:00",
+        "2024-12-31 22:46:00"
+      ],
+      "coverage": "unknown (event bounds are not observational coverage)",
+      "within_bounds_definition": "first recorded start <= t and t + window <= last recorded start",
+      "within_bounds_timestamps": 128303,
+      "past_bounds_timestamps": 25,
+      "past_bounds_range": [
+        "2024-12-30 23:00:00",
+        "2024-12-31 23:00:00"
+      ],
+      "past_bounds_package_nonzero": 24,
+      "past_bounds_published_nonzero": 24,
+      "within_bounds": {
+        "rows": 128303,
+        "raw_index": {
+          "rows": 128303,
+          "rows_compared": 128303,
+          "nonfinite_excluded": 0,
+          "nonfinite_a": 0,
+          "nonfinite_b": 0,
+          "exactly_equal": 117348,
+          "within_atol": 128303,
+          "differing_beyond_atol": 0,
+          "max_abs_difference": 4.547473508864641e-13,
+          "atol": 1e-09
+        },
+        "labels_recomputed_from_index": [
+          {
+            "threshold": 10.0,
+            "rows": 128303,
+            "rows_compared": 128303,
+            "nonfinite_excluded": 0,
+            "nonfinite_a": 0,
+            "nonfinite_b": 0,
+            "agree": 128303,
+            "disagree": 0,
+            "a_positive": 41943,
+            "b_positive": 41943,
+            "a1_b0": 0,
+            "a0_b1": 0
+          },
+          {
+            "threshold": 20.0,
+            "rows": 128303,
+            "rows_compared": 128303,
+            "nonfinite_excluded": 0,
+            "nonfinite_a": 0,
+            "nonfinite_b": 0,
+            "agree": 128294,
+            "disagree": 9,
+            "a_positive": 30087,
+            "b_positive": 30078,
+            "a1_b0": 9,
+            "a0_b1": 0
+          }
+        ],
+        "label_cum_published_vs_package_ge_10": {
+          "rows": 128303,
+          "agree": 128303,
+          "disagree": 0,
+          "package1_published0": 0,
+          "package0_published1": 0
+        },
+        "by_year": [
+          {
+            "year": 2010,
+            "rows": 5592,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2011,
+            "rows": 8760,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2012,
+            "rows": 8784,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2013,
+            "rows": 8760,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2014,
+            "rows": 8760,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2015,
+            "rows": 8760,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2016,
+            "rows": 8784,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2017,
+            "rows": 8760,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2018,
+            "rows": 8760,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2019,
+            "rows": 8760,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2020,
+            "rows": 8784,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2021,
+            "rows": 8760,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2022,
+            "rows": 8760,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2023,
+            "rows": 8760,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2024,
+            "rows": 8759,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          }
+        ]
+      },
+      "all_matched": {
+        "rows": 128328,
+        "raw_index": {
+          "rows": 128328,
+          "rows_compared": 128328,
+          "nonfinite_excluded": 0,
+          "nonfinite_a": 0,
+          "nonfinite_b": 0,
+          "exactly_equal": 117373,
+          "within_atol": 128328,
+          "differing_beyond_atol": 0,
+          "max_abs_difference": 4.547473508864641e-13,
+          "atol": 1e-09
+        },
+        "labels_recomputed_from_index": [
+          {
+            "threshold": 10.0,
+            "rows": 128328,
+            "rows_compared": 128328,
+            "nonfinite_excluded": 0,
+            "nonfinite_a": 0,
+            "nonfinite_b": 0,
+            "agree": 128328,
+            "disagree": 0,
+            "a_positive": 41967,
+            "b_positive": 41967,
+            "a1_b0": 0,
+            "a0_b1": 0
+          },
+          {
+            "threshold": 20.0,
+            "rows": 128328,
+            "rows_compared": 128328,
+            "nonfinite_excluded": 0,
+            "nonfinite_a": 0,
+            "nonfinite_b": 0,
+            "agree": 128319,
+            "disagree": 9,
+            "a_positive": 30111,
+            "b_positive": 30102,
+            "a1_b0": 9,
+            "a0_b1": 0
+          }
+        ],
+        "label_cum_published_vs_package_ge_10": {
+          "rows": 128328,
+          "agree": 128328,
+          "disagree": 0,
+          "package1_published0": 0,
+          "package0_published1": 0
+        },
+        "by_year": [
+          {
+            "year": 2010,
+            "rows": 5592,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2011,
+            "rows": 8760,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2012,
+            "rows": 8784,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2013,
+            "rows": 8760,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2014,
+            "rows": 8760,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2015,
+            "rows": 8760,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2016,
+            "rows": 8784,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2017,
+            "rows": 8760,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2018,
+            "rows": 8760,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2019,
+            "rows": 8760,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2020,
+            "rows": 8784,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2021,
+            "rows": 8760,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2022,
+            "rows": 8760,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2023,
+            "rows": 8760,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          },
+          {
+            "year": 2024,
+            "rows": 8784,
+            "raw_beyond_atol": 0,
+            "label_disagree": 0
+          }
+        ]
+      },
+      "disagreement_examples_within_bounds": []
+    }
+  },
+  "published_labels": {
+    "source": "https://huggingface.co/datasets/nasa-ibm-ai4science/surya-bench-flare-forecasting/resolve/main/data.csv",
+    "license": "CC BY 4.0",
+    "dataset": "nasa-ibm-ai4science/surya-bench-flare-forecasting",
+    "revision": "bf474bc1e7752bd529e9707650f9310db8693763",
+    "last_modified": "2025-12-16T21:25:30.000Z",
+    "sha256": "593560599946bc806270f8a69709d02ddb0737befb3de6af20c557a1deac1bba",
+    "rows": 128328,
+    "duplicate_timestamps": 0,
+    "nonfinite_cumulative_index": 0,
+    "first_timestamp": "2010-05-13 00:00:00",
+    "last_timestamp": "2024-12-31 23:00:00",
+    "label_cum_positive": 41967,
+    "label_cum_consistent_with_index_ge_10": 128328,
+    "modifications": "none; file used as downloaded (max_goes_class and label_max are not compared)"
+  },
+  "runtime_seconds": 44.5
+}

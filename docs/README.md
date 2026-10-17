@@ -6,7 +6,7 @@
 | **Look up any public class, function or method** | **[api_reference.md](api_reference.md)** |
 | **Understand how the code works inside** | **[architecture/system_design.md](architecture/system_design.md)** |
 | Label active-region patches | [active_region_workflow.md](active_region_workflow.md) |
-| Check the real-data validation | [validation/full_disk.md](validation/full_disk.md), [validation/active_region.md](validation/active_region.md) |
+| Check the real-data validation | [validation/full_disk.md](validation/full_disk.md), [validation/active_region.md](validation/active_region.md), [validation/cumulative_index.md](validation/cumulative_index.md) |
 | See which choices still need a scientific decision | [decisions.md](decisions.md) |
 
 Runnable examples with synthetic data are in [`../examples`](../examples).

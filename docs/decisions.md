@@ -8,7 +8,7 @@ from v0.2.1 until an answer is recorded here.
 
 | ID | Question | Status |
 |---|---|---|
-| Q1 | What should cumulative indexing calculate? | open – not implemented |
+| Q1 | What should cumulative indexing calculate? | partly decided 2026-10-16 – cumulative class index implemented after the reference formula; A/B convention, window edges and rxfi still open |
 | Q2 | Active-region labels: flares before or after the image? | open – blocks reproducing the published AR labels with the package API |
 | Q3 | Default flare time (start/peak) and window boundaries | open |
 | Q4 | Missing region numbers: on images, and on catalog flares | open |
@@ -23,18 +23,68 @@ D4 is Q5. Q1, Q6 and Q7 are new.)
 
 ## Q1. What should cumulative indexing calculate?
 
-**Fact.** Implemented: maximum flux (`MaxFluxReducer`), minimum flux
-(`MinFluxReducer`), per-class counts (`ClassCountReducer` +
-`ClassCountLabeler`) and class presence (`ClassPresenceLabeler`).
-Cumulative indexing is not implemented. The AIKE slides show only the
-maximum-flare example.
+**Sources (from Dr. Pandey, 2026-10-16).** Hong, Ji, Pandey, Aydin,
+*Beyond Traditional Flare Forecasting: A Data-driven Labeling Approach
+for High-fidelity Predictions*, DaWaK 2023
+(par.nsf.gov/servlets/purl/10435332); the lab repository
+`bitbucket.org/gsudmlab/data_driven_labels`; and
+`github.com/NASA-IMPACT/SuryaBench/blob/main/flare/flare_index_creator.py`
+("the flare index creator"). The paper defines four window indices:
+GC Max (already `MaxFluxReducer`), **GC Σ**, rxfi Max and rxfi Σ.
 
-**Options.** (a) sum of the peak fluxes of every flare in the window –
-for C2.0, C3.0 and M1.0 that is 2e-6 + 3e-6 + 1e-5 = 1.5e-5 W/m²;
-(b) another formula (e.g. time-integrated flux, which needs start/end
-times and a flare profile the catalog does not have).
+**Decided and implemented (GC Σ).** `CumulativeClassIndexReducer`
+computes, over the flares in the prediction window,
 
-**Question.** Add the peak fluxes, or use another formula?
+    index = Σ C_i + 10 · Σ M_j + 100 · Σ X_k
+
+with the numbers written in the class text (paper Sec. 2.2; SuryaBench
+`sub_class_num`: C → n, M → 10 n, X → 100 n, then `sum()`). Empty window
+→ 0.0. `NumericThresholdLabeler` binarizes the index at a plain number
+(SuryaBench `label_cum`: index ≥ 10; the paper's AR study: 20, and
+10..100 in steps of 5). Worked check: the paper's window M1.5, C2.6,
+C1.4, M2.1, C2.8, C4.2, C1.5 → 48.5. Validation against the public
+SuryaBench labels: [validation/cumulative_index.md](validation/cumulative_index.md).
+
+**Selected conventions, pending confirmation (not settled science).**
+
+- *A and B flares add 0.* The paper's formula names only C, M, X;
+  SuryaBench maps A/B to `None` and the sum skips them; the lab's AR
+  code keeps only C|M|X. The Bitbucket full-disk notebook sums a
+  precomputed column `abs_GOES` whose construction is not in the public
+  repository, so its A/B treatment cannot be verified. Consequence:
+  `B15.0` adds 0 while `C1.5` adds 1.5 at the same flux.
+- *Window edges.* Paper text: `[t_i, t_i + 24h]` (closed both ends).
+  Lab notebooks and SuryaBench: `t < start ≤ t + 23:59:59` on start time,
+  hourly. The package expresses the second exactly
+  (`event_time="start"`, `interval_mode="right_closed"`,
+  `prediction_window="23h59min59s"`); the closed interval is not one of
+  the two `interval_mode` options. The package defaults are unchanged
+  (see Q3).
+
+**Behaviors of the reference code that are documented, not copied.**
+SuryaBench picks the maximum class by sorting class strings and compares
+`ins >= "M1.0"` as text (`"M9.0" > "M10.0"`), mutates its input frame,
+and splits by calendar dates; the Bitbucket notebooks cast values to
+`float16` before thresholding and skip flares whose value is NaN. None of
+this affects the index formula; the package keeps numeric comparison and
+no partitioning.
+
+**Not implemented (rxfi).** rxfi is per flare: peak flux divided by a
+background flux, the mean of 1-minute GOES XRS flux in the 24 h before
+the flare's start after removing low-quality minutes, other flares'
+start–end intervals and values above the flux at start
+(`Preprocessing/rxfi_creator/*.py`; the Bitbucket README's fixed
+denominator of 1440 does not match the code or the paper text). rxfi Max
+and rxfi Σ are the window maximum and sum of that value (paper example:
+40.26 and 110.05). Neither our catalog nor SuryaBench's carries rxfi, and
+the package does not read XRS time series. The background interval (24 h
+before each flare) and the prediction window (after each image) are
+different intervals and must not be confused.
+
+**Questions.** (1) Confirm A/B = 0. (2) Which window edges should the
+index use: `[t, t+24h]` as written, or `(t, t+23:59:59]` as coded?
+(3) Should the package consume a precomputed per-flare rxfi column, or
+is computing rxfi from XRS data required?
 
 ## Q2. Active-region labels: flares before or after the image?
 

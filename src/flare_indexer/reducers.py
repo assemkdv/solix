@@ -1,6 +1,7 @@
+from decimal import Decimal
 from typing import Protocol
 
-from .classifier import FluxConverter
+from .classifier import FluxConverter, _parse_goes_class_decimal
 from .events import FlareEvent
 
 _flux_converter = FluxConverter()
@@ -58,3 +59,45 @@ class ClassCountReducer:
         for event in events:
             counts[_flux_converter.to_class(_flux_converter.to_flux(event.goes_class))] += 1
         return counts
+
+
+class CumulativeClassIndexReducer:
+    """Cumulative normalized GOES subclass index of all events in the window.
+
+    Formula (Hong, Ji, Pandey, Aydin, DaWaK 2023, Sec. 2.2; the same rule
+    is coded in NASA-IMPACT/SuryaBench ``flare/flare_index_creator.py``):
+
+        index = sum(C_i) + 10 * sum(M_j) + 100 * sum(X_k)
+
+    where C_i, M_j, X_k are the numbers written in the class text
+    (C2.6 -> 2.6, M1.5 -> 15, X1.0 -> 100). The unit is "one C1.0 flare";
+    the value is dimensionless. The paper's worked window (M1.5, C2.6,
+    C1.4, M2.1, C2.8, C4.2, C1.5) gives 48.5.
+
+    Selected convention, pending Dr. Pandey's confirmation: A- and
+    B-class events contribute 0, as in the paper's formula and in
+    SuryaBench (where they fall through to None and are skipped by the
+    sum). Consequences: "C10.0" and "M1.0" both add 10; "B15.0" adds 0
+    although its flux equals C1.5. The weights are per letter, in
+    WEIGHTS; a letter missing from WEIGHTS weighs 0.
+
+    The sum is formed in decimal arithmetic from the class text and
+    rounded to a float once, so values written differently but equal
+    (C10.0 and M1.0) give the identical result and the paper's 48.5 is
+    exact. Returns 0.0 for an empty window. An invalid class raises
+    InvalidGOESClassError (only possible for hand-built events; loaded
+    catalogs are already checked).
+
+    This reducer only aggregates; it does not choose the prediction
+    window. The reference implementations use start time and
+    (t, t+23:59:59]; see docs/decisions.md Q1 and Q3.
+    """
+
+    WEIGHTS = {"C": 1, "M": 10, "X": 100}
+
+    def reduce(self, events: list[FlareEvent]) -> float:
+        total = Decimal(0)
+        for event in events:
+            letter, multiplier = _parse_goes_class_decimal(event.goes_class)
+            total += multiplier * self.WEIGHTS.get(letter, 0)
+        return float(total)

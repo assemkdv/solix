@@ -1,6 +1,6 @@
 # API reference
 
-Every public name exported by `flare_indexer` (the 24 names in
+Every public name exported by `flare_indexer` (the 26 names in
 `flare_indexer.__all__`), every public method of those classes, and the
 public module-level helpers that are not exported. A developer appendix
 at the end describes private helpers; researchers should not depend on
@@ -28,10 +28,12 @@ package uses flux numbers, never class text.
 | `MaxFluxReducer` | class | `reducers` | [link](#maxfluxreducer) |
 | `MinFluxReducer` | class | `reducers` | [link](#minfluxreducer) |
 | `ClassCountReducer` | class | `reducers` | [link](#classcountreducer) |
+| `CumulativeClassIndexReducer` | class | `reducers` | [link](#cumulativeclassindexreducer) |
 | `ClassCountLabeler` | class | `labelers` | [link](#classcountlabeler) |
 | `ClassPresenceLabeler` | class | `labelers` | [link](#classpresencelabeler) |
 | `LabelAssigner` | Protocol (contract) | `labelers` | [link](#labelassigner) |
 | `BinaryThresholdLabeler` | class | `labelers` | [link](#binarythresholdlabeler) |
+| `NumericThresholdLabeler` | class | `labelers` | [link](#numericthresholdlabeler) |
 | `RegressionLabeler` | class | `labelers` | [link](#regressionlabeler) |
 | `MulticlassLabeler` | class | `labelers` | [link](#multiclasslabeler) |
 | `BinaryThresholdStrategy` | class | `strategies` | [link](#binarythresholdstrategy) |
@@ -47,8 +49,9 @@ package uses flux numbers, never class text.
 Public methods: `FluxConverter.to_flux`, `FluxConverter.to_class`, `FlareClassifier.is_strong`,
 `EventMatcher.query`, `EventReducer.reduce` (contract),
 `MaxFluxReducer.reduce`, `MinFluxReducer.reduce`, `ClassCountReducer.reduce`,
+`CumulativeClassIndexReducer.reduce`,
 `ClassCountLabeler.assign`, `ClassPresenceLabeler.assign`, `LabelAssigner.assign` (contract),
-`BinaryThresholdLabeler.assign`, `RegressionLabeler.assign`,
+`BinaryThresholdLabeler.assign`, `NumericThresholdLabeler.assign`, `RegressionLabeler.assign`,
 `MulticlassLabeler.assign`, `BinaryThresholdStrategy.label`, `MaxFlareStrategy.label`,
 `DatasetBuildingPipeline.extract_events`, `.reduce_events`,
 `.assign_label`, `.run_one`, `.label`, `DatasetBuilder.build`.
@@ -1297,8 +1300,118 @@ presence = DatasetBuildingPipeline(ClassCountReducer(), ClassPresenceLabeler())
 Pass any of these as `DatasetBuilder(..., strategy=...)`. Counts/presence
 are dictionary values in the `label` column; export them explicitly as
 JSON or expand to five columns before CSV/framework use. Plain CSV does
-not preserve Python mappings. Cumulative indexing is not implemented:
-its formula remains to be specified.
+not preserve Python mappings. For the cumulative class index see the next
+section.
+
+## Cumulative class index
+
+### `CumulativeClassIndexReducer`
+
+```python
+from flare_indexer import CumulativeClassIndexReducer
+CumulativeClassIndexReducer()
+```
+
+**Purpose.** The "cumulative normalized GOES subclass" index of Hong, Ji,
+Pandey and Aydin (DaWaK 2023, Sec. 2.2), also produced by
+NASA-IMPACT/SuryaBench `flare/flare_index_creator.py`:
+
+    index = sum(C_i) + 10 · sum(M_j) + 100 · sum(X_k)
+
+over all events in the window, using the numbers written in the class
+text (C2.6 → 2.6, M1.5 → 15, X1.0 → 100). The unit is "one C1.0 flare";
+the value is dimensionless, not W/m². **Class attribute** `WEIGHTS =
+{"C": 1, "M": 10, "X": 100}`; A and B are not in it and contribute 0.
+This is the selected reference-compatible convention, pending
+Dr. Pandey's confirmation ([decisions.md](decisions.md), Q1).
+
+### `CumulativeClassIndexReducer.reduce`
+
+```python
+CumulativeClassIndexReducer().reduce(events: list[FlareEvent]) -> float
+```
+
+**Inputs.** `events`: list of `FlareEvent`. **What it does.** Sums the
+weighted class numbers in decimal arithmetic and rounds once, so equal
+strengths written differently give the identical value (`C10.0` and
+`M1.0` both add 10) and decimal class text adds up exactly. **Returns.**
+`float`; `0.0` for an empty list.
+
+Run (requires Setup):
+
+<!-- example: cumulative -->
+```python
+paper = [fidx.FlareEvent(peak_time=None, goes_class=c, start_time=None, active_region=None)
+         for c in ["M1.5", "C2.6", "C1.4", "M2.1", "C2.8", "C4.2", "C1.5"]]
+reducer = fidx.CumulativeClassIndexReducer()
+print(reducer.reduce(paper))
+print(reducer.reduce([]))
+print(reducer.reduce(paper[:1] + [fidx.FlareEvent(None, "B5.0", None, None)]))
+```
+<!-- output: cumulative -->
+```text
+48.5
+0.0
+15.0
+```
+
+**Output explained.** The paper's worked window: (1.5 + 2.1) × 10 +
+(2.6 + 1.4 + 2.8 + 4.2 + 1.5) = 48.5. No events → `0.0`. M1.5 with a
+B5.0 → 15: the B flare adds nothing under the selected convention.
+**Errors.** `InvalidGOESClassError` for a bad class (hand-built events
+only). **Limitations.** The reducer aggregates whatever the matcher
+returns; the reference implementations use `event_time="start"` and
+`interval_mode="right_closed"` with `prediction_window="23h59min59s"`,
+and the paper writes the window as `[t, t+24h]`, which is closed at both
+ends and is not one of the two `interval_mode` options.
+
+### `NumericThresholdLabeler`
+
+```python
+from flare_indexer import NumericThresholdLabeler
+NumericThresholdLabeler(threshold: float)
+```
+
+| Parameter | Type | Default | Accepted values |
+|---|---|---|---|
+| `threshold` | `int` or `float` | – | any finite number; not a bool, not text |
+
+**Purpose.** Binarize a numeric index such as the cumulative class index.
+The threshold is compared directly with the reduced value; unlike
+`BinaryThresholdLabeler` it is not a GOES class and is not converted to
+flux. SuryaBench uses 10; the DaWaK 2023 active-region study used 20.
+**Public attribute.** `threshold` (as `float`).
+**Errors.** `TypeError` for a non-numeric or boolean threshold,
+`ValueError` for NaN or infinity.
+
+### `NumericThresholdLabeler.assign`
+
+```python
+NumericThresholdLabeler(...).assign(reduced_value) -> int
+```
+
+**Inputs.** `reduced_value`: a number. **Returns.** `1` if
+`reduced_value >= threshold`, else `0`.
+
+Run (requires `reducer` and `paper` from the previous block):
+
+<!-- example: numeric_threshold -->
+```python
+index = reducer.reduce(paper)
+print([fidx.NumericThresholdLabeler(t).assign(index) for t in (10, 20, 48.5, 48.6)])
+pipeline = fidx.DatasetBuildingPipeline(reducer, fidx.NumericThresholdLabeler(10))
+print(pipeline.label(paper), pipeline.label([]))
+```
+<!-- output: numeric_threshold -->
+```text
+[1, 1, 1, 0]
+1 0
+```
+
+**Output explained.** 48.5 meets 10, 20 and 48.5 (the comparison is "≥")
+but not 48.6; through the pipeline the paper window is 1 and an empty
+window 0. **Errors.** `TypeError` for text or booleans, `ValueError` for
+NaN or infinity; nothing is guessed.
 
 ## Developer appendix: private helpers
 

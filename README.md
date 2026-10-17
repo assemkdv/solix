@@ -58,6 +58,14 @@ time with its full date). Every labeling choice (window length, which
 flare time, boundary rule, threshold) is an explicit parameter; the
 defaults are listed in the researcher manual.
 
+The same run from the shell (the `flare-indexer` command is installed with
+the package; see the researcher manual, section 18):
+
+```bash
+flare-indexer label examples/data/full_disk_image_index.csv examples/data/flare_catalog.csv \
+    --output labels.csv --window 24h --threshold M
+```
+
 ## Documentation
 
 - **[Researcher manual](docs/researcher_manual.md)** — install, inputs and

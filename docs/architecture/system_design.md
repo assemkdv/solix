@@ -68,6 +68,12 @@ flowchart BT
     loaders --> classifier
     loaders --> events
     builder -. "calls strategy.label()" .-> strategies
+    cli["cli<br/>flare-indexer command"]
+    cli --> builder
+    cli --> strategies
+    cli --> pipeline
+    cli --> reducers
+    cli --> labelers
 ```
 
 | Layer | Modules | Knows about |
@@ -77,6 +83,7 @@ flowchart BT
 | 2 | `reducers` | `classifier`, `events` |
 | 3 | `strategies`, `pipeline`, `builder` | the layers below; `pipeline` and `builder` import only `events` (reducers, labelers and strategies reach them as objects) |
 | side | `loaders` | `classifier`, `events`; converts lab files into the two input CSVs |
+| top | `cli` | `builder`, `strategies`, `pipeline`, `reducers`, `labelers`; the `flare-indexer` console script, which only parses arguments, builds these objects and writes CSV |
 
 Two consequences of this shape:
 

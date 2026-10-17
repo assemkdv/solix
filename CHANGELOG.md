@@ -56,6 +56,15 @@ Not yet released; version in `setup.cfg` is still 0.2.1.
   bad value).
 
 ### Added
+- `flare-indexer` command (`flare_indexer.cli`, a console script registered
+  in `setup.cfg`): `flare-indexer label IMAGES.csv CATALOG.csv --output
+  OUT.csv` runs `DatasetBuilder` with the built-in labelings (binary,
+  max-flux, multiclass, class-counts, class-presence, cumulative with a
+  raw or thresholded output), both targets, the window settings and both
+  sequence modes. Index columns are carried through; list and dict cells
+  are JSON text; durations need a unit; an existing output needs
+  `--overwrite`; warnings and errors go to stderr; a failed run leaves no
+  partial file. Researcher manual §18. No new dependency.
 - `CumulativeClassIndexReducer`: the cumulative normalized GOES subclass
   index Σ C + 10 Σ M + 100 Σ X of Hong, Ji, Pandey, Aydin (DaWaK 2023)
   and SuryaBench, summed in decimal arithmetic; A/B add 0 (selected

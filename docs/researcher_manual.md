@@ -29,6 +29,7 @@ code works inside), [decisions](decisions.md) (open scientific choices).
 15. [Adapting the examples to your data](#15-adapting-the-examples-to-your-data)
 16. [Errors and warnings](#16-errors-and-warnings)
 17. [Limitations and unresolved scientific assumptions](#17-limitations-and-unresolved-scientific-assumptions)
+18. [Command line](#18-command-line)
 
 ---
 
@@ -823,3 +824,57 @@ uses NOAA numbers, both files must use the same key; see
 
 Matching published labels shows how they were computed, not that they are
 scientifically correct.
+
+## 18. Command line
+
+Installing the package also installs the `flare-indexer` command. It is a
+front end to `DatasetBuilder` and the built-in strategies: same input
+files, same rules, same results. Where the Python API has a default the
+command uses it (`--event-time peak`, `--interval-mode left_closed`,
+`--target full_disk`, binary threshold `M`, `--missing-active-region
+negative`). The command adds two defaults of its own, `--window 24h` and
+`--labeling binary`; `flare-indexer label --help` shows every default.
+
+```bash
+flare-indexer --version
+flare-indexer label docs/fixtures/images.csv docs/fixtures/catalog.csv \
+    --output labels.csv --labeling cumulative --threshold 10 \
+    --window 23h59min59s --event-time start --interval-mode right_closed
+```
+
+| Option | Meaning |
+|---|---|
+| `--labeling` | `binary` (0/1 by GOES threshold), `max-flux` (W/m²), `multiclass` (`NF`/`A`/`B`/`C`/`M`/`X`), `class-counts`, `class-presence` (JSON dicts), `cumulative` (the index of §13.1) |
+| `--threshold` | binary: a GOES class (`M`, `C4.2`); cumulative: a number, which turns the raw index into 0/1 (`index >= VALUE`); refused with the other labelings |
+| `--window`, `--event-time`, `--interval-mode`, `--target`, `--missing-active-region` | as the `DatasetBuilder` parameters of the same names (§7, §10, §11) |
+| `--sequence-length`, `--stride`, `--cadence-minutes` | row-based sequences (§9); `--stride` and `--cadence-minutes` need `--sequence-length` |
+| `--start`, `--cadence`, `--observation-window`, `--sliding-window`, `--report REPORT.json` | time-based sequences (§9); the report is the `SequenceBuildReport` as JSON |
+| `--output OUT.csv`, `--overwrite` | where to write; an existing file is never replaced without `--overwrite` |
+
+Every duration needs a unit (`24h`, `30min`, `23h59min59s`); a bare number
+is refused. All other columns of the image index (image paths, ids) are
+carried to the output, in single-image mode as well. Options that do not
+fit together are refused with a message (`--threshold` with `max-flux`,
+row-based with time-based options, `--report` without time-based
+sequences, `--missing-active-region` with `--target full_disk`). Warnings
+(for example region-less images) and errors go to stderr; the exit status
+is 0 on success, 1 for a data or option error, 2 for a usage error. A run
+that fails leaves no partial output file.
+
+**JSON cells.** A CSV cell cannot hold a list or a dict, so the sequence
+columns `timestamps` and the carried columns (for example `image_path`),
+and the `label` column of `class-counts` and `class-presence`, are written
+as JSON text: `["2024-05-01 00:00:00", "2024-05-01 03:00:00"]`,
+`{"A": 0, "B": 0, "C": 1, "M": 1, "X": 0}`. Read them back with
+`json.loads` and, for timestamps, `pd.to_datetime`:
+
+```python
+import json
+import pandas as pd
+
+labels = pd.read_csv("labels.csv", converters={"timestamps": json.loads, "image_path": json.loads})
+labels["timestamps"] = labels["timestamps"].map(pd.to_datetime)
+```
+
+Pass converters only for the columns the file has; a plain `label` column
+of 0/1, class letters or flux values needs none.

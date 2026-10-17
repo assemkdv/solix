@@ -338,14 +338,26 @@ EventMatcher(catalog_path: str | pathlib.Path)
 | `catalog_path` | `str` or `Path` | CSV with `start_time, peak_time, end_time, class, active_region` [+ `fl_lon, fl_lat`]; every time a full date-time |
 
 **What it does.** Reads the CSV; parses the three time columns (a blank
-cell becomes missing); checks that each row's available times satisfy
+cell becomes missing; a cell with a UTC offset such as `Z` or `+05:00`
+is converted to UTC and stored without the offset, offsets may differ
+between rows; a naive cell is kept as written; one column may not mix
+the two); checks that each row's available times satisfy
 `start <= peak <= end` (equal times allowed); validates every class;
-sorts by `peak_time`.
+sorts by `peak_time`. Missing-time policy: a flare with a blank
+`start_time` can never match under `event_time="start"`, one with a
+blank `peak_time` never under `"peak"`; a blank `end_time` never affects
+matching. `DatasetBuilder.build` warns with the count for the selected
+column.
 **Public class attribute.** `REQUIRED_CATALOG_COLUMNS` (`set` of `str`).
-**Errors.** `ValueError` for an empty file, missing columns, unparsable
-timestamps, or times out of order (the message names the data row, 1 =
-first row after the header); `InvalidGOESClassError` for bad classes. A
-header-only file is valid (every query returns `[]`).
+**Errors.** `ValueError` for an empty file, missing columns, a `class`
+column next to a `goes_class` column, a time column that holds numbers
+instead of date-time text (`20240101100000`, epoch seconds; the message
+names the file, column and data row), unparsable timestamps, a column
+that mixes naive and offset cells (the message names the first row of
+each kind), or times out of order (the
+message names the data row, 1 = first row after the header);
+`InvalidGOESClassError` for bad classes. A header-only file is valid
+(every query returns `[]`).
 
 ### `EventMatcher.query`
 
@@ -356,9 +368,9 @@ EventMatcher(...).query(image_time, prediction_window_hours, active_region=None,
 
 | Parameter | Type | Default | Accepted values / units |
 |---|---|---|---|
-| `image_time` | `pandas.Timestamp` | – | reference time `t` |
-| `prediction_window_hours` | number or duration | – | hours (`6`, `0.5`) or text/`Timedelta` (`"23h59min59s"`); > 0 and finite |
-| `active_region` | `str` or `None` | `None` | `None` = any region (full disk); otherwise the normalized region text, e.g. `"13700"` |
+| `image_time` | `pandas.Timestamp` (also `datetime`, `numpy.datetime64`) | – | reference time `t`; not missing/NaT; a UTC offset is converted to UTC first |
+| `prediction_window_hours` | number or duration | – | hours (`6`, `0.5`) or text/`Timedelta` with a unit (`"24h"`, `"23h59min59s"`); > 0 and finite; bare numeric text (`"24"`) is an error |
+| `active_region` | region identifier or `None` | `None` | `None` = any region (full disk); otherwise normalized like the catalog (`13700`, `13700.0`, `"13700"`, `"13700.0"` all mean `"13700"`); blank is an error |
 | `event_time` | `str` | `"peak"` | `"peak"` or `"start"` |
 | `interval_mode` | `str` | `"left_closed"` | `"left_closed"` = `[t, t+w)`, `"right_closed"` = `(t, t+w]` |
 
@@ -390,10 +402,13 @@ print([e.goes_class for e in matcher.query(pd.Timestamp("2024-05-01 18:00"), "6h
 M2.0 peaks 05:45, X1.2 peaks 08:10. Line 2 (start time): the same two.
 Line 3: only region 13700's flare. Line 4: M1.0 starts exactly at
 `18:00 + 6h`; the right-closed window includes it.
-**Errors.** `ValueError` for an invalid `event_time`, `interval_mode` or
-window. **Limitations.** The window always looks forward from `t`; there
-is no backward option. The region string must already be normalized
-(`"13700"`, not `13700`). No time-zone conversion.
+**Errors.** `ValueError` for an invalid `event_time`, `interval_mode`,
+window, a missing `image_time`, or a blank `active_region`.
+**Limitations.** The window always looks forward from `t`; there is no
+backward option. Time-zone policy: a timestamp with an explicit UTC
+offset is converted to UTC; a naive one is taken as already on the
+catalog's time scale (UTC for GOES). No time-scale conversion (TAI
+stays TAI).
 
 ---
 
@@ -494,8 +509,13 @@ BinaryThresholdLabeler(threshold: str = "M")
 BinaryThresholdLabeler(...).assign(reduced_value) -> int
 ```
 
-**Inputs.** `reduced_value`: a flux number in W/m². **Returns.** `1` if
-`reduced_value >= flux(threshold)`, else `0`.
+**Inputs.** `reduced_value`: a flux number in W/m² (Python `int`/`float`,
+numpy integer or floating scalar, `Fraction`); it is converted with
+`float()` before the comparison. **Returns.** `1` if
+`reduced_value >= flux(threshold)`, else `0`; a value exactly equal to
+the threshold flux gives `1`. **Errors.** `TypeError` for booleans,
+`Decimal`, text, `None` or other non-numbers; `ValueError` for NaN or
+infinite values. No label is guessed for them.
 
 Run (requires Setup):
 
@@ -939,31 +959,37 @@ DatasetBuilder(prediction_window, strategy, sequence_length=None, stride=None, c
 
 | Parameter | Type | Default | Accepted values / meaning |
 |---|---|---|---|
-| `prediction_window` | number or duration | – | hours, or text/`Timedelta`; > 0, finite |
+| `prediction_window` | number or duration | – | hours, or text/`Timedelta` with a unit (`"24h"`); > 0, finite; bare numeric text (`"24"`) is an error |
 | `strategy` | object with `label(flares)` | – | built-in strategy, pipeline, or custom |
-| `sequence_length` | `int` | `None` (= 1) | row-based: images per sequence, ≥ 1 |
-| `stride` | `int` | `None` (= 1) | row-based: rows between sequence starts, ≥ 1 |
-| `cadence_minutes` | `int` | `None` | row-based: required spacing; sequences with other gaps are skipped |
+| `sequence_length` | `int` | `None` (= 1) | row-based: images per sequence, integer ≥ 1 |
+| `stride` | `int` | `None` (= 1) | row-based: rows between sequence starts, integer ≥ 1 |
+| `cadence_minutes` | number | `None` | row-based: required spacing, finite and > 0; sequences with other gaps are skipped |
 | `target` | `str` | `"full_disk"` | `"full_disk"` or `"active_region"` |
 | `event_time` | `str` | `"peak"` | `"peak"` or `"start"` |
 | `interval_mode` | `str` | `"left_closed"` | `"left_closed"` or `"right_closed"` |
-| `start` | timestamp | `None` | time-based: first sequence start; must be an image time |
-| `cadence` | duration | `None` | time-based: spacing inside a sequence; multiple of the inferred source cadence |
-| `observation_window` | duration | `None` | time-based: span of one sequence; multiple of `cadence` |
-| `sliding_window` | duration | `None` | time-based: shift between starts; multiple of `cadence` |
+| `start` | timestamp | `None` | time-based: first sequence start; must be an image time; a UTC offset is converted to UTC |
+| `cadence` | duration text or `Timedelta` | `None` | time-based: spacing inside a sequence (`"1h"`, `"30min"`, `pd.Timedelta`); a bare number is rejected (it would be unit-less); multiple of the inferred source cadence |
+| `observation_window` | duration text or `Timedelta` | `None` | time-based: span of one sequence, same forms as `cadence`; multiple of `cadence` |
+| `sliding_window` | duration text or `Timedelta` | `None` | time-based: shift between starts, same forms as `cadence`; multiple of `cadence` |
 | `missing_active_region` | `str` | `"negative"` | `"negative"`, `"drop"`, `"error"` (AR mode only) |
 | `include_metadata` | `bool` | `False` | single-image: keep other index columns |
 
 Row-based and time-based parameters cannot be combined; giving any
 time-based parameter requires `cadence`, `observation_window` and
-`sliding_window`. **Public attributes.** The arguments as given
+`sliding_window`. Numbers mean different things per parameter and are
+never guessed: `prediction_window` reads a number as hours,
+`cadence_minutes` as minutes, and the three time-based durations accept
+no bare number. **Public attributes.** The arguments as given
 (`prediction_window`, `strategy`, `target`, `event_time`,
 `interval_mode`, `missing_active_region`, `include_metadata`), plus
 `time_based` (`bool`); row-based: `sequence_length`, `stride`,
 `cadence_minutes`; time-based: `cadence`, `observation_window`,
 `sliding_window` (parsed to `Timedelta`), `start`, `number_of_images`,
 `slide_steps`. Class attribute `VALID_TARGETS`.
-**Errors.** `ValueError` for any invalid value or combination.
+**Errors.** `ValueError` for any invalid value or combination;
+`TypeError` when `sequence_length` or `stride` is not an integer (a
+float such as `2.0` or a bool included) or `cadence_minutes` is not a
+number. These are checked here, not at `build` time.
 
 ### `DatasetBuilder.build`
 
@@ -1010,9 +1036,14 @@ region, and (policy `"negative"`) when images have no region.
 **Errors.** `ValueError` for a missing/empty index file or column,
 ordering/duplicate problems in sequence modes, incompatible cadence, an
 index column that would overwrite an output column, `return_report=True`
-outside time-based mode, and region policy `"error"`; catalog errors as
-for `EventMatcher`.
-**Limitations.** Forward windows only; no TAI/UTC or coverage handling.
+outside time-based mode, and region policy `"error"`; also for a
+`timestamp` column that holds numbers instead of date-time text (the
+message names the file, column and data row), an unparseable timestamp,
+or a blank timestamp (the message lists the data rows), all raised
+before any sample is built; catalog errors as for `EventMatcher`.
+**Limitations.** Forward windows only; no TAI-to-UTC or coverage
+handling. Timestamps with a UTC offset are converted to UTC and returned
+naive; see `EventMatcher.query`.
 
 ### `SequenceBuildReport`
 
@@ -1161,9 +1192,11 @@ adapt_goes_catalog(input_path, output_path=None) -> pandas.DataFrame
 | `input_path` | `str`/`Path` | CSV with `start_time, peak_time, end_time, goes_class, noaa_active_region` (+ optional `fl_lon, fl_lat`); other columns ignored |
 | `output_path` | `str`/`Path` | optional CSV to write |
 
-**What it does.** Validates classes; keeps full timestamps; renames
-`goes_class` → `class` and `noaa_active_region` → `active_region`
-(normalized: `13700.0` → `"13700"`, blank → missing).
+**What it does.** Validates classes; parses the three time columns with
+the same rules as `EventMatcher` (numbers refused, UTC offsets converted
+to UTC, errors name the file and column); renames `goes_class` → `class`
+and `noaa_active_region` → `active_region` (normalized: `13700.0`,
+`"13700.0"`, `" 13700 "` → `"13700"`, blank → missing).
 **Returns.** `DataFrame` in the full-timestamp schema accepted by
 `EventMatcher`.
 
@@ -1431,9 +1464,14 @@ accounted for.
 
 | Helper | Purpose | Input → output | Called by |
 |---|---|---|---|
+| `_UNITLESS_NUMBER_TEXT`, `_INTEGER_REGION_TEXT`, `_OFFSET_SUFFIX` | regular expressions: bare numeric text; integer region text (`"13700"`, `"13700.0"`); a trailing UTC offset (`Z`, `+05:00`) | – | `_reject_unitless_duration_text`, `_normalize_active_region`, `_parse_time_text_column` |
 | `_parse_prediction_window` | read a window | number (hours) or duration → positive `Timedelta`; `ValueError` otherwise | `EventMatcher.query`, `DatasetBuilder.__init__`, validation script |
-| `_normalize_active_region` | one spelling per region | value → `str` or `None` (`13700.0` → `"13700"`) | `EventMatcher`, `DatasetBuilder`, `adapt_goes_catalog` |
-| `_parse_full_timestamp_column` | parse a time column with a clear error | DataFrame, column → `Series` of timestamps | `EventMatcher._load_catalog` |
+| `_reject_unitless_duration_text` | refuse `"24"` (pandas would read nanoseconds) | value, name → `None` or `ValueError` | `_parse_prediction_window`, `builder._parse_duration` |
+| `_normalize_active_region` | one spelling per region | value → `str` or `None` (`13700.0`, `"13700.0"`, `" 13700 "` → `"13700"`; integers taken from the text, never via float; blank → `None`) | `EventMatcher`, `DatasetBuilder`, `adapt_goes_catalog` |
+| `_to_naive_utc`, `_to_naive_utc_series` | time-zone policy: offset-aware → UTC, naive unchanged | `Timestamp`/`Series` → naive `Timestamp`/`Series` | `EventMatcher.query`, `_parse_full_timestamp_column`, `builder` |
+| `_reject_numeric_time_column` | refuse a numeric time column (pandas would read nanoseconds since 1970) | Series, column, what, path → `None` or `ValueError` naming the data row | `_parse_full_timestamp_column`, `builder._parse_image_timestamps` |
+| `_parse_time_text_column` | the time-zone policy for one text column: all naive, or all with offsets (→ UTC); mixed → `ValueError` naming the first row of each kind; numbers refused | Series, column, what, path → `Series` of naive timestamps | `_parse_full_timestamp_column`, `builder._parse_image_timestamps` |
+| `_parse_full_timestamp_column` | parse a catalog time column | DataFrame, column, path, what → `Series` of naive timestamps (blank → NaT) | `EventMatcher._load_catalog`, `adapt_goes_catalog` |
 | `_validate_time_order` | reject rows with start > peak, peak > end or start > end (missing times skipped) | DataFrame, path → `None` or `ValueError` naming the data row | `EventMatcher._load_catalog` |
 | `EventMatcher._load_catalog` | read, check and sort the catalog | path → sorted DataFrame | `EventMatcher.__init__` |
 | `EventMatcher._sorted_view` | cached sorted times for binary search | `event_time` → (sorted values, original positions) | `EventMatcher.query` |
@@ -1452,8 +1490,10 @@ accounted for.
 
 | Helper | Purpose | Input → output | Called by |
 |---|---|---|---|
-| `_parse_duration` | positive duration | value, name → `Timedelta` | `DatasetBuilder.__init__` |
-| `_parse_timestamp_param` | timestamp parameter | value, name → `Timestamp` | `DatasetBuilder.__init__` |
+| `_parse_duration` | positive duration text with a unit or `Timedelta`; bare numbers rejected | value, name → `Timedelta` | `DatasetBuilder.__init__` |
+| `_parse_timestamp_param` | timestamp parameter (offset → UTC) | value, name → naive `Timestamp` | `DatasetBuilder.__init__` |
+| `_require_positive_int`, `_require_positive_number` | `sequence_length`/`stride` are integers ≥ 1; `cadence_minutes` is a finite number > 0 | value, name → value, `TypeError` or `ValueError` | `DatasetBuilder.__init__` |
+| `_parse_image_timestamps` | parse the index's `timestamp` column; refuse numbers, unparseable and blank cells | Series, path → naive `Series` or `ValueError` | `DatasetBuilder.build` |
 | `_infer_source_cadence` | most common gap | timestamps → `Timedelta` | time-based builders |
 | `_validate_requested_cadence` | cadence is a multiple of the source cadence | two `Timedelta`s → `None` or `ValueError` | time-based builders |
 | `_extra_columns` | columns to carry; refuse name clashes | DataFrame, excluded, reserved, path → `list[str]` | all builders that copy columns |
@@ -1463,6 +1503,7 @@ accounted for.
 | `DatasetBuilder._build_single_image_active_region` | AR, one row per image, region policy | index, matcher, path → DataFrame | `build` |
 | `DatasetBuilder._report_missing_active_regions` | warn or raise for region-less images | list, unit → `None` | `_build_single_image_active_region` |
 | `DatasetBuilder._warn_catalog_missing_active_region` | warn about region-less flares | matcher, path → `None` | `build` |
+| `DatasetBuilder._warn_catalog_missing_event_time` | warn about flares with a blank time in the selected `event_time` column | matcher, path → `None` | `build` |
 | `DatasetBuilder._validate_sequence_timestamps` | sorted + unique | timestamps, path, group → `None` or `ValueError` | row-based builders |
 | `DatasetBuilder._validate_unique_timestamps` | unique | timestamps, path, group → `None` or `ValueError` | sequence builders |
 | `DatasetBuilder._sequence_violates_cadence` | `cadence_minutes` check | window times → `bool` | row-based builders |

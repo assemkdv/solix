@@ -1,10 +1,15 @@
+import math
+import numbers
 import warnings
 
+import numpy as np
 import pandas as pd
 from dataclasses import dataclass, field
 from pathlib import Path
 from .events import (
-    EventMatcher, _normalize_active_region, _parse_prediction_window, VALID_EVENT_TIMES, VALID_INTERVAL_MODES,
+    EventMatcher, _normalize_active_region, _parse_prediction_window, _parse_time_text_column,
+    _reject_unitless_duration_text, _to_naive_utc,
+    VALID_EVENT_TIMES, VALID_INTERVAL_MODES,
 )
 
 _ROW_BASED_PARAM_NAMES = ("sequence_length", "stride", "cadence_minutes")
@@ -62,7 +67,21 @@ class SequenceBuildReport:
 
 
 def _parse_duration(value, name: str) -> pd.Timedelta:
-    """Normalize a pandas-compatible duration value, requiring it be strictly positive."""
+    """
+    Normalize a time-based duration parameter (cadence, observation_window,
+    sliding_window): duration text with a unit ("1h", "30min"), a
+    pd.Timedelta, a datetime.timedelta or a numpy.timedelta64, strictly
+    positive. A bare number is rejected: pandas would read it as
+    nanoseconds, and unlike prediction_window (hours) and cadence_minutes
+    (minutes) these parameters give a number no unit.
+    """
+    if isinstance(value, bool) or (isinstance(value, numbers.Real) and not isinstance(value, np.timedelta64)):
+        raise ValueError(
+            f"{name} must be a duration with a unit (e.g. '1h', '30min') or a Timedelta, got the bare "
+            f"number {value!r}. A number has no unit here; only prediction_window reads a number as "
+            "hours and cadence_minutes as minutes."
+        )
+    _reject_unitless_duration_text(value, name)
     try:
         duration = pd.Timedelta(value)
     except (ValueError, TypeError) as exc:
@@ -75,14 +94,59 @@ def _parse_duration(value, name: str) -> pd.Timedelta:
 
 
 def _parse_timestamp_param(value, name: str) -> pd.Timestamp:
-    """Normalize a pandas-compatible timestamp value."""
+    """
+    Normalize a pandas-compatible timestamp value. A value with a UTC
+    offset is converted to UTC and stored naive, like every other
+    timestamp the package compares (see events._to_naive_utc).
+    """
     try:
         timestamp = pd.Timestamp(value)
     except (ValueError, TypeError) as exc:
         raise ValueError(f"{name} must be a valid timestamp, got {value!r}: {exc}") from None
     if pd.isna(timestamp):
         raise ValueError(f"{name} must be a valid timestamp, got {value!r}")
-    return timestamp
+    return _to_naive_utc(timestamp)
+
+
+def _require_positive_int(value, name: str) -> int:
+    """sequence_length / stride: an integer >= 1 (not a bool, not a float)."""
+    if isinstance(value, bool) or not isinstance(value, numbers.Integral):
+        raise TypeError(f"{name} must be an integer >= 1, got {value!r} ({type(value).__name__})")
+    if value < 1:
+        raise ValueError(f"{name} must be >= 1, got {value}")
+    return int(value)
+
+
+def _require_positive_number(value, name: str):
+    """cadence_minutes: a finite real number > 0 (not a bool, not text)."""
+    if isinstance(value, bool) or not isinstance(value, numbers.Real):
+        raise TypeError(f"{name} must be a number > 0, got {value!r} ({type(value).__name__})")
+    if not math.isfinite(value) or value <= 0:
+        raise ValueError(f"{name} must be > 0, got {value}")
+    return value
+
+
+def _parse_image_timestamps(column: pd.Series, path: Path) -> pd.Series:
+    """
+    Parse the image index's timestamp column, refusing anything that
+    would otherwise produce samples silently: a numeric column (read as
+    nanoseconds since 1970), an unparseable cell, or a blank cell (NaT,
+    which single-image mode would crash on, row-based mode would report
+    as "not sorted", and time-based mode would drop without a trace).
+    Values with a UTC offset are converted to UTC and stored naive, as in
+    the catalog (see events._to_naive_utc).
+    """
+    parsed = _parse_time_text_column(column, "timestamp", "Image index", path)
+    missing = parsed.isna()
+    if missing.any():
+        rows = [int(i) + 1 for i in np.flatnonzero(missing.to_numpy())]
+        shown = ", ".join(str(r) for r in rows[:10]) + (", ..." if len(rows) > 10 else "")
+        raise ValueError(
+            f"Image index at {path} has {len(rows)} blank/missing timestamp(s) "
+            f"(data row(s) {shown}; row 1 is the first row after the header). "
+            "Fill or remove those rows; samples are never built from an image without a time."
+        )
+    return parsed
 
 
 def _infer_source_cadence(timestamps: pd.Series) -> pd.Timedelta:
@@ -129,8 +193,11 @@ class DatasetBuilder:
     prediction_window : int | float | str | pd.Timedelta
         How far after each image timestamp (or, for sequences, after the
         final image in the sequence) to search for flares. A plain number
-        is hours (e.g. 24); a string/Timedelta is a pandas duration (e.g.
-        "24h", "23h59min59s").
+        is hours (e.g. 24); a string/Timedelta is a pandas duration with
+        a unit (e.g. "24h", "23h59min59s"). Bare numeric text ("24") is
+        rejected. This hours convention is specific to prediction_window:
+        cadence_minutes counts minutes, and the time-based durations
+        below accept no bare number at all.
     strategy : BinaryThresholdStrategy | MaxFlareStrategy
         Labeling strategy that converts a list of FlareEvents to a label.
     target : str
@@ -191,11 +258,14 @@ class DatasetBuilder:
         image must exist at exactly this timestamp, or build() raises
         ValueError -- it never silently moves to the next available image.
         If omitted, defaults to the image index's earliest timestamp.
-    cadence : pandas-compatible duration | None
+    cadence : duration text with a unit, or Timedelta | None
         The spacing between consecutive images *within* a sequence (e.g.
-        "1h"). Required whenever any time-based parameter is used. Must be
-        an exact multiple of the image index's own inferred cadence (see
-        "Source cadence inference").
+        "1h", "30min", pd.Timedelta(hours=1)). A bare number is rejected
+        as unit-less (it is not hours and not minutes). Required whenever
+        any time-based parameter is used. Must be an exact multiple of
+        the image index's own inferred cadence (see "Source cadence
+        inference"). observation_window and sliding_window take the same
+        forms.
     observation_window : pandas-compatible duration | None
         The half-open span [sequence_start, sequence_start +
         observation_window) covered by one sequence. Required in
@@ -341,18 +411,11 @@ class DatasetBuilder:
             self.stride = None
             self.cadence_minutes = None
         else:
-            resolved_sequence_length = 1 if sequence_length is None else sequence_length
-            resolved_stride = 1 if stride is None else stride
-            if resolved_sequence_length < 1:
-                raise ValueError(f"sequence_length must be >= 1, got {resolved_sequence_length}")
-            if resolved_stride < 1:
-                raise ValueError(f"stride must be >= 1, got {resolved_stride}")
-            if cadence_minutes is not None and cadence_minutes <= 0:
-                raise ValueError(f"cadence_minutes must be > 0, got {cadence_minutes}")
-
-            self.sequence_length = resolved_sequence_length
-            self.stride = resolved_stride
-            self.cadence_minutes = cadence_minutes
+            self.sequence_length = 1 if sequence_length is None else _require_positive_int(sequence_length, "sequence_length")
+            self.stride = 1 if stride is None else _require_positive_int(stride, "stride")
+            self.cadence_minutes = (
+                None if cadence_minutes is None else _require_positive_number(cadence_minutes, "cadence_minutes")
+            )
 
     def build(
         self, image_index_path: str | Path, event_catalog_path: str | Path, return_report: bool = False,
@@ -422,9 +485,10 @@ class DatasetBuilder:
             )
 
         index_df = index_df.reset_index(drop=True)
-        index_df["timestamp"] = pd.to_datetime(index_df["timestamp"])
+        index_df["timestamp"] = _parse_image_timestamps(index_df["timestamp"], image_index_path)
 
         matcher = EventMatcher(event_catalog_path)
+        self._warn_catalog_missing_event_time(matcher, event_catalog_path)
         if self.target == "active_region":
             self._warn_catalog_missing_active_region(matcher, event_catalog_path)
 
@@ -527,6 +591,27 @@ class DatasetBuilder:
                 "to stop.",
                 UserWarning,
                 stacklevel=4,
+            )
+
+    def _warn_catalog_missing_event_time(self, matcher: EventMatcher, path) -> None:
+        """
+        A catalog row may have a blank start_time or peak_time (the
+        catalog still loads). Such a flare can never be matched through
+        the blank column, so when it is the selected event_time column
+        the build says how many flares are invisible to it.
+        """
+        catalog = matcher._catalog
+        column = "start_time" if self.event_time == "start" else "peak_time"
+        if catalog.empty or column not in catalog.columns:
+            return
+        missing = int(catalog[column].isna().sum())
+        if missing:
+            warnings.warn(
+                f"{missing} of {len(catalog)} flare(s) in the catalog at {path} have no {column}. "
+                f"With event_time={self.event_time!r} they can never match any image, so a window "
+                "that contains one of them is labeled as if it were absent.",
+                UserWarning,
+                stacklevel=3,
             )
 
     def _warn_catalog_missing_active_region(self, matcher: EventMatcher, path) -> None:

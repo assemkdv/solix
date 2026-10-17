@@ -1,4 +1,6 @@
+import datetime
 import numbers
+import re
 
 import numpy as np
 import pandas as pd
@@ -6,6 +8,18 @@ from pathlib import Path
 from dataclasses import dataclass
 
 from .classifier import validate_goes_class_column
+
+# A bare number written as text ("24", "1.5", "2.4e1"): pandas would read
+# it as nanoseconds, so such a duration string is rejected and a unit asked for.
+_UNITLESS_NUMBER_TEXT = re.compile(r"^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$")
+
+# Region text that is an integer, possibly with a ".0" tail as pandas writes
+# a float column ("13700", "13700.0", "013700", "+13700").
+_INTEGER_REGION_TEXT = re.compile(r"^[+-]?\d+(?:\.0*)?$")
+
+# A date-time text that ends in an explicit UTC offset: "Z", "+00:00",
+# "+0500", "-07:00". Used to tell offset-aware cells from naive ones.
+_OFFSET_SUFFIX = re.compile(r"(?:Z|[+-]\d{2}:?\d{2})$", re.IGNORECASE)
 
 
 # A simple container that holds the details of one flare event
@@ -37,6 +51,7 @@ def _parse_prediction_window(value) -> pd.Timedelta:
     """
     if isinstance(value, bool):
         raise ValueError(f"prediction_window must be a number of hours or a duration, got {value!r}")
+    _reject_unitless_duration_text(value, "prediction_window")
     try:
         if isinstance(value, numbers.Real):
             window = pd.Timedelta(hours=float(value))
@@ -52,34 +67,156 @@ def _parse_prediction_window(value) -> pd.Timedelta:
     return window
 
 
+def _reject_unitless_duration_text(value, name: str) -> None:
+    """
+    Raise ValueError for a duration given as bare numeric text ("24",
+    "1.5", "2.4e1"). pandas reads such text as nanoseconds, which would
+    silently give an (almost) empty window; a unit must be written
+    ("24h"). Numbers that are not text are left to the caller, which
+    gives them their documented meaning (hours for prediction_window).
+    """
+    if isinstance(value, str) and _UNITLESS_NUMBER_TEXT.match(value.strip()):
+        raise ValueError(
+            f"{name} {value!r} has no unit, so pandas would read it as nanoseconds. "
+            f"Write a duration with a unit, e.g. '{value.strip()}h', or pass a number of hours."
+        )
+
+
 def _normalize_active_region(value) -> str | None:
-    # A catalog with any missing active_region cells gets read by pandas as
-    # float64 (NaN for missing), so a present value like 4456 arrives as the
-    # Python float 4456.0, not a string. Normalize both cases here so
-    # FlareEvent.active_region actually matches its str | None type.
+    """
+    Normalize a region identifier to the text form used for matching.
+
+    The same value can arrive as 13700 (int column), 13700.0 (float
+    column, because pandas uses float64 for a column with blanks),
+    "13700" or "13700.0" (object column, because some cell in the column
+    is text), or " 13700 ". All of these become "13700"; the integer is
+    taken from the text itself, never through a float, so no precision is
+    lost. Non-numeric text ("AR13700", "13700.5") is kept as written,
+    with surrounding whitespace removed. Missing values (NaN, None, blank
+    text) become None.
+    """
+    if value is None or isinstance(value, bool):
+        return None if value is None else str(value)
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return None
+        if _INTEGER_REGION_TEXT.match(text):
+            return str(int(text.split(".")[0]))
+        return text
     if pd.isna(value):
         return None
-    if isinstance(value, float) and value.is_integer():
+    if isinstance(value, numbers.Integral):
         return str(int(value))
-    return str(value)
+    if isinstance(value, numbers.Real):
+        as_float = float(value)
+        if as_float.is_integer():
+            return str(int(as_float))
+        return str(value)
+    return _normalize_active_region(str(value))
 
 
-def _parse_full_timestamp_column(df: pd.DataFrame, column: str, path) -> pd.Series:
+def _to_naive_utc(timestamp: pd.Timestamp) -> pd.Timestamp:
+    """
+    Apply the package's time-zone policy to one timestamp: a value with an
+    explicit UTC offset is converted to UTC and the offset dropped; a
+    naive value is returned unchanged and is assumed to be on the
+    catalog's time scale (UTC for GOES). This is a calendar conversion
+    only; it never changes the time scale (no TAI-to-UTC correction).
+    """
+    if timestamp.tzinfo is not None:
+        return timestamp.tz_convert("UTC").tz_localize(None)
+    return timestamp
+
+
+def _to_naive_utc_series(parsed: pd.Series) -> pd.Series:
+    """Column version of _to_naive_utc (see there for the policy)."""
+    if not pd.api.types.is_datetime64_any_dtype(parsed):
+        raise ValueError(
+            "time column did not parse to a single datetime dtype "
+            f"(got {parsed.dtype}); every cell must use the same convention."
+        )
+    if parsed.dt.tz is not None:
+        return parsed.dt.tz_convert("UTC").dt.tz_localize(None)
+    return parsed
+
+
+def _parse_time_text_column(series: pd.Series, column: str, what: str, path) -> pd.Series:
+    """
+    Parse one column of date-time text into naive timestamps under the
+    package's time-zone policy (see _to_naive_utc):
+
+    - every non-blank cell naive  -> parsed as written;
+    - every non-blank cell with an explicit UTC offset ("Z", "+05:00";
+      different offsets may be mixed, e.g. across a daylight-saving
+      change) -> each instant converted to UTC, offset dropped;
+    - naive and offset cells mixed in one column -> ValueError naming the
+      first row of each kind, because the naive cells' zone is unknown;
+    - a numeric column -> ValueError (see _reject_numeric_time_column);
+    - blank cells -> NaT in every case.
+
+    `what` and `path` name the file in messages ("Flare catalog at ...").
+    """
+    _reject_numeric_time_column(series, column, what, path)
+    present = series.notna().to_numpy()
+    positions = np.flatnonzero(present)
+    text = series.iloc[positions].astype(str).str.strip()
+    has_offset = text.str.contains(_OFFSET_SUFFIX).to_numpy() if len(text) else np.zeros(0, dtype=bool)
+    if has_offset.any() and not has_offset.all():
+        first_naive = int(positions[~has_offset][0]) + 1
+        first_offset = int(positions[has_offset][0]) + 1
+        raise ValueError(
+            f"{what} at {path}, column '{column}' mixes times without a UTC offset "
+            f"(first at data row {first_naive}) and times with one (first at data row "
+            f"{first_offset}). Use one convention per column: all naive (taken as the "
+            "catalog's time scale) or all with an explicit offset (converted to UTC)."
+        )
+    try:
+        parsed = pd.to_datetime(series, utc=True) if has_offset.any() else pd.to_datetime(series)
+        return _to_naive_utc_series(parsed)
+    except (ValueError, TypeError) as exc:
+        raise ValueError(
+            f"{what} at {path} has an unparseable value in column '{column}': {exc}"
+        ) from None
+
+
+def _reject_numeric_time_column(series: pd.Series, column: str, what: str, path) -> None:
+    """
+    Raise ValueError when a time column holds numbers rather than
+    date-time text. pandas would read 20240101100000 or 1700000000 as
+    nanoseconds since 1970, placing every row in 1970 and matching
+    nothing, so the value is ambiguous and is refused. An all-blank
+    column (float64 of NaN) is not numeric data and passes.
+    """
+    if pd.api.types.is_bool_dtype(series) or (
+        pd.api.types.is_numeric_dtype(series) and series.notna().any()
+    ):
+        position = int(np.flatnonzero(series.notna().to_numpy())[0])
+        value = series.iloc[position]
+        value = value.item() if hasattr(value, "item") else value
+        raise ValueError(
+            f"{what} at {path}, column '{column}', data row {position + 1}: the value "
+            f"{value!r} is a number, not date-time text. Write full "
+            f"date-times such as 2024-01-01 10:00:00; numbers are ambiguous "
+            f"(yyyymmddHHMMSS, epoch seconds, ...) and are not interpreted."
+        )
+
+
+def _parse_full_timestamp_column(df: pd.DataFrame, column: str, path, what: str = "Flare catalog") -> pd.Series:
     """
     Parse a column of full datetime strings (e.g. "2010-05-01 01:39:00"),
     raising a clear ValueError naming the file/column/value on failure.
 
     Each cell carries its own complete calendar date, so a flare that
     crosses midnight (start_time on one date, peak_time/end_time on the
-    next) is represented as written. A blank cell becomes NaT.
+    next) is represented as written. A blank cell becomes NaT: the flare
+    stays in the catalog, but it can never be matched through that
+    column (a flare with a blank start_time is invisible to
+    event_time="start", one with a blank peak_time to event_time="peak";
+    a blank end_time never affects matching). Numeric columns, time-zone
+    offsets and mixed conventions are handled by _parse_time_text_column.
     """
-    try:
-        return pd.to_datetime(df[column])
-    except (ValueError, TypeError) as exc:
-        raise ValueError(
-            f"Flare catalog at {path} has an unparseable value in column "
-            f"'{column}': {exc}"
-        ) from None
+    return _parse_time_text_column(df[column], column, what, path)
 
 
 def _validate_time_order(df: pd.DataFrame, path) -> None:
@@ -150,6 +287,11 @@ class EventMatcher:
                 f"Flare catalog at {path} is missing required column(s): "
                 f"{', '.join(sorted(missing))}"
             )
+        if "goes_class" in df.columns:
+            raise ValueError(
+                f"Flare catalog at {path} has both a 'class' and a 'goes_class' column; "
+                "keep only 'class' (the column the catalog schema uses)."
+            )
 
         df = df.rename(columns={"class": "goes_class"})
         df["start_time"] = _parse_full_timestamp_column(df, "start_time", path)
@@ -216,14 +358,37 @@ class EventMatcher:
         If active_region is given, only flares attributed to that exact
         active region are returned; flares with a missing active_region
         never match, and flares from any other active region are excluded
-        regardless of strength. If active_region is None (the default),
-        matching is full-disk: any flare in the window counts.
+        regardless of strength. The value is normalized like the catalog
+        side (13700, 13700.0, "13700" and "13700.0" all mean "13700"); a
+        blank or missing value is an error, not full-disk matching. If
+        active_region is None (the default), matching is full-disk: any
+        flare in the window counts.
+
+        image_time must be a pandas Timestamp (not NaT). A Timestamp with
+        a UTC offset is converted to UTC before matching; a naive one is
+        assumed to be on the catalog's time scale.
         """
         if event_time not in VALID_EVENT_TIMES:
             raise ValueError(f"event_time must be one of {sorted(VALID_EVENT_TIMES)}, got {event_time!r}")
         if interval_mode not in VALID_INTERVAL_MODES:
             raise ValueError(f"interval_mode must be one of {sorted(VALID_INTERVAL_MODES)}, got {interval_mode!r}")
+        if isinstance(image_time, (datetime.datetime, np.datetime64)) and not isinstance(image_time, pd.Timestamp):
+            image_time = pd.Timestamp(image_time)
+        if not isinstance(image_time, pd.Timestamp) or pd.isna(image_time):
+            raise ValueError(
+                f"image_time must be a pandas Timestamp (not missing/NaT), got {image_time!r} "
+                f"({type(image_time).__name__})."
+            )
+        if active_region is not None:
+            normalized_query_ar = _normalize_active_region(active_region)
+            if normalized_query_ar is None:
+                raise ValueError(
+                    f"active_region must be a region identifier such as '13700', got {active_region!r}; "
+                    "pass None for full-disk matching."
+                )
+            active_region = normalized_query_ar
 
+        image_time = _to_naive_utc(image_time)
         window_end = image_time + _parse_prediction_window(prediction_window_hours)
 
         sorted_values, sort_positions = self._sorted_view(event_time)

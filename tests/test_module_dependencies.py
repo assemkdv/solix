@@ -4,7 +4,8 @@ The package is layered; this test keeps it that way.
     classifier                 (GOES class <-> flux; no package imports)
     events, labelers           (only classifier)
     reducers                   (classifier, events)
-    strategies, pipeline       (events, reducers, labelers)
+    strategies                 (events, reducers, labelers)
+    pipeline                   (events only; reducer and labeler are passed in as objects)
     builder                    (events only; strategies are passed in as objects)
     loaders                    (classifier, events; input adapters, outside the core)
 

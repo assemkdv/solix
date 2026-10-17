@@ -6,7 +6,7 @@ from typing import Iterable, Union
 import pandas as pd
 
 from .classifier import validate_goes_class_column
-from .events import _normalize_active_region
+from .events import _normalize_active_region, _parse_full_timestamp_column
 
 # Matches filenames like "HMI.m2010.12.21_21.00.00.jpg", regardless of how
 # deep the surrounding directory path is -- only the basename is checked.
@@ -235,10 +235,12 @@ def adapt_goes_catalog(
 
     validate_goes_class_column(df["goes_class"], input_path, column="goes_class")
 
+    # Same parsing rules as EventMatcher: numeric columns refused, UTC
+    # offsets converted to UTC and dropped, errors name file and column.
     adapted = pd.DataFrame({
-        "start_time": pd.to_datetime(df["start_time"]),
-        "peak_time": pd.to_datetime(df["peak_time"]),
-        "end_time": pd.to_datetime(df["end_time"]),
+        "start_time": _parse_full_timestamp_column(df, "start_time", input_path, what="GOES catalog"),
+        "peak_time": _parse_full_timestamp_column(df, "peak_time", input_path, what="GOES catalog"),
+        "end_time": _parse_full_timestamp_column(df, "end_time", input_path, what="GOES catalog"),
         "class": df["goes_class"],
         "active_region": df["noaa_active_region"].apply(_normalize_active_region),
     })

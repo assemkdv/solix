@@ -4,6 +4,57 @@
 
 Not yet released; version in `setup.cfg` is still 0.2.1.
 
+### Fixed (input validation, review of 2026-10-17)
+- A duration given as bare numeric text (`prediction_window="24"`,
+  `cadence="3600"`) was read by pandas as nanoseconds and silently
+  labeled everything 0. Such text is now rejected with a request for a
+  unit (`"24h"`). A bare number keeps its documented meaning only where
+  one exists: `prediction_window` reads a number as hours and
+  `cadence_minutes` as minutes; the time-based `cadence`,
+  `observation_window` and `sliding_window` (which pandas also read as
+  nanoseconds) now reject a bare number and take duration text or a
+  `Timedelta`.
+- A catalog flare whose `start_time` (or `peak_time`) is blank can never
+  match under `event_time="start"` (or `"peak"`). This was silent;
+  `DatasetBuilder.build` now warns with the count for the selected
+  column. The catalog still loads, as before.
+- A numeric time column (`20240101100000`, epoch seconds) in the catalog
+  or the image index was read as nanoseconds since 1970 and matched
+  nothing. It is now rejected, naming file, column and data row.
+- Region identifiers were normalized only when pandas inferred a numeric
+  column, so text `"13700.0"` or `" 13700"` in a column that also held
+  one text value never matched 13700. Equivalent spellings now match
+  regardless of column dtype, the integer is taken from the text (no
+  float rounding), whitespace is stripped, and non-numeric identifiers
+  are kept. `EventMatcher.query(active_region=...)` applies the same
+  normalization; a blank region is an error rather than full-disk matching.
+- A blank `timestamp` cell in the image index crashed single-image mode
+  with a `TypeError`, was reported as "not sorted" in row-based mode and
+  was silently dropped in time-based mode with a report that showed no
+  skip. It is now rejected before any sample is built, listing the rows.
+- Time-zone policy, now one rule everywhere: a timestamp with an explicit
+  UTC offset is converted to UTC and stored naive (offsets may differ
+  within a column, e.g. across a daylight-saving change; `Z`, `+00:00`
+  and `+05:00` spellings of one instant give one value); a naive
+  timestamp is assumed to be on the catalog's scale; a column that mixes
+  naive and offset cells is rejected, naming the first row of each kind.
+  Catalogs with `Z`/`+00:00` times previously loaded and then failed on
+  every `query`; offset-aware image times previously worked only through
+  numpy with a warning per query. No TAI/UTC conversion is implied.
+- A catalog with both a `class` and a `goes_class` column reported bogus
+  invalid classes; it is now rejected with a message naming the columns.
+- `BinaryThresholdLabeler.assign` compared whatever it was given: NaN
+  gave 0, `True` gave 1, `Decimal` gave 0. It now accepts real numbers
+  only (converted with `float()`), raising `TypeError` for booleans,
+  `Decimal`, text or `None` and `ValueError` for NaN/infinite values, like
+  `NumericThresholdLabeler`. A numpy `float32` value is compared after
+  conversion to `float`, as `MulticlassLabeler` already did.
+- `sequence_length`/`stride` given as floats (`2.0`, `2.5`) or booleans
+  passed the constructor and failed inside `build`; `cadence_minutes`
+  given as text failed with a bare `TypeError`. All three are validated
+  in the constructor (`TypeError` for the wrong type, `ValueError` for a
+  bad value).
+
 ### Added
 - `CumulativeClassIndexReducer`: the cumulative normalized GOES subclass
   index Σ C + 10 Σ M + 100 Σ X of Hong, Ji, Pandey, Aydin (DaWaK 2023)
@@ -25,9 +76,13 @@ Not yet released; version in `setup.cfg` is still 0.2.1.
   region, and when catalog flares have no region.
 - `scripts/validate_full_disk.py --prediction-window --summary`.
 - `scripts/validate_active_region.py`.
-- `examples/` (six scripts, synthetic data), `docs/` (getting started,
-  user guide, AR workflow, architecture diagrams, validation reports,
-  open decisions).
+- `examples/` (six scripts at that point, synthetic data; later entries
+  below bring the count to 13) and `docs/` (at that point: getting
+  started, user guide, AR workflow, architecture diagrams, validation
+  reports, open decisions). Later in this cycle the getting-started and
+  user-guide pages were merged into `researcher_manual.md` and
+  `api_reference.md`, and the diagram images and their generator were
+  replaced by the Mermaid diagram in `docs/architecture/system_design.md`.
 - CI builds the sdist and wheel and checks them with `twine check`.
 - `MulticlassLabeler`: maps a reduced flux to `"NF"`, `"A"`, `"B"`, `"C"`,
   `"M"` or `"X"` by numeric class boundaries; use it as
@@ -66,10 +121,16 @@ Not yet released; version in `setup.cfg` is still 0.2.1.
   wheel with the extra, replays the pinned example images with SHA-256
   checks, runs examples 07/08 or 10/11 and their tests, and fails on any
   unexpected skip. The `build` job also checks the sdist contents and
-  imports the installed wheel. Not yet run on GitHub.
-- Release-readiness checks of the built wheel and sdist: clean-venv
-  installs on 3.12/3.13, both extras, examples from the sdist, a CI job
-  that runs the framework examples and fails on unexpected skips.
+  imports the installed wheel. (This entry was written before the push;
+  the job first ran on GitHub on 2026-10-09, run 37912188090, and has
+  passed on every `main` run since.)
+- Release-readiness checks of the built wheel and sdist, done at that
+  point: clean-venv installs on 3.12 and 3.13, both extras, examples
+  from the sdist. CI repeats only part of this: the `build` job installs
+  the wheel in a clean venv on 3.12 and imports it, and the
+  `framework-examples` job installs the wheel with each extra and runs
+  the examples; the 3.13 clean-venv install and the run from the sdist
+  are not in CI.
 
 ### Changed
 - `FluxConverter.to_class(flux)` is the one place that turns a flux into a

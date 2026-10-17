@@ -211,6 +211,14 @@ UTC. TAI − UTC was 34–37 s in 2010–2018. Neither the package nor the
 legacy scripts convert; this matters only for flares within seconds of a
 window edge.
 
+**Fact (offsets, 2026-10-17).** The package's time-zone policy: a
+timestamp written with an explicit UTC offset (`Z`, `+05:00`) is
+converted to UTC and stored naive; a naive timestamp is kept as written
+and assumed to be on the catalog's scale. This applies alike to the
+catalog, the image index, `start` and `query`. It is a calendar
+conversion, not a TAI-to-UTC correction, so the TAI question above is
+unchanged.
+
 **Options.** Tolerance: (a) none (current); (b) a configurable
 `cadence_tolerance`, with a documented default. TAI: (a) document only
 (current); (b) a conversion option in `build_image_index_from_filenames`.

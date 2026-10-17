@@ -54,7 +54,7 @@ summary JSON lists every affected row.
 | Lab catalog | The seven documented `peak_time` corrections of `scripts/catalog_corrections.py` ([full_disk.md](full_disk.md), Step 2a) | 7 | The package rejects a catalog whose peak precedes its start. Peaks only; start-time matching is unaffected. |
 | SuryaBench catalog | Columns renamed to the lab names (`event_starttime` → `start_time`, `event_peaktime` → `peak_time`, `event_endtime` → `end_time`, `fl_goescls` → `goes_class`, `ar_noaanum` → `noaa_active_region`), then `adapt_goes_catalog` | all | Same adapter path as the lab catalog. |
 | SuryaBench catalog | `peak_time` blanked where it precedes `start_time` | 13 | Same upstream HEK error as the lab file (7 of the 13 are the same flares as the lab corrections; the other 6, from 2021 on, carry peak timestamps days away from the flare). The package rejects such rows; a blank peak is accepted and cannot matter for start-time matching. |
-| SuryaBench catalog | `peak_time` blanked where it follows `end_time` | 11 | Same reason (2020–2024 rows; 9 B, 1 C, 1 M class). |
+| SuryaBench catalog | `peak_time` blanked where it follows `end_time` | 11 | Same reason (2020–2024 rows; 6 B, 4 C, 1 M class). |
 | SuryaBench catalog | `end_time` blanked where it precedes `start_time` | 0 | – |
 | SuryaBench catalog | Row dropped: class `A0.0`, start 2019-08-18 18:56 | 1 | Zero multiplier, rejected by the package's class parser. SuryaBench's regex accepts it, but an A value contributes `None` (nothing) to its sum, so dropping it cannot change any index. |
 

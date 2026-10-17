@@ -76,7 +76,7 @@ def test_load_catalog_rejects_non_numeric_time(tmp_path):
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
         "start_time,peak_time,end_time,class,active_region\n"
-        "2024-01-23,0309,abc,0338,M5.1,3559\n"
+        "2024-01-23 03:09:00,abc,2024-01-23 03:38:00,M5.1,3559\n"
     )
 
     with pytest.raises(ValueError) as excinfo:

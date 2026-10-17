@@ -27,6 +27,13 @@ class BinaryThresholdLabeler:
     threshold may be a plain letter ("M") or a full GOES class with a
     number ("C4.2") -- both are converted via FluxConverter.to_flux(), so
     the comparison is always numeric.
+
+    assign() accepts a real number (Python int/float, numpy integer or
+    floating scalar, fractions.Fraction); it is converted with float()
+    and compared with the threshold flux, so a value exactly equal to the
+    threshold (1e-5 for "M") gives 1. Booleans (bool, numpy.bool_),
+    Decimal, text, None and other non-real inputs raise TypeError; NaN
+    and infinities raise ValueError. A label is never guessed for them.
     """
 
     def __init__(self, threshold: str = "M"):
@@ -37,7 +44,15 @@ class BinaryThresholdLabeler:
             raise ValueError(f"Invalid GOES threshold {threshold!r}: {exc}") from exc
 
     def assign(self, reduced_value) -> int:
-        return int(reduced_value >= self._threshold_flux)
+        if isinstance(reduced_value, bool) or not isinstance(reduced_value, numbers.Real):
+            raise TypeError(
+                "BinaryThresholdLabeler.assign expects a flux number in W/m^2 (e.g. the output of "
+                f"MaxFluxReducer), got {reduced_value!r} ({type(reduced_value).__name__})."
+            )
+        value = float(reduced_value)
+        if not math.isfinite(value):
+            raise ValueError(f"BinaryThresholdLabeler.assign got a non-finite flux {reduced_value!r}.")
+        return int(value >= self._threshold_flux)
 
 
 class NumericThresholdLabeler:

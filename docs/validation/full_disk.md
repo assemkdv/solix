@@ -1,7 +1,9 @@
 # Full-disk validation on the supplied real data
 
-**Status:** reproduced on 2026-10-01 from this repository
-(`scripts/validate_full_disk.py`), not copied from earlier reports.
+**Status:** reproduced from this repository (`scripts/validate_full_disk.py`),
+not copied from earlier reports. The summary JSONs in this folder are from
+the 2026-10-09 run (first results 2026-10-02; regenerated when the catalog
+corrections were applied); a re-run on 2026-10-17 gave identical counts.
 
 ## Inputs
 

@@ -76,7 +76,7 @@ python -c "import flare_indexer as f; print(len(f.__all__), 'public names'); pri
 Expected:
 
 ```text
-24 public names
+26 public names
 <class 'flare_indexer.builder.DatasetBuilder'>
 ```
 
@@ -173,13 +173,22 @@ Why each label:
 
 | Column | Required | Type | Meaning |
 |---|---|---|---|
-| `timestamp` | always | date-time text, e.g. `2024-05-01 03:00:00` | When the image was taken. |
-| `active_region` | only with `target="active_region"` | integer or text (`13700`, `13700.0` and `"13700"` are the same) | Region shown in the image. Blank = unknown. |
+| `timestamp` | always | date-time text, e.g. `2024-05-01 03:00:00`; never a bare number, never blank | When the image was taken. |
+| `active_region` | only with `target="active_region"` | integer or text (`13700`, `13700.0`, `"13700"`, `"13700.0"` and `" 13700 "` are the same; `AR13700` is a different, text identifier) | Region shown in the image. Blank = unknown. |
 | any other column | no | any | Carried through to the output in sequence mode, and in single-image mode with `include_metadata=True`. Must not be named `label`, `sequence_start`, `sequence_end`, `timestamps` or `n_images` when it is carried through. |
 
-Timestamps carry no time zone and are compared exactly as written. Use
-the same time scale (e.g. UTC) in the image index and the catalog; the
-package does no conversion.
+Time-zone policy (image index, catalog, `start`, `query`): a timestamp
+written with a UTC offset (`2024-05-01T08:00:00+05:00`, `...Z`) is
+converted to UTC and the offset dropped (`10:00:00Z`, `10:00:00+00:00`
+and `15:00:00+05:00` are one instant and give one value; offsets may
+differ from row to row, for example across a daylight-saving change); a
+timestamp without an offset is kept as written and assumed to be on the
+catalog's time scale (UTC for GOES). One column must use one convention;
+a column that mixes naive and offset cells is rejected with the first
+row of each kind. This is a calendar conversion only: the package never
+changes the time scale, so a SHARP file-name time in TAI stays TAI
+(§17, Q6). A `timestamp` cell that is a number (`20240101000000`, epoch
+seconds) or blank is rejected before any sample is built.
 
 Single-image mode accepts any row order and repeated times. Sequence
 modes need unique times (per region in active-region mode); row-based
@@ -201,6 +210,14 @@ times allowed), otherwise loading raises a `ValueError` naming the data
 row. Blank cells are skipped. Because every time carries its own date, a
 flare that starts before midnight and peaks after it is written as it
 happened.
+
+**Missing times:** a blank time cell is allowed and the row is kept, but
+the flare is invisible to any matching through that column: with
+`event_time="start"` a flare with a blank `start_time` never matches, with
+`event_time="peak"` one with a blank `peak_time` never matches, and a
+blank `end_time` never affects matching. `build` warns with the number
+of such flares for the selected column. Time cells may carry a UTC
+offset (converted to UTC, see §5.1) and must not be bare numbers.
 
 **GOES class rules:** a letter `A`–`X` (any case), optionally followed by
 a positive number; spaces around it are ignored. Blank or malformed
@@ -739,10 +756,20 @@ uses NOAA numbers, both files must use the same key; see
 
 | Message (start) | Raised by | Cause | What to do |
 |---|---|---|---|
-| `Flare catalog at … is missing required column(s)` | loading the catalog | neither schema matched | rename columns or use `adapt_goes_catalog` |
+| `Flare catalog at … is missing required column(s)` | loading the catalog | a required column is absent (the one accepted schema is `start_time, peak_time, end_time, class, active_region`) | rename columns or use `adapt_goes_catalog` |
 | `Flare catalog at … has N missing or invalid GOES class value(s)` (`InvalidGOESClassError`) | loading the catalog | blank/malformed `class` | fix or remove those lines |
+| `Flare catalog at … has both a 'class' and a 'goes_class' column` | loading the catalog | two class columns | keep `class` only |
+| `… column '…', data row N: the value … is a number, not date-time text` | loading the catalog, `adapt_goes_catalog`, `build` | a time column holds numbers (`20240101100000`, epoch seconds) | write full date-times |
+| `… has an unparseable value in column '…'` | loading the catalog, `adapt_goes_catalog`, `build` | malformed time, or two date formats in one column | fix the cell; use one format per column |
+| `… column '…' mixes times without a UTC offset … and times with one` | loading the catalog, `adapt_goes_catalog`, `build` | naive and offset cells in one column | use one convention per column (§5) |
+| `… flare(s) in the catalog … have no start_time` / `… no peak_time` (`UserWarning`) | `build` | blank time in the selected `event_time` column | informational: those flares cannot match; choose the other `event_time` or fill the times |
 | `Image index at … is missing required column` | `build` | no `timestamp`, or no `active_region` in AR mode | add the column |
+| `Image index at … has N blank/missing timestamp(s)` | `build` | empty `timestamp` cells | fill or remove those rows |
 | `prediction_window must be …` | `DatasetBuilder(...)`, `query` | zero, negative, non-finite or unreadable window | use e.g. `24` or `"23h59min59s"` |
+| `… has no unit, so pandas would read it as nanoseconds` | `DatasetBuilder(...)`, `query` | duration given as bare numeric text (`"24"`) | write `"24h"`; for `prediction_window` only, the number `24` also means 24 hours |
+| `cadence/observation_window/sliding_window must be a duration with a unit … got the bare number` | `DatasetBuilder(...)` | a number where only text with a unit or a `Timedelta` has a meaning | write `"1h"`, `"30min"` or `pd.Timedelta(...)`; `cadence_minutes` is the parameter that counts minutes |
+| `sequence_length/stride must be an integer` / `cadence_minutes must be a number` (`TypeError`) | `DatasetBuilder(...)` | float, bool or text where an integer/number is needed | pass `2`, not `2.0` or `"2"` |
+| `image_time must be a pandas Timestamp` / `active_region must be a region identifier` | `query` | missing time, or a blank region passed instead of `None` | pass a `Timestamp`; pass `None` for full disk |
 | `Cannot mix row-based sequence parameters …` | `DatasetBuilder(...)` | both sequence styles given | choose one |
 | `… must have timestamps sorted …` / `… duplicate timestamp(s)` | `build` | sequence mode on unsorted or repeated times | sort, deduplicate, or use AR mode for several regions |
 | `cadence … smaller than / not an exact multiple of the inferred source cadence` | `build` | sampling incompatible with the data | choose a multiple |
@@ -766,7 +793,8 @@ uses NOAA numbers, both files must use the same key; see
   records none). Start-time labels are unaffected; the flare without a
   peak cannot be matched by peak time. See `docs/validation/full_disk.md`,
   Step 2a.
-- No time-zone or TAI/UTC conversion.
+- No time-scale (TAI/UTC) conversion. Explicit UTC offsets are converted
+  to UTC (§5); naive times are assumed to share the catalog's scale.
 - No catalog-coverage check: a catalog does not say which periods it
   covers, and the package does not guess.
 - In AR sequence mode with the default policy, several region-less

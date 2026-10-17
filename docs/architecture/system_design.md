@@ -75,7 +75,7 @@ flowchart BT
 | 0 | `classifier` | only the GOES scale: `to_flux` (text → W/m²), `to_class` (W/m² → letter), `is_strong` |
 | 1 | `events`, `labelers` | `classifier` |
 | 2 | `reducers` | `classifier`, `events` |
-| 3 | `strategies`, `pipeline`, `builder` | the layers below; `builder` imports only `events` |
+| 3 | `strategies`, `pipeline`, `builder` | the layers below; `pipeline` and `builder` import only `events` (reducers, labelers and strategies reach them as objects) |
 | side | `loaders` | `classifier`, `events`; converts lab files into the two input CSVs |
 
 Two consequences of this shape:

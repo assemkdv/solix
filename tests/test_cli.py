@@ -143,7 +143,9 @@ def test_active_region_single_images_keep_identity_and_warn(tmp_path, capsys):
     assert list(got.columns) == list(expected.columns)
     assert got["label"].tolist() == expected["label"].tolist()
     assert got["image_path"].tolist() == expected["image_path"].tolist()
-    assert got["active_region"].fillna("").tolist() == [r or "" for r in expected["active_region"]]
+    # A missing region is None under pandas 2 (object column) and NaN under
+    # pandas 3 (str column); both mean "missing" and both write as a blank cell.
+    assert got["active_region"].fillna("").tolist() == ["" if pd.isna(r) else r for r in expected["active_region"]]
 
 
 def test_missing_active_region_policy_is_passed_through(tmp_path, capsys):
@@ -216,7 +218,9 @@ def test_active_region_time_based_sequences_match_api(tmp_path):
     got = pd.read_csv(output, dtype={"active_region": str}, converters={"timestamps": json.loads})
     assert list(got.columns) == list(expected.columns)
     assert got["label"].tolist() == expected["label"].tolist()
-    assert got["active_region"].fillna("").tolist() == [r or "" for r in expected["active_region"]]
+    # A missing region is None under pandas 2 (object column) and NaN under
+    # pandas 3 (str column); both mean "missing" and both write as a blank cell.
+    assert got["active_region"].fillna("").tolist() == ["" if pd.isna(r) else r for r in expected["active_region"]]
 
 
 # --- refusals ---------------------------------------------------------------

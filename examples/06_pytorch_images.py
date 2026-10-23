@@ -1,5 +1,5 @@
 """
-Example 7 -- real full-disk images, one label per image, loaded with PyTorch.
+Example 6 -- real full-disk images, one label per image, loaded with PyTorch.
 
 Question answered for every image: "Does an M-class or stronger flare start
 in (t, t + 24h), where t is the image's own observation time?"
@@ -20,7 +20,7 @@ examples/real_data/README.md.
 
 Setup:  pip install torch pillow
         python examples/real_data/fetch_real_data.py     # downloads ~10 MB once
-Run:    python examples/07_pytorch_full_disk_images.py
+Run:    python examples/06_pytorch_images.py
 """
 
 import argparse
@@ -77,8 +77,8 @@ def main(argv=None):
     from torch.utils.data import DataLoader
 
     args.output.mkdir(parents=True, exist_ok=True)
-    index_path = args.output / "07_image_index.csv"
-    labels_path = args.output / "07_image_labels.csv"
+    index_path = args.output / "06_image_index.csv"
+    labels_path = args.output / "06_image_labels.csv"
 
     # 1. Image index from actual observation times.
     index = real.build_image_index(index_path)

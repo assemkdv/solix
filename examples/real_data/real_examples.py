@@ -1,5 +1,5 @@
 """
-Helpers shared by the real-image examples (07, 08 with PyTorch; 10, 11
+Helpers shared by the real-image examples (06, 07 with PyTorch; 08, 09
 with TensorFlow): turning the download manifest into an image index,
 checking catalog coverage, saving sequence tables with list-valued columns,
 and an independent label check that does not use flare_indexer.
@@ -79,7 +79,7 @@ def check_catalog_coverage(reference_times, prediction_window) -> dict:
     Stop unless every prediction window (t, t + prediction_window) lies
     inside the interval the catalog was queried for. This is the only
     coverage the example can establish: a flare list cannot show that the
-    instrument observed without gaps (docs/decisions.md, Q5).
+    instrument observed without gaps.
     """
     provenance = json.loads(CATALOG_PROVENANCE.read_text())
     query_start, query_end = pd.Timestamp(provenance["query_start"]), pd.Timestamp(provenance["query_end"])

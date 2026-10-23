@@ -16,8 +16,8 @@ import pytest
 import flare_indexer as fidx
 from flare_indexer.cli import main
 
-FIXTURES = Path(__file__).resolve().parent.parent / "docs" / "fixtures"
-pytestmark = pytest.mark.skipif(not FIXTURES.is_dir(), reason="docs/fixtures not available (installed package)")
+FIXTURES = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "cli"
+pytestmark = pytest.mark.skipif(not FIXTURES.is_dir(), reason="tests/fixtures/cli not available (installed package)")
 IMAGES = FIXTURES / "images.csv"          # 5 full-disk images, 3 h apart (one 9 h gap), with image_path
 AR_IMAGES = FIXTURES / "ar_images.csv"    # patches of two regions at shared times, one blank region
 CATALOG = FIXTURES / "catalog.csv"        # 4 flares, one without a region

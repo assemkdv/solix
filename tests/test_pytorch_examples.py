@@ -1,5 +1,5 @@
 """
-Checks for the real-image PyTorch examples (examples 07 and 08).
+Checks for the real-image PyTorch examples (examples 06 and 07).
 
 The committed provenance files (image manifest, flare catalog) are checked
 always. Labeling is checked from the manifest's timestamps alone, which
@@ -101,18 +101,6 @@ def test_catalog_matches_raw_hek_result_and_covers_every_window():
         real.check_catalog_coverage([pd.Timestamp("2017-09-05 12:00:00")], "24h")
 
 
-def test_catalog_agrees_with_lab_catalog_when_cached():
-    lab_path = REPO / "scripts" / ".cache" / "goes_flares_integrated.csv"
-    if not lab_path.exists():
-        pytest.skip("lab catalog scripts/.cache/goes_flares_integrated.csv not present")
-    lab = pd.read_csv(lab_path, usecols=["start_time", "goes_class"], parse_dates=["start_time"])
-    catalog = real.load_catalog()
-    period = (lab["start_time"] >= "2017-09-01") & (lab["start_time"] < "2017-09-06")
-    in_period = (catalog["start_time"] >= "2017-09-01") & (catalog["start_time"] < "2017-09-06")
-    assert set(zip(lab.loc[period, "start_time"], lab.loc[period, "goes_class"])) == \
-        set(zip(catalog.loc[in_period, "start_time"], catalog.loc[in_period, "class"]))
-
-
 # ── Labels from the real index (no images or PyTorch needed) ─────────────
 
 def test_image_labels_match_independent_check(index_csv):
@@ -188,7 +176,7 @@ def test_tenth_of_a_second_off_grid_is_not_turned_into_an_hourly_step(tmp_path):
 
 
 def test_sequence_csv_round_trip(index_csv, tmp_path):
-    example = _load_example("08_pytorch_full_disk_sequences.py")
+    example = _load_example("07_pytorch_sequences.py")
     sequences = _builder(cadence="1h", observation_window="3h", sliding_window="1h").build(index_csv, real.CATALOG)
     path = tmp_path / "sequences.csv"
     example.save_sequences(sequences, path)
@@ -233,9 +221,9 @@ def test_decoded_images_are_real_and_match_header_times():
 
 @needs_images
 @pytest.mark.parametrize("script, expected", [
-    ("07_pytorch_full_disk_images.py", ["images [4, 1, 256, 256]", "images [1, 1, 256, 256]",
+    ("06_pytorch_images.py", ["images [4, 1, 256, 256]", "images [1, 1, 256, 256]",
                                         "9 images: 4 positive, 5 negative; all checks passed"]),
-    ("08_pytorch_full_disk_sequences.py", ["images [2, 3, 1, 256, 256]", "candidates 8, emitted 2, skipped 6",
+    ("07_pytorch_sequences.py", ["images [2, 3, 1, 256, 256]", "candidates 8, emitted 2, skipped 6",
                                            "2 sequences: 0 positive, 2 negative; all checks passed"]),
 ])
 def test_pytorch_example_runs(script, expected, tmp_path):

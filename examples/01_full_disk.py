@@ -4,7 +4,7 @@ Example 1 -- full-disk, single-image labels.
 Question answered for every image: "Did an M-class or stronger flare
 start in the 24 hours after this image?"
 
-Run:  python examples/01_full_disk_single_image.py
+Run:  python examples/01_full_disk.py
 """
 
 from pathlib import Path

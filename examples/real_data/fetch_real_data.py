@@ -1,5 +1,5 @@
 """
-Acquire the real images and flare catalog used by examples 07, 08, 10 and 11.
+Acquire the real images and flare catalog used by examples 06-09.
 
 This script only acquires data; it does no labeling. It writes:
 
@@ -67,7 +67,7 @@ REQUESTED_TIMES = pd.date_range("2017-09-03 01:00:00", periods=10, freq="1h")
 MAX_OFFSET = pd.Timedelta("60s")
 
 # The catalog interval must contain every prediction window (t, t + 24h)
-# of every image above; examples 07, 08, 10 and 11 check this before labeling.
+# of every image above; examples 06-09 check this before labeling.
 CATALOG_START = pd.Timestamp("2017-09-01 00:00:00")
 CATALOG_END = pd.Timestamp("2017-09-06 00:00:00")
 
@@ -308,7 +308,7 @@ def fetch_catalog() -> pd.DataFrame:
         "rows_without_goes_class_dropped": int(no_class.sum()),
         "catalog_rows": int(len(catalog)),
         "note": "HEK returns events overlapping [query_start, query_end]. The list records flares; "
-                "it does not certify that GOES observed without gaps (docs/decisions.md, Q5).",
+                "it does not certify that GOES observed without gaps.",
     }, indent=2) + "\n")
     print(f"HEK SWPC flares {CATALOG_START} .. {CATALOG_END}: {len(raw)} rows, "
           f"{int(no_class.sum())} without a GOES class dropped, {len(catalog)} written to {CATALOG.name}")

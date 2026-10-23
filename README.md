@@ -1,28 +1,16 @@
 # flare-indexer
 
-flare-indexer builds **labeled datasets for solar flare prediction**: given
-solar image timestamps and a NOAA flare catalog, it looks forward in time
-from each image (or each sequence of images), checks whether a flare occurs
-within a configurable prediction window, and returns a table of
-image/sequence → label pairs ready for training.
+flare-indexer builds labeled datasets for solar flare prediction. You give it
+the times of your solar images and a GOES flare catalog. For each image, or
+each sequence of images, it finds the flares in the prediction window after
+the image and turns them into a label: binary, flux, class, counts or a
+cumulative index. Full-disk and active-region data are both supported.
 
-```
-image timestamp(s) + flare catalog
-        │
-        ▼
-  EventMatcher      flares in the window after each image
-        │           (optionally only from the image's active region)
-        ▼
-  reducer + labeler one value per window: binary (≥ M?), max flux, class, counts
-        │
-        ▼
-  DatasetBuilder    the labeled table (single images or sequences)
-```
+![Architecture](docs/architecture/overview.svg)
 
 ## Installation
 
-Not yet published to PyPI. Install from source (Python ≥ 3.10; needs only
-pandas and numpy):
+Python 3.10 or newer. The only dependencies are pandas and numpy.
 
 ```bash
 git clone https://github.com/assemkdv/flare-indexer.git
@@ -30,93 +18,126 @@ cd flare-indexer
 pip install .
 ```
 
-Optional extras for the real-image examples: `pip install ".[pytorch-examples]"`
-(torch, pillow) or `pip install ".[tensorflow-examples]"` (tensorflow, pillow;
-Python 3.10–3.13).
+## Inputs
 
-## Quick example
+Two CSV files:
+
+| File | Columns |
+|---|---|
+| Image index | `timestamp`, plus `active_region` for active-region labels, plus any columns you want to keep (e.g. `image_path`) |
+| Flare catalog | `start_time, peak_time, end_time, class, active_region` (full date and time in every time cell) |
+
+## Quick start
 
 ```python
 import flare_indexer as fidx
 
 builder = fidx.DatasetBuilder(
-    prediction_window="24h",                      # window (t, t + 24h)
-    strategy=fidx.BinaryThresholdStrategy("M"),   # 1 if any flare >= M1.0, else 0
-    target="full_disk",                           # or "active_region"
-    event_time="start",                           # flare start time must be in the window
+    prediction_window="24h",                     # window (t, t + 24h)
+    strategy=fidx.BinaryThresholdStrategy("M"),  # 1 if a flare >= M1.0 starts in it
 )
 labels = builder.build("examples/data/full_disk_image_index.csv",
                        "examples/data/flare_catalog.csv")
-print(labels)
 ```
 
-Inputs are two CSV files: an **image index** (`timestamp`, plus
-`active_region` and any identifier columns you want back) and a **flare
-catalog** (`start_time, peak_time, end_time, class, active_region`, every
-time with its full date). Every labeling choice (window length, which
-flare time, boundary rule, threshold) is an explicit parameter; the
-defaults are listed in the researcher manual.
+The result is a pandas DataFrame with one row per image and a `label`
+column.
 
-The same run from the shell (the `flare-indexer` command is installed with
-the package; see the researcher manual, section 18):
+The window is `(t, t + w)`: a flare counts if its start time is after the
+image time `t` and before `t + w`. Use `event_time="peak"` to match the peak
+time instead.
+
+## Labels
+
+| Label | Strategy |
+|---|---|
+| 0/1, strongest flare ≥ a GOES class | `BinaryThresholdStrategy("M")` |
+| Peak flux of the strongest flare (W/m²) | `MaxFlareStrategy()` |
+| Class of the strongest flare (NF, A, B, C, M, X) | `DatasetBuildingPipeline(MaxFluxReducer(), MulticlassLabeler())` |
+| Number of flares per class | `DatasetBuildingPipeline(ClassCountReducer(), ClassCountLabeler())` |
+| Cumulative index ΣC + 10ΣM + 100ΣX | `DatasetBuildingPipeline(CumulativeClassIndexReducer(), RegressionLabeler())` |
+| Cumulative index ≥ a number, as 0/1 | `DatasetBuildingPipeline(CumulativeClassIndexReducer(), NumericThresholdLabeler(10))` |
+
+A pipeline is a reducer (flares → one value) and a labeler (value → label).
+Any object with a `label(events)` method can be passed as `strategy`.
+
+## Sequences
+
+```python
+builder = fidx.DatasetBuilder(
+    prediction_window="24h",
+    strategy=fidx.BinaryThresholdStrategy("M"),
+    cadence="1h", observation_window="3h", sliding_window="1h",  # 3 images, 1 h apart
+)
+sequences = builder.build("examples/data/full_disk_image_index.csv",
+                          "examples/data/flare_catalog.csv")
+```
+
+Each sequence is labeled from the time of its last image. Sequences with a
+missing image are skipped. For fixed-length sequences of consecutive rows,
+use `sequence_length=` and `stride=` instead.
+
+## Active regions
+
+```python
+builder = fidx.DatasetBuilder(
+    prediction_window="24h",
+    strategy=fidx.BinaryThresholdStrategy("M"),
+    target="active_region",
+)
+labels = builder.build("examples/data/active_region_image_index.csv",
+                       "examples/data/flare_catalog.csv")
+```
+
+Only flares from the image's own region count. Sequences are built
+separately for each region.
+
+## Preparing real data
+
+```python
+index = fidx.build_image_index_from_filenames(
+    "examples/data/hmi_image_list.txt", output_path="image_index.csv",
+    strict=False)  # skip lines that are not HMI images
+catalog = fidx.adapt_goes_catalog(
+    "examples/data/goes_flares_sample.csv", output_path="flare_catalog.csv")
+```
+
+The first function reads HMI or SHARP file names and writes the image
+index. The second converts an integrated GOES catalog into the catalog
+format above.
+
+## Command line
 
 ```bash
 flare-indexer label examples/data/full_disk_image_index.csv examples/data/flare_catalog.csv \
     --output labels.csv --window 24h --threshold M
 ```
 
-## Documentation
-
-- **[Researcher manual](docs/researcher_manual.md)** — install, inputs and
-  outputs, windows, strategies, sequences, active regions, real data,
-  errors, limitations. Start here.
-- **[API reference](docs/api_reference.md)** — every public class, function
-  and method.
-- **[System design](docs/architecture/system_design.md)** — how the code
-  works inside, with one inspectable example.
-- [Active-region workflow](docs/active_region_workflow.md) — labeling
-  SHARP/HARP patches step by step.
-- [Open decisions](docs/decisions.md) — labeling choices that still need a
-  scientific sign-off (window edge, look-back, missing regions, coverage).
-- Real-data validation: [full disk](docs/validation/full_disk.md),
-  [active region](docs/validation/active_region.md) — reproduction of the
-  lab's published labels, with the documented catalog corrections;
-  [cumulative index](docs/validation/cumulative_index.md) — reproduction
-  of the public SuryaBench cumulative flare index.
-- [CHANGELOG](CHANGELOG.md).
-
-The examples in the manual, the API reference and the system design are
-run by `python scripts/check_doc_examples.py` and in the test suite, so
-their recorded output is always current.
+Run `flare-indexer label --help` for all options.
 
 ## Examples
 
-`examples/01`–`06`, `09`, `12` and `13` run on the synthetic data in
-`examples/data/` (single images, window boundaries, sequences, active
-regions, real-data loaders, the modular pipeline, multiclass labels, counts,
-the cumulative class index).
-`examples/07`–`08` (PyTorch) and `10`–`11` (TensorFlow) label real SDO/HMI
-magnetograms and load them as `[B,C,H,W]` / `[B,T,C,H,W]` and
-`[B,H,W,C]` / `[B,T,H,W,C]` batches; see
+| Script | Shows |
+|---|---|
+| `examples/01_full_disk.py` | single-image labels |
+| `examples/02_sequences.py` | image sequences |
+| `examples/03_active_region.py` | active-region labels |
+| `examples/04_loaders.py` | preparing real inputs |
+| `examples/05_cumulative_index.py` | cumulative flare index |
+| `examples/06_pytorch_images.py`, `07_pytorch_sequences.py` | real HMI images in PyTorch |
+| `examples/08_tensorflow_images.py`, `09_tensorflow_sequences.py` | real HMI images in TensorFlow |
+
+Examples 01–05 use the synthetic data in `examples/data/`. Examples 06–09
+need `pip install ".[pytorch-examples]"` or `".[tensorflow-examples]"` and
+download about 10 MB of images; see
 [examples/real_data/README.md](examples/real_data/README.md).
 
-```bash
-python examples/01_full_disk_single_image.py
-```
-
-## Development
+## Tests
 
 ```bash
 pip install -e ".[dev]"
-pytest                                   # framework tests skip without torch/tensorflow
-python scripts/check_doc_examples.py     # documentation examples
+pytest
 ```
-
-`scripts/validate_full_disk.py` and `scripts/validate_active_region.py`
-rerun the real-data validation against the lab's published files (they
-download about 90 MB into `scripts/.cache/`);
-`scripts/validate_cumulative_index.py` compares the cumulative class index
-with the public SuryaBench labels (about 13 MB).
 
 ## License
 

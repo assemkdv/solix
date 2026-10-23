@@ -1,10 +1,8 @@
-include tests/fixtures/*.csv
-include tests/fixtures/*.md
-prune src/flare_indexer.egg-info
-include CHANGELOG.md
+include tests/fixtures/*.csv tests/fixtures/*.md
+recursive-include tests/fixtures/cli *.csv *.txt *.md
 recursive-include examples *.py *.csv *.txt *.json *.md
-recursive-include docs *.md *.json *.txt *.py *.csv
-recursive-include scripts *.py
+recursive-include docs *.py *.pdf *.svg
+prune src/flare_indexer.egg-info
 # Never ship generated example outputs, the downloaded image cache,
 # partial downloads or byte code.
 prune examples/output

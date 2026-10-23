@@ -5,9 +5,7 @@ and its numeric threshold labeler (NumericThresholdLabeler).
 Reference: Hong, Ji, Pandey, Aydin, "Beyond Traditional Flare
 Forecasting: A Data-driven Labeling Approach for High-fidelity
 Predictions", DaWaK 2023, Sec. 2.2:  sum(C) + 10*sum(M) + 100*sum(X).
-The same rule is coded in NASA-IMPACT/SuryaBench flare_index_creator.py
-(threshold 10). A/B contributing 0 is the selected convention pending
-Dr. Pandey's confirmation (docs/decisions.md Q1).
+A and B flares contribute 0.
 """
 
 import math
@@ -70,8 +68,7 @@ def test_empty_window_is_zero():
 
 @pytest.mark.parametrize("classes", [["A1.2"], ["B5.0"], ["A1.0", "B9.9", "B15.0"]])
 def test_a_and_b_only_windows_are_zero(classes):
-    # Selected convention (paper formula lists only C, M, X; SuryaBench
-    # maps A/B to None and skips them). B15.0 has the flux of C1.5 but
+    # The formula lists only C, M, X. B15.0 has the flux of C1.5 but
     # still counts 0 under this letter-based rule.
     assert CumulativeClassIndexReducer().reduce(_events(classes)) == 0.0
 

@@ -1,5 +1,5 @@
 """
-Example 10 -- real full-disk images, one label per image, loaded with TensorFlow.
+Example 8 -- real full-disk images, one label per image, loaded with TensorFlow.
 
 The TensorFlow counterpart of example 7: same images, same catalog, same
 labeling settings, same checks. Only the loader differs.
@@ -22,7 +22,7 @@ Steps
 
 Setup:  pip install tensorflow pillow        # TensorFlow needs Python <= 3.13
         python examples/real_data/fetch_real_data.py
-Run:    python examples/10_tensorflow_full_disk_images.py
+Run:    python examples/08_tensorflow_images.py
 """
 
 import argparse
@@ -87,8 +87,8 @@ def main(argv=None):
     import tensorflow as tf
 
     args.output.mkdir(parents=True, exist_ok=True)
-    index_path = args.output / "10_image_index.csv"
-    labels_path = args.output / "10_image_labels.csv"
+    index_path = args.output / "08_image_index.csv"
+    labels_path = args.output / "08_image_labels.csv"
 
     # 1. Image index from actual, full-precision observation times.
     index = real.build_image_index(index_path)

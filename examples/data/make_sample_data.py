@@ -18,8 +18,8 @@ from flare_indexer import adapt_goes_catalog
 
 DATA_DIR = Path(__file__).parent
 
-# GOES-catalog-shaped flares (same column names as the lab's
-# goes_flares_integrated.csv; `ssw_flare_id` is an extra column that
+# GOES-catalog-shaped flares (same column names as an integrated
+# GOES catalog, goes_flares_integrated.csv; `ssw_flare_id` is an extra column that
 # adapt_goes_catalog ignores).
 FLARES = [
     # start,              peak,                 end,                  class, NOAA AR, lon,  lat

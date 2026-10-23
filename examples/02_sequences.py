@@ -1,5 +1,5 @@
 """
-Example 3 -- labeling sequences of images (full-disk).
+Example 2 -- labeling sequences of images (full-disk).
 
 A sequence is labeled from its LAST image: the prediction window starts at
 `sequence_end`. Two ways to build sequences:
@@ -11,7 +11,7 @@ A sequence is labeled from its LAST image: the prediction window starts at
 
 The sample image index has a gap (2024-03-02 05:00 and 06:00 are missing).
 
-Run:  python examples/03_sequences.py
+Run:  python examples/02_sequences.py
 """
 
 from pathlib import Path

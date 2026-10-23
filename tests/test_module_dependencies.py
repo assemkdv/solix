@@ -11,8 +11,7 @@ The package is layered; this test keeps it that way.
     cli                        (builder, strategies, pipeline, reducers, labelers; the console script)
 
 A module may import only from layers below it. The allowed sets below are
-exact: adding a new internal import means updating this table and the
-dependency section of docs/architecture/system_design.md.
+exact: adding a new internal import means updating this table.
 """
 
 import ast

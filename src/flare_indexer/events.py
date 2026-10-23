@@ -45,8 +45,7 @@ def _parse_prediction_window(value) -> pd.Timedelta:
     A plain number (int or float) is interpreted as hours, preserving the
     original `prediction_window=24` behavior. Anything else is parsed as a
     pandas-compatible duration, e.g. "24h", "23h59min59s", or a
-    pd.Timedelta -- which is what allows reproducing a legacy window such
-    as (t, t + 23:59:59] exactly.
+    pd.Timedelta.
     """
     if isinstance(value, bool):
         raise ValueError(f"prediction_window must be a number of hours or a duration, got {value!r}")
@@ -250,8 +249,8 @@ class EventMatcher:
     class, active_region (optionally fl_lon, fl_lat). Every time cell is a
     complete date-time string, so a flare whose start, peak and end fall on
     different calendar dates is written as it happened. This is the schema
-    `flare_indexer.loaders.adapt_goes_catalog` produces from the lab's
-    integrated GOES catalog.
+    `flare_indexer.loaders.adapt_goes_catalog` produces from an integrated
+    GOES catalog.
     """
 
     REQUIRED_CATALOG_COLUMNS = {"start_time", "peak_time", "end_time", "class", "active_region"}
@@ -333,15 +332,14 @@ class EventMatcher:
 
         event_time selects which of a flare's timestamps is checked against
         the window:
-        - "start" (default): the flare's start_time. This matches
-          SuryaBench and the lab's labeling scripts.
+        - "start" (default): the flare's start_time.
         - "peak": the flare's peak_time.
 
         The window is (image_time, image_time + prediction_window): a flare
         must come strictly after image_time and strictly before the window
         end, so a flare at exactly image_time or exactly the window end does
         not count. With minute-resolution catalogs a 24 h window is
-        t < time <= t + 23:59:59, as in SuryaBench.
+        t < time <= t + 23:59:59.
 
         prediction_window_hours is either a number of hours (e.g. 24) or a
         pandas-compatible duration (e.g. "23h59min59s", pd.Timedelta).

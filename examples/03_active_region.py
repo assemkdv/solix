@@ -1,5 +1,5 @@
 """
-Example 4 -- active-region (AR) labels.
+Example 3 -- active-region (AR) labels.
 
 With target="active_region", an image patch only gets flares from its own
 NOAA active region. This example shows:
@@ -9,7 +9,7 @@ NOAA active region. This example shows:
 3. catalog flares with no region can never be matched (a warning says so);
 4. sequences are built separately for each region.
 
-Run:  python examples/04_active_region.py
+Run:  python examples/03_active_region.py
 """
 
 import warnings
@@ -48,7 +48,7 @@ def main():
         warnings.simplefilter("ignore")
         dropped = build(missing_active_region="drop")
     print(f"  rows: {len(labels)} -> {len(dropped)}")
-    dropped.to_csv(OUTPUT / "04_active_region_labels.csv", index=False)
+    dropped.to_csv(OUTPUT / "03_active_region_labels.csv", index=False)
 
     print("\n   missing_active_region='error' stops instead:")
     try:

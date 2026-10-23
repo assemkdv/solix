@@ -310,7 +310,7 @@ def test_event_time_defaults_to_start():
     })
 
     # Window (00:00, 00:45] catches the flare by start_time (00:30) but not
-    # by peak_time (01:00) -- the default (start, as in SuryaBench) includes it.
+    # by peak_time (01:00) -- the default (start) includes it.
     results = matcher.query(pd.Timestamp("2024-01-01 00:00"), prediction_window_hours=0.75)
     assert len(results) == 1
 

@@ -61,8 +61,7 @@ class NumericThresholdLabeler:
     threshold, else 0.
 
     For dimensionless indices such as the cumulative class index
-    (CumulativeClassIndexReducer): SuryaBench binarizes it at 10, the
-    DaWaK 2023 paper's active-region study at 20. The threshold is a
+    (CumulativeClassIndexReducer), e.g. 10 or 20. The threshold is a
     plain number compared directly with the reduced value; it is not a
     GOES class and is not converted to flux. For flux values in W/m^2
     with a GOES-class threshold use BinaryThresholdLabeler instead.

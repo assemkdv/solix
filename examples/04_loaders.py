@@ -1,5 +1,5 @@
 """
-Example 5 -- preparing real-world inputs.
+Example 4 -- preparing real-world inputs.
 
 Real inputs rarely arrive in the package's schema. Two helpers convert them:
 
@@ -10,7 +10,7 @@ Real inputs rarely arrive in the package's schema. Two helpers convert them:
   end_time, goes_class, noaa_active_region (like goes_flares_integrated.csv)
   -> the catalog schema DatasetBuilder reads.
 
-Run:  python examples/05_real_data_loaders.py
+Run:  python examples/04_loaders.py
 """
 
 from pathlib import Path
@@ -26,7 +26,7 @@ def main():
 
     index, report = fidx.build_image_index_from_filenames(
         DATA / "hmi_image_list.txt",
-        output_path=OUTPUT / "05_image_index.csv",
+        output_path=OUTPUT / "04_image_index.csv",
         strict=False,              # exclude non-image rows instead of raising
         duplicate_policy="error",  # stop if two images share a timestamp
         return_report=True,
@@ -36,14 +36,14 @@ def main():
           f"excluded: {report.excluded_row_count} {report.excluded_rows}")
     print(index.to_string(index=False))
 
-    catalog = fidx.adapt_goes_catalog(DATA / "goes_flares_sample.csv", OUTPUT / "05_flare_catalog.csv")
+    catalog = fidx.adapt_goes_catalog(DATA / "goes_flares_sample.csv", OUTPUT / "04_flare_catalog.csv")
     print("\nGOES catalog -> flare catalog (extra columns such as ssw_flare_id are dropped)")
     print(catalog.to_string(index=False))
 
     labels = fidx.DatasetBuilder(
         prediction_window=24, strategy=fidx.BinaryThresholdStrategy("M"),
         event_time="start", include_metadata=True,
-    ).build(OUTPUT / "05_image_index.csv", OUTPUT / "05_flare_catalog.csv")
+    ).build(OUTPUT / "04_image_index.csv", OUTPUT / "04_flare_catalog.csv")
     print("\nLabels for the converted inputs")
     print(labels.to_string(index=False))
 

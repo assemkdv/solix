@@ -1,10 +1,10 @@
 """
-Checks for the real-image TensorFlow examples (examples 10 and 11).
+Checks for the real-image TensorFlow examples (examples 08 and 09).
 
 The layout conversion and the sequence checks need neither TensorFlow nor
 images. Running the examples needs TensorFlow, Pillow with JPEG 2000
 support and the images from examples/real_data/fetch_real_data.py; the
-comparison with the PyTorch examples (07, 08) also needs PyTorch. Tests
+comparison with the PyTorch examples (06, 07) also needs PyTorch. Tests
 whose requirements are missing are skipped, so the base suite runs without
 any framework installed.
 """
@@ -52,7 +52,7 @@ needs_tf_and_torch = pytest.mark.skipif(not _has("tensorflow") or not _has("torc
 # ── Without TensorFlow ───────────────────────────────────────────────────
 
 def test_channels_first_is_converted_to_channels_last():
-    images = _load("10_tensorflow_full_disk_images.py")
+    images = _load("08_tensorflow_images.py")
     chw = np.arange(2 * 3 * 4, dtype=np.float32).reshape(2, 3, 4)  # C=2, H=3, W=4
     hwc = images.to_channels_last(chw)
     assert hwc.shape == (3, 4, 2) and hwc.flags["C_CONTIGUOUS"]
@@ -63,7 +63,7 @@ def test_channels_first_is_converted_to_channels_last():
 
 
 def test_sequence_checks_reject_bad_rows_before_decoding():
-    sequences = _load("11_tensorflow_full_disk_sequences.py")
+    sequences = _load("09_tensorflow_sequences.py")
     t = pd.to_datetime(["2017-09-03 00:59:49.9", "2017-09-03 01:59:49.9", "2017-09-03 02:59:49.9"])
     good = dict(timestamps=list(t), image_path=["a", "b", "c"], n_images=3, sequence_end=t[-1])
     cadence = pd.Timedelta("1h")
@@ -83,8 +83,8 @@ def test_sequence_checks_reject_bad_rows_before_decoding():
 
 
 def test_tensorflow_shapes_follow_the_shared_decoder():
-    images = _load("10_tensorflow_full_disk_images.py")
-    sequences = _load("11_tensorflow_full_disk_sequences.py")
+    images = _load("08_tensorflow_images.py")
+    sequences = _load("09_tensorflow_sequences.py")
     assert images.IMAGE_SHAPE == (256, 256, 1)
     assert sequences.SEQUENCE_SHAPE == (3, 256, 256, 1)
 
@@ -100,7 +100,7 @@ def _run(script, output):
 
 @needs_tf
 def test_tensorflow_image_example_runs(tmp_path):
-    output = _run("10_tensorflow_full_disk_images.py", tmp_path)
+    output = _run("08_tensorflow_images.py", tmp_path)
     assert "batch 0: images [4, 256, 256, 1] float32" in output
     assert "batch 1: images [4, 256, 256, 1] float32" in output
     assert "batch 2: images [1, 256, 256, 1] float32" in output
@@ -110,7 +110,7 @@ def test_tensorflow_image_example_runs(tmp_path):
 
 @needs_tf
 def test_tensorflow_sequence_example_runs(tmp_path):
-    output = _run("11_tensorflow_full_disk_sequences.py", tmp_path)
+    output = _run("09_tensorflow_sequences.py", tmp_path)
     assert "candidates 8, emitted 2, skipped 6" in output
     assert "batch 0: images [2, 3, 256, 256, 1] float32  labels [0, 0]" in output
     assert "2 sequences: 0 positive, 2 negative; all checks passed" in output
@@ -119,10 +119,10 @@ def test_tensorflow_sequence_example_runs(tmp_path):
 @needs_tf_and_torch
 def test_tensorflow_and_pytorch_examples_produce_the_same_label_tables(tmp_path):
     for torch_script, tf_script, torch_table, tf_table in [
-        ("07_pytorch_full_disk_images.py", "10_tensorflow_full_disk_images.py",
-         "07_image_labels.csv", "10_image_labels.csv"),
-        ("08_pytorch_full_disk_sequences.py", "11_tensorflow_full_disk_sequences.py",
-         "08_sequence_labels.csv", "11_sequence_labels.csv"),
+        ("06_pytorch_images.py", "08_tensorflow_images.py",
+         "06_image_labels.csv", "08_image_labels.csv"),
+        ("07_pytorch_sequences.py", "09_tensorflow_sequences.py",
+         "07_sequence_labels.csv", "09_sequence_labels.csv"),
     ]:
         _run(torch_script, tmp_path / "torch")
         _run(tf_script, tmp_path / "tf")
@@ -131,10 +131,10 @@ def test_tensorflow_and_pytorch_examples_produce_the_same_label_tables(tmp_path)
 
 @needs_tf_and_torch
 def test_tensorflow_and_pytorch_loaders_yield_the_same_samples(tmp_path):
-    torch_images = _load("07_pytorch_full_disk_images.py")
-    tf_images = _load("10_tensorflow_full_disk_images.py")
-    torch_sequences = _load("08_pytorch_full_disk_sequences.py")
-    tf_sequences = _load("11_tensorflow_full_disk_sequences.py")
+    torch_images = _load("06_pytorch_images.py")
+    tf_images = _load("08_tensorflow_images.py")
+    torch_sequences = _load("07_pytorch_sequences.py")
+    tf_sequences = _load("09_tensorflow_sequences.py")
     real = tf_images.real
     import flare_indexer as fidx
 

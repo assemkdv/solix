@@ -16,8 +16,8 @@ EXAMPLES_DIR = Path(__file__).resolve().parent.parent / "examples"
 # images and a framework; they are checked in test_pytorch_examples.py and
 # test_tensorflow_examples.py instead.
 REAL_DATA_EXAMPLES = {
-    "07_pytorch_full_disk_images.py", "08_pytorch_full_disk_sequences.py",
-    "10_tensorflow_full_disk_images.py", "11_tensorflow_full_disk_sequences.py",
+    "06_pytorch_images.py", "07_pytorch_sequences.py",
+    "08_tensorflow_images.py", "09_tensorflow_sequences.py",
 }
 EXAMPLE_SCRIPTS = sorted(p for p in EXAMPLES_DIR.glob("[0-9][0-9]_*.py") if p.name not in REAL_DATA_EXAMPLES)
 
@@ -39,23 +39,8 @@ def test_example_runs(script, tmp_path):
     assert _run(copy / script.name, tmp_path)
 
 
-def test_boundary_example_shows_label_change(tmp_path):
-    output = _run(EXAMPLES_DIR / "02_window_boundaries.py", tmp_path)
-    assert "label=0  starts exactly at t+24h: excluded" in output
-    assert "label=1  window 10 min longer: included" in output
-    assert "label=0  peak exactly at t+w: excluded" in output
-    assert "label=0  starts exactly at t: excluded" in output
-
-
-def test_multiclass_example_shows_class_labels(tmp_path):
-    output = _run(EXAMPLES_DIR / "09_multiclass_labels.py", tmp_path)
-    assert "label counts: NF=18, A=0, B=23, C=2, M=54, X=21" in output
-    assert "binary M label == (multiclass in {M, X}) for every image: True" in output
-    assert "2024-03-01 12:00:00         13600     M               X" in output
-
-
 def test_cumulative_index_example_shows_paper_value_and_labels(tmp_path):
-    output = _run(EXAMPLES_DIR / "13_cumulative_index.py", tmp_path)
+    output = _run(EXAMPLES_DIR / "05_cumulative_index.py", tmp_path)
     assert "cumulative index: 48.5" in output
     assert "label (index >= 10): 1" in output
     assert "label (index >= 20): 1" in output

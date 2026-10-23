@@ -210,8 +210,7 @@ class DatasetBuilder:
         observed at the same timestamps; see "Active-region sequences".
     event_time : str
         Which of a flare's timestamps EventMatcher checks against the
-        prediction window: "start" (default, as in SuryaBench and the lab's
-        scripts) or "peak". See EventMatcher.query.
+        prediction window: "start" (default) or "peak". See EventMatcher.query.
     missing_active_region : str
         Only used when target="active_region". What to do with images
         whose image-side active_region is missing:

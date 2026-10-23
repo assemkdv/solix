@@ -64,8 +64,7 @@ class ClassCountReducer:
 class CumulativeClassIndexReducer:
     """Cumulative normalized GOES subclass index of all events in the window.
 
-    Formula (Hong, Ji, Pandey, Aydin, DaWaK 2023, Sec. 2.2; the same rule
-    is coded in NASA-IMPACT/SuryaBench ``flare/flare_index_creator.py``):
+    Formula (Hong, Ji, Pandey, Aydin, DaWaK 2023, Sec. 2.2):
 
         index = sum(C_i) + 10 * sum(M_j) + 100 * sum(X_k)
 
@@ -74,10 +73,8 @@ class CumulativeClassIndexReducer:
     the value is dimensionless. The paper's worked window (M1.5, C2.6,
     C1.4, M2.1, C2.8, C4.2, C1.5) gives 48.5.
 
-    Selected convention, pending Dr. Pandey's confirmation: A- and
-    B-class events contribute 0, as in the paper's formula and in
-    SuryaBench (where they fall through to None and are skipped by the
-    sum). Consequences: "C10.0" and "M1.0" both add 10; "B15.0" adds 0
+    A- and B-class events contribute 0, as in the paper's formula.
+    Consequences: "C10.0" and "M1.0" both add 10; "B15.0" adds 0
     although its flux equals C1.5. The weights are per letter, in
     WEIGHTS; a letter missing from WEIGHTS weighs 0.
 
@@ -89,8 +86,7 @@ class CumulativeClassIndexReducer:
     catalogs are already checked).
 
     This reducer only aggregates; it does not choose the prediction
-    window. The reference implementations use start time and
-    (t, t+23:59:59]; see docs/decisions.md Q1 and Q3.
+    window.
     """
 
     WEIGHTS = {"C": 1, "M": 10, "X": 100}

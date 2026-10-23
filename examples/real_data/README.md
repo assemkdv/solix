@@ -1,14 +1,14 @@
-# Real-image PyTorch and TensorFlow examples (07, 08, 10, 11)
+# Real-image PyTorch and TensorFlow examples (06-09)
 
 Four examples label the same real SDO/HMI full-disk images with
 `flare_indexer` and load them with a deep-learning framework:
 
 | Example | Framework | Sample | Batch shape |
 |---|---|---|---|
-| [`07_pytorch_full_disk_images.py`](../07_pytorch_full_disk_images.py) | PyTorch `Dataset`/`DataLoader` | one image, labeled from its observation time `t` | `[B, C, H, W]` = `[B, 1, 256, 256]` |
-| [`08_pytorch_full_disk_sequences.py`](../08_pytorch_full_disk_sequences.py) | PyTorch `Dataset`/`DataLoader` | 3 images 1 h apart, labeled from the final observation time `t_end` | `[B, T, C, H, W]` = `[B, 3, 1, 256, 256]` |
-| [`10_tensorflow_full_disk_images.py`](../10_tensorflow_full_disk_images.py) | `tf.data.Dataset` | as 07 | `[B, H, W, C]` = `[B, 256, 256, 1]` |
-| [`11_tensorflow_full_disk_sequences.py`](../11_tensorflow_full_disk_sequences.py) | `tf.data.Dataset` | as 08, oldest image first | `[B, T, H, W, C]` = `[B, 3, 256, 256, 1]` |
+| [`06_pytorch_images.py`](../06_pytorch_images.py) | PyTorch `Dataset`/`DataLoader` | one image, labeled from its observation time `t` | `[B, C, H, W]` = `[B, 1, 256, 256]` |
+| [`07_pytorch_sequences.py`](../07_pytorch_sequences.py) | PyTorch `Dataset`/`DataLoader` | 3 images 1 h apart, labeled from the final observation time `t_end` | `[B, T, C, H, W]` = `[B, 3, 1, 256, 256]` |
+| [`08_tensorflow_images.py`](../08_tensorflow_images.py) | `tf.data.Dataset` | as 06 | `[B, H, W, C]` = `[B, 256, 256, 1]` |
+| [`09_tensorflow_sequences.py`](../09_tensorflow_sequences.py) | `tf.data.Dataset` | as 07, oldest image first | `[B, T, H, W, C]` = `[B, 3, 256, 256, 1]` |
 
 Framework code lives only in these example scripts, not in the package.
 PyTorch, TensorFlow and Pillow are optional dependencies; the base
@@ -16,9 +16,9 @@ package and its tests need none of them.
 
 The TensorFlow examples use the same manifest, cached images, catalog,
 decoder, provenance checks and independent label checks as the PyTorch
-ones. The shared decoder returns channel-first `[C, H, W]`; examples 10
-and 11 convert each image explicitly to TensorFlow's channel-last
-`[H, W, C]` (`to_channels_last` in example 10) before batching.
+ones. The shared decoder returns channel-first `[C, H, W]`; examples 08
+and 09 convert each image explicitly to TensorFlow's channel-last
+`[H, W, C]` (`to_channels_last` in example 08) before batching.
 
 ## Labeling settings
 
@@ -31,14 +31,10 @@ fidx.DatasetBuilder(
     strategy=fidx.BinaryThresholdStrategy("M"),  # 1 if any flare >= M1.0
     target="full_disk",
     event_time="start",
-    # examples 08 and 11 only:
+    # examples 07 and 09 only:
     cadence="1h", observation_window="3h", sliding_window="1h",
 )
 ```
-
-The window edge (`24h` vs `23h59min59s`) and catalog coverage are open
-questions Q3 and Q5 in [`docs/decisions.md`](../../docs/decisions.md);
-these examples do not settle them.
 
 ## Setup and run
 
@@ -47,8 +43,8 @@ From the repository root:
 ```bash
 pip install -e ".[pytorch-examples]"              # flare_indexer + torch + pillow
 python examples/real_data/fetch_real_data.py      # replays the committed manifest (~9 MB once)
-python examples/07_pytorch_full_disk_images.py
-python examples/08_pytorch_full_disk_sequences.py
+python examples/06_pytorch_images.py
+python examples/07_pytorch_sequences.py
 pytest tests/test_pytorch_examples.py tests/test_fetch_real_data.py
 ```
 
@@ -57,9 +53,9 @@ TensorFlow (2.21 publishes wheels for Python 3.10–3.13, not 3.14):
 ```bash
 python3.13 -m venv .venv-tf && . .venv-tf/bin/activate
 pip install -e ".[tensorflow-examples]"           # flare_indexer + tensorflow + pillow
-python examples/10_tensorflow_full_disk_images.py
-python examples/11_tensorflow_full_disk_sequences.py
-pytest tests/test_tensorflow_examples.py          # add torch to also compare with 07/08
+python examples/08_tensorflow_images.py
+python examples/09_tensorflow_sequences.py
+pytest tests/test_tensorflow_examples.py          # add torch to also compare with 06/07
 ```
 
 On macOS with a python.org interpreter, downloads can fail with
@@ -137,11 +133,7 @@ record it but do not interpret or filter on it.
 for 2017-09-01 00:00 to 2017-09-06 00:00 (exact URL in
 [`catalog_provenance.json`](catalog_provenance.json)): 55 flares, all
 with a GOES class. Raw result: [`hek_swpc_flares.csv`](hek_swpc_flares.csv);
-in the package schema: [`flare_catalog.csv`](flare_catalog.csv). For this
-period it lists the same 55 (start time, class) pairs as the lab catalog
-`goes_flares_integrated.csv` (checked by
-`test_catalog_agrees_with_lab_catalog_when_cached` when that file is in
-`scripts/.cache/`).
+in the package schema: [`flare_catalog.csv`](flare_catalog.csv).
 
 Before labeling, the examples stop unless every window `(t, t + 24h)`
 lies inside the queried interval (last window ends 2017-09-04 09:59:50).
@@ -163,7 +155,7 @@ standardization.
 
 ## Results (executed 2026-10-09)
 
-Example 07 — 9 images, 4 positive, 5 negative:
+Example 06 — 9 images, 4 positive, 5 negative:
 
 ```
               timestamp  label                           image_path
@@ -190,7 +182,7 @@ M-class flare in the catalog after the images, M1.2 from NOAA 12673,
 starts 2017-09-04 05:36, which is inside `(t, t + 24h)` only from 05:36 on
 09-03.
 
-Example 08 — 8 candidate sequences, 2 emitted, 6 skipped, both labeled 0:
+Example 07 — 8 candidate sequences, 2 emitted, 6 skipped, both labeled 0:
 
 ```
 Time grid: inferred source cadence 0 days 01:00:00, start 2017-09-03 00:59:49.900000
@@ -223,8 +215,8 @@ That positive sequence existed only because of the rounding; with the
 actual observation times it is incomplete and is skipped. The data were not changed to recover it.
 Single-image labels are the same in both versions.
 
-Examples 10 and 11 (TensorFlow 2.21.0, Python 3.13, executed 2026-10-09)
-produce the same label tables as 07 and 08 (byte-identical CSVs) and the
+Examples 08 and 09 (TensorFlow 2.21.0, Python 3.13, executed 2026-10-09)
+produce the same label tables as 06 and 07 (byte-identical CSVs) and the
 same samples in the same order:
 
 ```
@@ -247,8 +239,8 @@ are identical.
 
 ## Saved sequence index
 
-`08_sequence_labels.csv` has two list-valued columns, `timestamps` and
-`image_path`. Examples 08 and 11 write them as JSON lists (timestamps as ISO
+`07_sequence_labels.csv` has two list-valued columns, `timestamps` and
+`image_path`. Examples 07 and 09 write them as JSON lists (timestamps as ISO
 strings) and read them back with `load_sequences` (both in `real_examples.py`), which parses them into
 lists of `pd.Timestamp` and `str`; the examples check the reloaded table
 equals the original. A plain `pd.read_csv` returns these columns as
@@ -276,8 +268,7 @@ strings.
   from calibrated FITS (e.g. JSOC `hmi.M_720s`), which needs a registered
   JSOC export e-mail and was not used here.
 - `QUALITY` flags are recorded, not interpreted.
-- Catalog coverage is the query interval only (Q5). The window edge `24h`
-  is the example's explicit choice, not a resolution of Q3.
+- Catalog coverage is the query interval only.
 - The grid uses exact timestamps. HMI observation times here drift by
   0.1 s, which is enough to break the hourly grid. Building longer
   sequences from such data would need an explicit, documented tolerance

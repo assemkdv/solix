@@ -1,5 +1,5 @@
 """
-Example 11 -- real full-disk image sequences on a time grid, loaded with TensorFlow.
+Example 9 -- real full-disk image sequences on a time grid, loaded with TensorFlow.
 
 The TensorFlow counterpart of example 8: same images, same catalog, same
 labeling and grid settings, same checks. Only the loader differs.
@@ -15,7 +15,7 @@ why: images 0.1 s off the grid, a missing hour, and an image at
 09:00:34.9); both are labeled 0. Missing grid images are never replaced.
 
 Steps
-1. Image index from the manifest (same as examples 7, 8 and 10).
+1. Image index from the manifest (same as examples 6, 7 and 8).
 2. Sequences and labels: DatasetBuilder in time-based mode.
 3. CSV round trip of the list-valued columns (timestamps, image_path).
 4. Loading: a tf.data.Dataset that decodes the T images of each sequence,
@@ -27,7 +27,7 @@ Steps
 
 Setup:  pip install tensorflow pillow        # TensorFlow needs Python <= 3.13
         python examples/real_data/fetch_real_data.py
-Run:    python examples/11_tensorflow_full_disk_sequences.py
+Run:    python examples/09_tensorflow_sequences.py
 """
 
 import argparse
@@ -57,8 +57,8 @@ SEQUENCE_SHAPE = (N_IMAGES, hmi_jp2.IMAGE_SIZE, hmi_jp2.IMAGE_SIZE, 1)  # [T, H,
 
 
 def _image_example():
-    """Reuse example 10's channel conversion and per-image loading (header check + decode)."""
-    spec = importlib.util.spec_from_file_location("example_10", EXAMPLES / "10_tensorflow_full_disk_images.py")
+    """Reuse example 8's channel conversion and per-image loading (header check + decode)."""
+    spec = importlib.util.spec_from_file_location("example_10", EXAMPLES / "08_tensorflow_images.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -108,8 +108,8 @@ def main(argv=None):
     import tensorflow as tf
 
     args.output.mkdir(parents=True, exist_ok=True)
-    index_path = args.output / "11_image_index.csv"
-    sequences_path = args.output / "11_sequence_labels.csv"
+    index_path = args.output / "09_image_index.csv"
+    sequences_path = args.output / "09_sequence_labels.csv"
 
     # 1. Image index from actual, full-precision observation times.
     index = real.build_image_index(index_path)

@@ -8,7 +8,6 @@ The package is layered; this test keeps it that way.
     pipeline                   (events only; reducer and labeler are passed in as objects)
     builder                    (events only; strategies are passed in as objects)
     loaders                    (classifier, events; input adapters, outside the core)
-    cli                        (builder, strategies, pipeline, reducers, labelers; the console script)
 
 A module may import only from layers below it. The allowed sets below are
 exact: adding a new internal import means updating this table.
@@ -30,7 +29,6 @@ ALLOWED = {
     "pipeline": {"events"},
     "builder": {"events"},
     "loaders": {"classifier", "events"},
-    "cli": {"builder", "labelers", "pipeline", "reducers", "strategies"},
 }
 
 

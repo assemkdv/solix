@@ -106,15 +106,6 @@ The first function reads HMI or SHARP file names and writes the image
 index. The second converts an integrated GOES catalog into the catalog
 format above.
 
-## Command line
-
-```bash
-flare-indexer label examples/data/full_disk_image_index.csv examples/data/flare_catalog.csv \
-    --output labels.csv --window 24h --threshold M
-```
-
-Run `flare-indexer label --help` for all options.
-
 ## Examples
 
 | Script | Shows |

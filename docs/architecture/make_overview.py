@@ -42,8 +42,6 @@ NODES = {
                 ["start_time, peak_time, end_time", "class, active_region"], 21, 22, 16, 6.5),
     "api": ("entry", "Python API",
             ["DatasetBuilder(window, strategy, target, ...)", ".build(index_csv, catalog_csv)"], 40, 51.5, 21, 7),
-    "cli": ("entry", "Command line",
-            ["flare-indexer label IMAGES.csv CATALOG.csv", "  --output OUT.csv [options]"], 65, 51.5, 19, 7),
     "builder": ("pkg", "DatasetBuilder  (builder): sample construction",
                 ["target:  full_disk  |  active_region  (region from the index column)",
                  "mode:    single image  |  row-based sequence  |  time-based sequence (grid, report)",
@@ -74,14 +72,13 @@ NODES = {
                  "RegressionLabeler → raw index"], 90, 14.3, 25, 6.4),
     "classifier": ("pkg", "classifier",
                    ["FluxConverter: GOES class ↔ flux (decimal)", "GOES class validation"], 40, 7.5, 18, 6.5),
-    "output": ("data", "Output table  (pandas DataFrame; CSV from the CLI)",
+    "output": ("data", "Output table  (pandas DataFrame)",
                ["single image:  timestamp [active_region] label [image_path, ids]",
                 "sequence:      sequence_start, sequence_end, timestamps,",
-                "               n_images [active_region] label [image_path, ids]",
-                "CLI writes CSV; list and dict cells as JSON text"], 89, 49.5, 27, 9.5),
-    "torch": ("ext", "PyTorch examples 07, 08",
+                "               n_images [active_region] label [image_path, ids]"], 89, 50.5, 27, 8),
+    "torch": ("ext", "PyTorch examples 06, 07",
               ["Dataset / DataLoader", "[B,C,H,W]  [B,T,C,H,W]"], 89, 40.5, 13, 7),
-    "tf": ("ext", "TensorFlow examples 10, 11",
+    "tf": ("ext", "TensorFlow examples 08, 09",
            ["tf.data.Dataset", "[B,H,W,C]  [B,T,H,W,C]"], 103, 40.5, 13, 7),
 }
 
@@ -99,7 +96,6 @@ EDGES = [
     ("loaders", "catalog", "writes", "flow", "r", "l", 0.3, 0.5),
     ("index", "builder", "", "flow", "r", "l", 0.5, 0.65),
     ("catalog", "matcher", "", "flow", "r", "l", 0.5, 0.5),
-    ("cli", "api", "builds + calls", "call", "l", "r", 0.5, 0.5),
     ("api", "builder", "", "flow", "b", "t", 0.5, 0.24),
     ("builder", "matcher", "t, window, region", "flow", "b", "t", 0.2, 0.5),
     ("matcher", "red_flux", "events", "flow", "r", "l", 0.8, 0.5),
@@ -173,7 +169,7 @@ def draw(base: Path, png: bool = False):
 
     # legend
     lx, ly = 2, 22
-    for i, (kind, text) in enumerate([("pkg", "flare_indexer package component (module in parentheses)"),
+    for i, (kind, text) in enumerate([("pkg", "package code (module in parentheses)"),
                                       ("entry", "entry point of the package"),
                                       ("data", "external data: CSV files / tables"),
                                       ("ext", "framework examples, outside the package")]):
@@ -182,21 +178,20 @@ def draw(base: Path, png: bool = False):
         ax.add_patch(FancyBboxPatch((lx, yy), 2.4, 1.5, boxstyle="round,pad=0.02,rounding_size=0.3",
                                     facecolor=s["face"], edgecolor=s["edge"], linestyle=s["ls"], linewidth=s["lw"]))
         ax.text(lx + 3.2, yy + 0.75, text, fontsize=7.6, va="center")
-    for j, (style, text) in enumerate([("flow", "data flow"), ("call", "the CLI builds a DatasetBuilder and calls it"),
-                                       ("use", "uses the GOES class ↔ flux conversion")]):
+    for j, (style, text) in enumerate([("flow", "data flow"), ("use", "uses the GOES class ↔ flux conversion")]):
         a = ARROW[style]
         yy = ly - 4 * 2.3 - j * 1.9 + 0.75
         ax.plot([lx, lx + 2.4], [yy, yy], linestyle=a["ls"], color=a["color"], linewidth=1.2)
         ax.text(lx + 3.2, yy, text, fontsize=7.6, va="center")
 
-    ax.text(2, 62.6, "flare-indexer: from an observation index and a flare catalog to labeled samples   (code at commit 7e1de6c)",
+    ax.text(2, 62.6, "flare-indexer: from an observation index and a flare catalog to labeled samples",
             fontsize=12.5, fontweight="bold", va="top")
     ax.text(2, 60.4, "Each box names the class or function that does the work. Solid blue boxes are package code; "
                      "dashed grey boxes are files or tables; dotted green boxes are example scripts outside the package.",
             fontsize=8.2, va="top", color="#444444")
 
     fig.subplots_adjust(left=0.003, right=0.997, top=0.997, bottom=0.003)
-    meta = {"Title": "flare-indexer architecture (commit 7e1de6c)"}
+    meta = {"Title": "flare-indexer architecture"}
     fig.savefig(f"{base}.pdf", metadata=meta)
     fig.savefig(f"{base}.svg", metadata=meta)
     if png:

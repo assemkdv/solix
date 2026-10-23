@@ -300,7 +300,7 @@ def test_load_catalog_full_timestamp_allows_equal_and_missing_times(tmp_path):
 # ── event_time (start vs. peak matching) ────────────────────────────────
 
 
-def test_event_time_defaults_to_peak():
+def test_event_time_defaults_to_start():
     matcher = EventMatcher.__new__(EventMatcher)
     matcher._catalog = pd.DataFrame({
         "peak_time": pd.to_datetime(["2024-01-01 01:00"]),
@@ -309,10 +309,10 @@ def test_event_time_defaults_to_peak():
         "active_region": [None],
     })
 
-    # Window [00:00, 00:45) catches the flare by start_time (00:30) but not
-    # by peak_time (01:00) -- default (peak) must exclude it.
+    # Window (00:00, 00:45] catches the flare by start_time (00:30) but not
+    # by peak_time (01:00) -- the default (start, as in SuryaBench) includes it.
     results = matcher.query(pd.Timestamp("2024-01-01 00:00"), prediction_window_hours=0.75)
-    assert results == []
+    assert len(results) == 1
 
 
 def test_event_time_start_vs_peak_produce_different_results():
@@ -348,7 +348,7 @@ def test_event_time_invalid_value_raises():
     assert "event_time" in str(excinfo.value)
 
 
-# ── interval_mode (window boundary convention) ──────────────────────────
+# ── window boundaries: (t, t + w) ──────────────────────────
 
 
 def _boundary_matcher():
@@ -372,42 +372,17 @@ def _boundary_matcher():
     return matcher
 
 
-def test_interval_mode_left_closed_default_boundaries():
+def test_window_excludes_t_and_window_end():
     matcher = _boundary_matcher()
     window_start = pd.Timestamp("2024-01-01 00:00:00")
 
-    results = matcher.query(window_start, prediction_window_hours=1)  # default left_closed
+    results = matcher.query(window_start, prediction_window_hours=1)
     peak_times = sorted(r.peak_time for r in results)
 
-    # [t, t+1h): includes t itself and t+1h-1s, excludes t+1h exactly.
+    # (t, t+1h): excludes t and t+1h exactly, includes t+1s and t+1h-1s.
     assert peak_times == [
-        pd.Timestamp("2024-01-01 00:00:00"),
         pd.Timestamp("2024-01-01 00:00:01"),
         pd.Timestamp("2024-01-01 00:59:59"),
     ]
 
 
-def test_interval_mode_right_closed_boundaries():
-    matcher = _boundary_matcher()
-    window_start = pd.Timestamp("2024-01-01 00:00:00")
-
-    results = matcher.query(window_start, prediction_window_hours=1, interval_mode="right_closed")
-    peak_times = sorted(r.peak_time for r in results)
-
-    # (t, t+1h]: excludes t itself, includes t+1h exactly.
-    assert peak_times == [
-        pd.Timestamp("2024-01-01 00:00:01"),
-        pd.Timestamp("2024-01-01 00:59:59"),
-        pd.Timestamp("2024-01-01 01:00:00"),
-    ]
-
-
-def test_interval_mode_invalid_value_raises():
-    matcher = _boundary_matcher()
-
-    with pytest.raises(ValueError) as excinfo:
-        matcher.query(
-            pd.Timestamp("2024-01-01 00:00:00"), prediction_window_hours=1, interval_mode="both_closed"
-        )
-
-    assert "interval_mode" in str(excinfo.value)

@@ -142,7 +142,6 @@ builder = fidx.DatasetBuilder(
     prediction_window=6,                         # hours
     strategy=fidx.BinaryThresholdStrategy("M"),  # 1 if the strongest flare is >= M1.0
     event_time="start",                          # compare the flare's start_time
-    interval_mode="right_closed",                # window (t, t + 6h]
     include_metadata=True,                       # keep image_path in the output
 )
 labels = builder.build("docs/fixtures/images.csv", "docs/fixtures/catalog.csv")
@@ -155,18 +154,18 @@ print(labels.to_string(index=False))
 2024-05-01 03:00:00      1 hmi/HMI.m2024.05.01_03.00.00.jpg
 2024-05-01 06:00:00      1 hmi/HMI.m2024.05.01_06.00.00.jpg
 2024-05-01 09:00:00      0 hmi/HMI.m2024.05.01_09.00.00.jpg
-2024-05-01 18:00:00      1 hmi/HMI.m2024.05.01_18.00.00.jpg
+2024-05-01 18:00:00      0 hmi/HMI.m2024.05.01_18.00.00.jpg
 ```
 
 Why each label:
 
-| Image `t` | Window `(t, t+6h]` | Flares starting in it | Strongest | Label |
+| Image `t` | Window `(t, t+6h)` | Flares starting in it | Strongest | Label |
 |---|---|---|---|---|
 | 00:00 | 00:00–06:00 | C4.0 (02:00), M2.0 (05:30) | M2.0 = 2.0e-5 ≥ 1e-5 | 1 |
 | 03:00 | 03:00–09:00 | M2.0 (05:30), X1.2 (08:00) | X1.2 = 1.2e-4 | 1 |
 | 06:00 | 06:00–12:00 | X1.2 (08:00) | X1.2 | 1 |
 | 09:00 | 09:00–15:00 | none | – | 0 |
-| 18:00 | 18:00–00:00 next day | M1.0 (starts 00:00 next day, exactly `t + 6h`; included because the right end is closed) | M1.0 = 1.0e-5 ≥ 1e-5 | 1 |
+| 18:00 | 18:00–00:00 next day | none (the M1.0 starts at 00:00 next day, exactly `t + 6h`, which the window excludes) | – | 0 |
 
 ## 5. Input formats
 
@@ -248,13 +247,16 @@ an empty table with these columns.
 
 ## 7. Time windows
 
-Three settings decide which flares count for reference time `t`:
+Two settings decide which flares count for reference time `t`. The window
+is always `(t, t + w)`: a flare must come after `t` and before `t + w`. A
+flare at exactly `t` or exactly `t + w` does not count, so with
+minute-resolution catalogs a 24-hour window means
+`t < time <= t + 23:59:59`, as in SuryaBench.
 
 | Setting | Values | Default | Effect |
 |---|---|---|---|
 | `prediction_window` | hours as a number (`24`, `0.5`) or a duration text (`"24h"`, `"23h59min59s"`) | – | Window length `w`. Must be > 0. |
-| `event_time` | `"peak"`, `"start"` | `"peak"` | Which flare time must fall in the window. |
-| `interval_mode` | `"left_closed"`, `"right_closed"` | `"left_closed"` | `[t, t+w)` includes `t`, excludes `t+w`; `(t, t+w]` excludes `t`, includes `t+w`. |
+| `event_time` | `"start"`, `"peak"` | `"start"` | Which flare time must fall in the window (SuryaBench and the lab scripts use start). |
 
 Windows always look **forward** from `t`. The package has no option to
 look backward.
@@ -263,29 +265,27 @@ Run (requires `fidx` from §4):
 
 <!-- example: windows -->
 ```python
-for window, event_time, mode in [
-    (6, "peak", "left_closed"),          # package defaults
-    (6, "start", "right_closed"),        # lab full-disk convention
-    ("5h59min59s", "start", "right_closed"),
+for window, event_time in [
+    (6, "start"),
+    (6, "peak"),
+    ("6h1min", "start"),
 ]:
     result = fidx.DatasetBuilder(
         prediction_window=window, strategy=fidx.BinaryThresholdStrategy("M"),
-        event_time=event_time, interval_mode=mode,
+        event_time=event_time,
     ).build("docs/fixtures/images.csv", "docs/fixtures/catalog.csv")
-    print(f"{str(window):>11} {event_time:5} {mode:12} labels={result['label'].tolist()}")
+    print(f"{str(window):>7} {event_time:5} labels={result['label'].tolist()}")
 ```
 <!-- output: windows -->
 ```text
-          6 peak  left_closed  labels=[1, 1, 1, 0, 0]
-          6 start right_closed labels=[1, 1, 1, 0, 1]
- 5h59min59s start right_closed labels=[1, 1, 1, 0, 0]
+      6 start labels=[1, 1, 1, 0, 0]
+      6 peak  labels=[1, 1, 1, 0, 0]
+ 6h1min start labels=[1, 1, 1, 0, 1]
 ```
 
-Only the last image (18:00) changes. The M1.0 flare *starts* at exactly
-`t + 6h` and *peaks* 20 minutes later, so it counts only for the
-start-based, right-closed 6-hour window. On real full-disk data the same
-effect (with 24 hours) explains all six differences from the legacy
-labels; see [decision Q3](decisions.md#q3-default-flare-time-and-window-boundaries).
+Only the last image (18:00) can change. The M1.0 flare *starts* at exactly
+`t + 6h`, which `(t, t + 6h)` excludes; a window one minute longer
+includes it.
 
 ## 8. Strategies: binary labels and flux values
 
@@ -300,19 +300,19 @@ Run (requires `fidx` from §4):
 ```python
 flux = fidx.DatasetBuilder(
     prediction_window=6, strategy=fidx.MaxFlareStrategy(),
-    event_time="start", interval_mode="right_closed",
+    event_time="start",
 ).build("docs/fixtures/images.csv", "docs/fixtures/catalog.csv")
 binary_c = fidx.DatasetBuilder(
     prediction_window=6, strategy=fidx.BinaryThresholdStrategy("C"),
-    event_time="start", interval_mode="right_closed",
+    event_time="start",
 ).build("docs/fixtures/images.csv", "docs/fixtures/catalog.csv")
 print("max flux (W/m^2):", flux["label"].tolist())
 print("binary, >= C1.0: ", binary_c["label"].tolist())
 ```
 <!-- output: strategies -->
 ```text
-max flux (W/m^2): [2e-05, 0.00012, 0.00012, 0.0, 1e-05]
-binary, >= C1.0:  [1, 1, 1, 0, 1]
+max flux (W/m^2): [2e-05, 0.00012, 0.00012, 0.0, 0.0]
+binary, >= C1.0:  [1, 1, 1, 0, 0]
 ```
 
 **Cumulative class index.** A third kind of label sums all flares in the
@@ -326,18 +326,18 @@ strategy. Run (requires `fidx` from §4):
 index = fidx.DatasetBuildingPipeline(fidx.CumulativeClassIndexReducer(), fidx.RegressionLabeler())
 binary_10 = fidx.DatasetBuildingPipeline(fidx.CumulativeClassIndexReducer(), fidx.NumericThresholdLabeler(10))
 raw = fidx.DatasetBuilder(
-    prediction_window=6, strategy=index, event_time="start", interval_mode="right_closed",
+    prediction_window=6, strategy=index, event_time="start",
 ).build("docs/fixtures/images.csv", "docs/fixtures/catalog.csv")
 cum = fidx.DatasetBuilder(
-    prediction_window=6, strategy=binary_10, event_time="start", interval_mode="right_closed",
+    prediction_window=6, strategy=binary_10, event_time="start",
 ).build("docs/fixtures/images.csv", "docs/fixtures/catalog.csv")
 print("cumulative index:", raw["label"].tolist())
 print("index >= 10:     ", cum["label"].tolist())
 ```
 <!-- output: cumulative_strategy -->
 ```text
-cumulative index: [24.0, 140.0, 120.0, 0.0, 10.0]
-index >= 10:      [1, 1, 1, 0, 1]
+cumulative index: [24.0, 140.0, 120.0, 0.0, 0.0]
+index >= 10:      [1, 1, 1, 0, 0]
 ```
 
 The first image sees C4.0 and M2.0 in its 6-hour window: 4 + 20 = 24.
@@ -368,7 +368,7 @@ starts:
 ```python
 sequences, report = fidx.DatasetBuilder(
     prediction_window=6, strategy=fidx.BinaryThresholdStrategy("M"),
-    event_time="start", interval_mode="right_closed",
+    event_time="start",
     cadence="3h", observation_window="6h", sliding_window="3h",
 ).build("docs/fixtures/images.csv", "docs/fixtures/catalog.csv", return_report=True)
 print(sequences[["sequence_start", "sequence_end", "n_images", "label"]].to_string(index=False))
@@ -408,7 +408,7 @@ with warnings.catch_warnings(record=True) as caught:
     warnings.simplefilter("always")
     ar_labels = fidx.DatasetBuilder(
         prediction_window=6, strategy=fidx.BinaryThresholdStrategy("M"),
-        target="active_region", event_time="start", interval_mode="right_closed",
+        target="active_region", event_time="start",
         include_metadata=True,
     ).build("docs/fixtures/ar_images.csv", "docs/fixtures/catalog.csv")
 print()
@@ -459,7 +459,7 @@ with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     ar_seqs = fidx.DatasetBuilder(
         prediction_window=6, strategy=fidx.BinaryThresholdStrategy("M"),
-        target="active_region", event_time="start", interval_mode="right_closed",
+        target="active_region", event_time="start",
         missing_active_region="drop",
         cadence="3h", observation_window="6h", sliding_window="3h",
     ).build("docs/fixtures/ar_images.csv", "docs/fixtures/catalog.csv")
@@ -535,7 +535,7 @@ Stop after **matching** (requires `fidx`, `pd` from §4):
 ```python
 matcher = fidx.EventMatcher("docs/fixtures/catalog.csv")
 t = pd.Timestamp("2024-05-01 03:00")
-events = matcher.query(t, 6, event_time="start", interval_mode="right_closed")
+events = matcher.query(t, 6, event_time="start")
 print(type(events).__name__, len(events))
 for event in events:
     print(" ", event.goes_class, event.start_time, "region", event.active_region)
@@ -580,7 +580,7 @@ All three stages at once, keeping every intermediate value (requires
 <!-- example: run_one -->
 ```python
 pipeline = fidx.DatasetBuildingPipeline(fidx.MaxFluxReducer(), fidx.BinaryThresholdLabeler("M"))
-result = pipeline.run_one(matcher, t, 6, event_time="start", interval_mode="right_closed")
+result = pipeline.run_one(matcher, t, 6, event_time="start")
 print(type(result).__name__)
 print("events:", [e.goes_class for e in result.events])
 print("reduced_value:", result.reduced_value)
@@ -624,7 +624,7 @@ class AtLeastTwo:
 
 counting = fidx.DatasetBuildingPipeline(FlareCount(), AtLeastTwo())
 labels = fidx.DatasetBuilder(
-    prediction_window=6, strategy=counting, event_time="start", interval_mode="right_closed",
+    prediction_window=6, strategy=counting, event_time="start",
 ).build("docs/fixtures/images.csv", "docs/fixtures/catalog.csv")
 print(labels.to_string(index=False))
 
@@ -636,7 +636,7 @@ class StrongestClassText:
         return max(flares, key=lambda f: fidx.FluxConverter().to_flux(f.goes_class)).goes_class
 
 text_labels = fidx.DatasetBuilder(
-    prediction_window=6, strategy=StrongestClassText(), event_time="start", interval_mode="right_closed",
+    prediction_window=6, strategy=StrongestClassText(), event_time="start",
 ).build("docs/fixtures/images.csv", "docs/fixtures/catalog.csv")
 print(text_labels["label"].tolist())
 ```
@@ -648,7 +648,7 @@ print(text_labels["label"].tolist())
 2024-05-01 06:00:00      0
 2024-05-01 09:00:00      0
 2024-05-01 18:00:00      0
-['M2.0', 'X1.2', 'X1.2', 'none', 'M1.0']
+['M2.0', 'X1.2', 'X1.2', 'none', 'none']
 ```
 
 An object without the required method is rejected when the pipeline is
@@ -675,13 +675,8 @@ Conventions this package follows for reference compatibility, which are
 - **A and B flares add 0.** The paper's formula lists only C, M and X;
   SuryaBench maps A/B to `None` and the sum skips them. So `C10.0` and
   `M1.0` both add 10, while `B15.0` adds 0 although its flux equals C1.5.
-- **Window.** The lab notebooks and SuryaBench count flares with
-  `t < start_time ≤ t + 23:59:59`, i.e. `event_time="start"`,
-  `interval_mode="right_closed"`, `prediction_window="23h59min59s"`. The
-  paper text writes the window as `[t, t+24h]`, closed at both ends; that
-  interval is not one of the two `interval_mode` options (`[t, t+w)` and
-  `(t, t+w]`). Choose the window explicitly; the package defaults
-  (`peak`, `[t, t+w)`) are unchanged and are not the reference convention.
+- **Window.** Like every label in the package, the index uses the
+  window `(t, t + w)` on the flare's start time.
 - **Thresholds.** `NumericThresholdLabeler(10)` reproduces SuryaBench's
   `label_cum`; the paper's active-region study used 20 (and 10..100 in
   steps of 5). The threshold is a plain number, kept separate from the
@@ -742,7 +737,7 @@ then pass to `DatasetBuilder.build()`. For the lab's real files, see
    `adapt_goes_catalog`. Check that `class` values are valid and that
    times use the same time scale as your images.
 3. **Choose the question:** `prediction_window`, `event_time`,
-   `interval_mode`, `target`, and a strategy with a threshold. Write
+   `target`, and a strategy with a threshold. Write
    these down; they define your labels.
 4. **Choose single images or sequences** (§9).
 5. **Run** `DatasetBuilder(...).build(index, catalog)`, read the
@@ -805,13 +800,8 @@ uses NOAA numbers, both files must use the same key; see
 [decisions.md](decisions.md))
 
 - Cumulative indexing: the cumulative class index (Σ C + 10 Σ M + 100 Σ X)
-  is implemented after the reference formula. Whether A and B flares
-  should count, whether the window is the paper's `[t, t+24h]` or the
-  reference code's `(t, t+23:59:59]`, and whether the relative-flux
-  indices (rxfi) are needed, are not settled (Q1).
-- Whether active-region labels should look forward or back (Q2).
-- Which flare time (start or peak) and which window edges should be the
-  defaults; `t + 24h` or `t + 23:59:59` (Q3).
+  is implemented after the reference formula, with A and B flares adding
+  0. The relative-flux indices (rxfi) are not implemented yet (Q1).
 - How to treat images without a region and catalog flares without a
   NOAA region (Q4). Both can cause false negatives (a 0 where 1 would be
   correct); which rows are affected is unknown.
@@ -830,23 +820,23 @@ scientifically correct.
 Installing the package also installs the `flare-indexer` command. It is a
 front end to `DatasetBuilder` and the built-in strategies: same input
 files, same rules, same results. Where the Python API has a default the
-command uses it (`--event-time peak`, `--interval-mode left_closed`,
-`--target full_disk`, binary threshold `M`, `--missing-active-region
-negative`). The command adds two defaults of its own, `--window 24h` and
+command uses it (`--event-time start`, `--target full_disk`, binary
+threshold `M`, `--missing-active-region negative`). The command adds two
+defaults of its own, `--window 24h` and
 `--labeling binary`; `flare-indexer label --help` shows every default.
 
 ```bash
 flare-indexer --version
 flare-indexer label docs/fixtures/images.csv docs/fixtures/catalog.csv \
     --output labels.csv --labeling cumulative --threshold 10 \
-    --window 23h59min59s --event-time start --interval-mode right_closed
+    --window 24h --event-time start
 ```
 
 | Option | Meaning |
 |---|---|
 | `--labeling` | `binary` (0/1 by GOES threshold), `max-flux` (W/m²), `multiclass` (`NF`/`A`/`B`/`C`/`M`/`X`), `class-counts`, `class-presence` (JSON dicts), `cumulative` (the index of §13.1) |
 | `--threshold` | binary: a GOES class (`M`, `C4.2`); cumulative: a number, which turns the raw index into 0/1 (`index >= VALUE`); refused with the other labelings |
-| `--window`, `--event-time`, `--interval-mode`, `--target`, `--missing-active-region` | as the `DatasetBuilder` parameters of the same names (§7, §10, §11) |
+| `--window`, `--event-time`, `--target`, `--missing-active-region` | as the `DatasetBuilder` parameters of the same names (§7, §10, §11) |
 | `--sequence-length`, `--stride`, `--cadence-minutes` | row-based sequences (§9); `--stride` and `--cadence-minutes` need `--sequence-length` |
 | `--start`, `--cadence`, `--observation-window`, `--sliding-window`, `--report REPORT.json` | time-based sequences (§9); the report is the `SequenceBuildReport` as JSON |
 | `--output OUT.csv`, `--overwrite` | where to write; an existing file is never replaced without `--overwrite` |

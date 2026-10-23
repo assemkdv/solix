@@ -9,8 +9,8 @@ from v0.2.1 until an answer is recorded here.
 | ID | Question | Status |
 |---|---|---|
 | Q1 | What should cumulative indexing calculate? | partly decided 2026-10-16 – cumulative class index implemented after the reference formula; A/B convention, window edges and rxfi still open |
-| Q2 | Active-region labels: flares before or after the image? | open – blocks reproducing the published AR labels with the package API |
-| Q3 | Default flare time (start/peak) and window boundaries | open |
+| Q2 | Active-region labels: flares before or after the image? | decided 2026-10-23: forward (Dr. Pandey); no look-back option |
+| Q3 | Default flare time (start/peak) and window boundaries | decided 2026-10-23: window `(t, t+w)`, as SuryaBench; no option; default `event_time="start"` |
 | Q4 | Missing region numbers: on images, and on catalog flares | open |
 | Q5 | Does an empty window mean "no flare" or "no observations"? | open – needs coverage information |
 | Q6 | Image timestamps: cadence tolerance, TAI vs UTC | open |
@@ -112,9 +112,17 @@ package support as the default (the other stays available as an option)?
 
 **Fact (flare time).** The package can match by `start_time` or
 `peak_time` (`event_time`). The lab's full-disk `labeling.py` uses start
-time; the package default is `event_time="peak"`.
+time. The package default was `event_time="peak"`; since 2026-10-23 it is
+`"start"`.
 
-**Fact (boundaries).** The package default is
+**Decision (2026-10-23).** The window is `(t, t+w)`: a flare must start
+after the image time and less than `w` after it, so a 24-hour window is
+`t < start <= t + 23:59:59` as in SuryaBench and the lab's full-disk
+script. There is no option for the window edges; the former
+`interval_mode` parameter was removed. The command line defaults to
+`--window 24h`.
+
+**Fact (boundaries, before the decision).** The package default was
 `interval_mode="left_closed"`, `[t, t+w)`. The legacy full-disk script
 counts flares with `t < start ≤ t + 23:59:59`, i.e. `right_closed`. With
 `prediction_window=24` and `right_closed` the package uses
@@ -139,7 +147,7 @@ the first public release would silently change users' results.
 **Options.** Flare time: `start` (lab convention) or `peak`. Window:
 (a) `(t, t+24h]` – a clean 24-hour definition, 6 labels differ from the
 published work; (b) `(t, t+23:59:59]` – exact reproduction; (c)
-`[t, t+24h)` – half-open in the other direction (current default).
+`[t, t+24h)` – half-open in the other direction (the former default).
 
 **Question.** Change the default to start time? Should a flare starting
 exactly at the image time count, and one starting exactly 24 h later?

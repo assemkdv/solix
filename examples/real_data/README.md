@@ -31,7 +31,6 @@ fidx.DatasetBuilder(
     strategy=fidx.BinaryThresholdStrategy("M"),  # 1 if any flare >= M1.0
     target="full_disk",
     event_time="start",
-    interval_mode="right_closed",                # (t, t + 24h]
     # examples 08 and 11 only:
     cadence="1h", observation_window="3h", sliding_window="1h",
 )
@@ -144,7 +143,7 @@ period it lists the same 55 (start time, class) pairs as the lab catalog
 `test_catalog_agrees_with_lab_catalog_when_cached` when that file is in
 `scripts/.cache/`).
 
-Before labeling, the examples stop unless every window `(t, t + 24h]`
+Before labeling, the examples stop unless every window `(t, t + 24h)`
 lies inside the queried interval (last window ends 2017-09-04 09:59:50).
 A flare list cannot show that GOES observed without gaps, so a 0 label
 means "no M/X flare in this list", as discussed in Q5.
@@ -188,7 +187,7 @@ batch 2: images [1, 1, 256, 256] torch.float32 range [0.000, 1.000]  labels [1]
 
 The label changes between 04:59:50.0 and 05:59:50.0 because the first
 M-class flare in the catalog after the images, M1.2 from NOAA 12673,
-starts 2017-09-04 05:36, which is inside `(t, t + 24h]` only from 05:36 on
+starts 2017-09-04 05:36, which is inside `(t, t + 24h)` only from 05:36 on
 09-03.
 
 Example 08 — 8 candidate sequences, 2 emitted, 6 skipped, both labeled 0:

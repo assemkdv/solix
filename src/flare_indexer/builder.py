@@ -9,7 +9,7 @@ from pathlib import Path
 from .events import (
     EventMatcher, _normalize_active_region, _parse_prediction_window, _parse_time_text_column,
     _reject_unitless_duration_text, _to_naive_utc,
-    VALID_EVENT_TIMES, VALID_INTERVAL_MODES,
+    VALID_EVENT_TIMES,
 )
 
 _ROW_BASED_PARAM_NAMES = ("sequence_length", "stride", "cadence_minutes")
@@ -210,13 +210,8 @@ class DatasetBuilder:
         observed at the same timestamps; see "Active-region sequences".
     event_time : str
         Which of a flare's timestamps EventMatcher checks against the
-        prediction window: "peak" (default, preserves original behavior)
-        or "start". See EventMatcher.query.
-    interval_mode : str
-        The prediction window's boundary convention: "left_closed"
-        (default, preserves original behavior) for
-        [t, t + prediction_window), or "right_closed" for
-        (t, t + prediction_window]. See EventMatcher.query.
+        prediction window: "start" (default, as in SuryaBench and the lab's
+        scripts) or "peak". See EventMatcher.query.
     missing_active_region : str
         Only used when target="active_region". What to do with images
         whose image-side active_region is missing:
@@ -324,8 +319,7 @@ class DatasetBuilder:
         stride=None,
         cadence_minutes=None,
         target="full_disk",
-        event_time="peak",
-        interval_mode="left_closed",
+        event_time="start",
         start=None,
         cadence=None,
         observation_window=None,
@@ -343,8 +337,6 @@ class DatasetBuilder:
             raise ValueError(f"target must be one of {sorted(self.VALID_TARGETS)}, got {target!r}")
         if event_time not in VALID_EVENT_TIMES:
             raise ValueError(f"event_time must be one of {sorted(VALID_EVENT_TIMES)}, got {event_time!r}")
-        if interval_mode not in VALID_INTERVAL_MODES:
-            raise ValueError(f"interval_mode must be one of {sorted(VALID_INTERVAL_MODES)}, got {interval_mode!r}")
 
         row_based_given = [
             name for name, value in zip(_ROW_BASED_PARAM_NAMES, (sequence_length, stride, cadence_minutes))
@@ -369,7 +361,6 @@ class DatasetBuilder:
         self.strategy = strategy
         self.target = target
         self.event_time = event_time
-        self.interval_mode = interval_mode
         self.missing_active_region = missing_active_region
         self.include_metadata = include_metadata
         self.time_based = bool(time_based_given)
@@ -516,7 +507,7 @@ class DatasetBuilder:
         for ts in index_df["timestamp"]:
             flares = matcher.query(
                 ts, self._window,
-                event_time=self.event_time, interval_mode=self.interval_mode,
+                event_time=self.event_time,
             )
             label = self.strategy.label(flares)
             records.append({"timestamp": ts, "label": label})
@@ -559,7 +550,7 @@ class DatasetBuilder:
             else:
                 flares = matcher.query(
                     ts, self._window, active_region=active_region,
-                    event_time=self.event_time, interval_mode=self.interval_mode,
+                    event_time=self.event_time,
                 )
             label = self.strategy.label(flares)
             record = {"timestamp": ts, "active_region": active_region, "label": label}
@@ -673,7 +664,7 @@ class DatasetBuilder:
                 sequence_end = window[-1]
                 flares = matcher.query(
                     sequence_end, self._window,
-                    event_time=self.event_time, interval_mode=self.interval_mode,
+                    event_time=self.event_time,
                 )
                 label = self.strategy.label(flares)
 
@@ -751,7 +742,7 @@ class DatasetBuilder:
             return []
         return matcher.query(
             reference_time, self._window, active_region=region,
-            event_time=self.event_time, interval_mode=self.interval_mode,
+            event_time=self.event_time,
         )
 
     def _build_sequences_active_region(self, index_df: pd.DataFrame, matcher: EventMatcher, path: Path) -> pd.DataFrame:
@@ -887,7 +878,7 @@ class DatasetBuilder:
             sequence_end = window_timestamps[-1]
             flares = matcher.query(
                 sequence_end, self._window,
-                event_time=self.event_time, interval_mode=self.interval_mode,
+                event_time=self.event_time,
             )
             label = self.strategy.label(flares)
 

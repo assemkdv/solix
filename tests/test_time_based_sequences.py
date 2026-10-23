@@ -208,7 +208,7 @@ def test_observation_window_is_half_open_last_image_at_t_plus_5h(tmp_path):
     result = builder.build(index_path, catalog_path)
 
     assert len(result) == 1
-    # [t, t+6h) -> images at t..t+5h, NOT t+6h.
+    # (t, t+6h) -> images at t..t+5h, NOT t+6h.
     assert result.iloc[0]["sequence_end"] == pd.Timestamp("2024-01-01T05:00:00")
     assert result.iloc[0]["n_images"] == 6
     assert pd.Timestamp("2024-01-01T06:00:00") not in result.iloc[0]["timestamps"]
@@ -217,10 +217,10 @@ def test_observation_window_is_half_open_last_image_at_t_plus_5h(tmp_path):
 def test_label_uses_final_image_timestamp_not_sequence_start(tmp_path):
     timestamps = _hourly("2024-01-01T00:00:00", 6)
     index_path = _write_index(tmp_path, timestamps)
-    # Flare peaks exactly at the final image's timestamp (05:00); a window
-    # measured from sequence_start (00:00) with a short prediction_window
-    # would miss it, but one measured from sequence_end (05:00) catches it.
-    catalog_path = _catalog_with_flare(tmp_path, "2024-01-01", "0500", "0500", "0505", "M1.0", "4456")
+    # Flare peaks one minute after the final image's timestamp (05:00); a
+    # window measured from sequence_start (00:00) with a short
+    # prediction_window would miss it, but one from sequence_end catches it.
+    catalog_path = _catalog_with_flare(tmp_path, "2024-01-01", "0501", "0501", "0505", "M1.0", "4456")
 
     builder = DatasetBuilder(
         prediction_window=0.1,  # 6 minutes
@@ -594,7 +594,7 @@ def test_legacy_default_single_image_mode_still_default(tmp_path):
     assert list(result.columns) == ["timestamp", "label"]
 
 
-# ── event_time / interval_mode / MaxFlareStrategy compatibility ──────────
+# ── event_time / window boundary / MaxFlareStrategy compatibility ──────────
 
 
 def test_time_based_event_time_start(tmp_path):
@@ -605,7 +605,7 @@ def test_time_based_event_time_start(tmp_path):
     catalog_path = _catalog_with_flare(tmp_path, "2024-01-01", "0505", "0510", "0515", "M1.0", "4456")
 
     builder = DatasetBuilder(
-        prediction_window=0.1,  # 6 minutes: [05:00, 05:06) catches start=05:05, not peak=05:10
+        prediction_window=0.1,  # 6 minutes: (05:00, 05:06) catches start=05:05, not peak=05:10
         strategy=BinaryThresholdStrategy(),
         cadence="1h", observation_window="6h", sliding_window="6h",
         event_time="start",
@@ -617,7 +617,7 @@ def test_time_based_event_time_start(tmp_path):
 def test_time_based_event_time_peak(tmp_path):
     timestamps = _hourly("2024-01-01T00:00:00", 6)
     index_path = _write_index(tmp_path, timestamps)
-    catalog_path = _catalog_with_flare(tmp_path, "2024-01-01", "0459", "0500", "0501", "M1.0", "4456")
+    catalog_path = _catalog_with_flare(tmp_path, "2024-01-01", "0459", "0501", "0502", "M1.0", "4456")
 
     builder = DatasetBuilder(
         prediction_window=24, strategy=BinaryThresholdStrategy(),
@@ -628,39 +628,24 @@ def test_time_based_event_time_peak(tmp_path):
     assert result.iloc[0]["label"] == 1
 
 
-def test_time_based_interval_mode_left_closed(tmp_path):
+def test_time_based_window_excludes_its_end(tmp_path):
     timestamps = _hourly("2024-01-01T00:00:00", 6)
     index_path = _write_index(tmp_path, timestamps)
-    # Flare peaks exactly at sequence_end + prediction_window -- excluded by left_closed.
+    # Flare peaks exactly at sequence_end + prediction_window -- excluded by (t, t+w).
     catalog_path = _catalog_with_flare(tmp_path, "2024-01-01", "0600", "0600", "0605", "X1.0", "4456")
 
     builder = DatasetBuilder(
         prediction_window=1, strategy=BinaryThresholdStrategy(),
         cadence="1h", observation_window="6h", sliding_window="6h",
-        interval_mode="left_closed",
     )
     result = builder.build(index_path, catalog_path)
     assert result.iloc[0]["label"] == 0
 
 
-def test_time_based_interval_mode_right_closed(tmp_path):
-    timestamps = _hourly("2024-01-01T00:00:00", 6)
-    index_path = _write_index(tmp_path, timestamps)
-    catalog_path = _catalog_with_flare(tmp_path, "2024-01-01", "0600", "0600", "0605", "X1.0", "4456")
-
-    builder = DatasetBuilder(
-        prediction_window=1, strategy=BinaryThresholdStrategy(),
-        cadence="1h", observation_window="6h", sliding_window="6h",
-        interval_mode="right_closed",
-    )
-    result = builder.build(index_path, catalog_path)
-    assert result.iloc[0]["label"] == 1
-
-
 def test_time_based_max_flare_strategy(tmp_path):
     timestamps = _hourly("2024-01-01T00:00:00", 6)
     index_path = _write_index(tmp_path, timestamps)
-    catalog_path = _catalog_with_flare(tmp_path, "2024-01-01", "0500", "0500", "0505", "M2.3", "4456")
+    catalog_path = _catalog_with_flare(tmp_path, "2024-01-01", "0501", "0501", "0505", "M2.3", "4456")
 
     builder = DatasetBuilder(
         prediction_window=24, strategy=MaxFlareStrategy(),
@@ -693,7 +678,7 @@ def test_time_based_preserves_extra_columns(tmp_path):
 def test_active_region_time_based_basic(tmp_path):
     timestamps = _hourly("2024-01-01T08:00:00", 6)
     index_path = _write_index(tmp_path, timestamps, active_regions=["3559"] * 6)
-    catalog_path = _catalog_with_flare(tmp_path, "2024-01-01", "1300", "1300", "1305", "M1.0", "3559")
+    catalog_path = _catalog_with_flare(tmp_path, "2024-01-01", "1301", "1301", "1305", "M1.0", "3559")
 
     builder = DatasetBuilder(
         prediction_window=1, strategy=BinaryThresholdStrategy(), target="active_region",

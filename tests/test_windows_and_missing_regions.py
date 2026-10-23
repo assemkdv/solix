@@ -50,16 +50,20 @@ def test_prediction_window_accepts_hours_and_durations(tmp_path, boundary_catalo
     index_path = _write(tmp_path / "index.csv", "timestamp\n2024-01-01 00:00:00\n")
     builder = DatasetBuilder(
         prediction_window=window, strategy=BinaryThresholdStrategy(),
-        event_time="start", interval_mode="right_closed",
+        event_time="start",
     )
-    assert builder.build(index_path, boundary_catalog)["label"].tolist() == [1]
+    # Every spelling means the same 24 h window; the M1.0 starts exactly at
+    # t + 24h, so (t, t + 24h) excludes it.
+    assert builder.build(index_path, boundary_catalog)["label"].tolist() == [0]
+    longer = DatasetBuilder(prediction_window="24h1min", strategy=BinaryThresholdStrategy(), event_time="start")
+    assert longer.build(index_path, boundary_catalog)["label"].tolist() == [1]
 
 
 def test_legacy_23h59m59s_window_excludes_flare_at_exactly_24h(tmp_path, boundary_catalog):
     index_path = _write(tmp_path / "index.csv", "timestamp\n2024-01-01 00:00:00\n")
     builder = DatasetBuilder(
         prediction_window="23h59min59s", strategy=BinaryThresholdStrategy(),
-        event_time="start", interval_mode="right_closed",
+        event_time="start",
     )
     assert builder.build(index_path, boundary_catalog)["label"].tolist() == [0]
 
@@ -67,8 +71,9 @@ def test_legacy_23h59m59s_window_excludes_flare_at_exactly_24h(tmp_path, boundar
 def test_event_matcher_query_accepts_duration(boundary_catalog):
     matcher = EventMatcher(boundary_catalog)
     t = pd.Timestamp("2024-01-01 00:00:00")
-    assert len(matcher.query(t, "24h", event_time="start", interval_mode="right_closed")) == 1
-    assert len(matcher.query(t, "23h59min59s", event_time="start", interval_mode="right_closed")) == 0
+    assert len(matcher.query(t, "24h1min", event_time="start")) == 1
+    assert len(matcher.query(t, "24h", event_time="start")) == 0       # exactly t + 24h is excluded
+    assert len(matcher.query(t, "23h59min59s", event_time="start")) == 0
 
 
 @pytest.mark.parametrize("window", [0, -1, "0h", "-2h", "soon", None, True])

@@ -4,6 +4,20 @@
 
 Not yet released; version in `setup.cfg` is still 0.2.1.
 
+### Changed (prediction window, 2026-10-23)
+- The prediction window is always `(t, t + w)`: a flare at exactly the
+  image time `t` or exactly `t + w` does not count. With minute-resolution
+  catalogs a 24-hour window is `t < start <= t + 23:59:59`, the SuryaBench
+  rule. The `interval_mode` parameter is removed from
+  `DatasetBuilder`, `EventMatcher.query` and `DatasetBuildingPipeline`,
+  and `--interval-mode` from the command line; passing it is now a
+  `TypeError`. Code that used either former mode gets the new window; a
+  flare starting exactly at an image time no longer counts for that image.
+- The default `event_time` is now `"start"` (was `"peak"`): a flare counts
+  when its start time is in the window. Pass `event_time="peak"` for the
+  old behavior.
+- The command line's `--window` default stays `24h`.
+
 ### Fixed (input validation, review of 2026-10-17)
 - A duration given as bare numeric text (`prediction_window="24"`,
   `cadence="3600"`) was read by pandas as nanoseconds and silently

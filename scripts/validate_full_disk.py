@@ -177,21 +177,19 @@ def main():
     # A bare number on the command line means hours, as in the Python API.
     window = float(args.prediction_window) if re.fullmatch(r"\d+(\.\d+)?", args.prediction_window) \
         else args.prediction_window
-    print(f"\n=== Building labels (full-disk, event_time=start, interval_mode=right_closed, "
+    print(f"\n=== Building labels (full-disk, event_time=start, window (t, t+w), "
           f"prediction_window={window}, M-threshold) ===")
     binary_builder = DatasetBuilder(
         prediction_window=window,
         strategy=BinaryThresholdStrategy(threshold="M"),
         target="full_disk",
         event_time="start",
-        interval_mode="right_closed",
     )
     flux_builder = DatasetBuilder(
         prediction_window=window,
         strategy=MaxFlareStrategy(),
         target="full_disk",
         event_time="start",
-        interval_mode="right_closed",
     )
     binary_result = binary_builder.build(image_index_cache_path, catalog_cache_path)
     flux_result = flux_builder.build(image_index_cache_path, catalog_cache_path)
@@ -219,7 +217,7 @@ def main():
         "settings": {
             "target": "full_disk",
             "event_time": "start",
-            "interval_mode": "right_closed",
+            "window": "(t, t+w)",
             "prediction_window": str(_parse_prediction_window(window)),
             "threshold": "M",
             "duplicate_policy": args.duplicate_policy,
@@ -364,15 +362,11 @@ def _categorize_mismatches(mismatches: pd.DataFrame, image_report, catalog_path:
     """
     Best-effort, per-row explanation of remaining binary-label mismatches.
 
-    "legacy_23h59m59s_boundary" is checked directly rather than guessed at:
-    Dr. Pandey's legacy script computes its window as
-    (pws, pws + 23:59:59] -- one second short of a true 24 hours (see
-    labeling.py's create_labels(): pwe starts at pws + '23:59:59', not
-    pws + 24h, and both are advanced by the same hourly step together). A
-    flare whose start_time lands exactly on pws + 24:00:00 is therefore
-    INSIDE our interval_mode="right_closed" window (t, t+24h] but OUTSIDE
-    legacy's (t, t+23:59:59] window -- a real, deterministic boundary-
-    precision difference, not a bug in either implementation.
+    "image_time_boundary" is checked directly rather than guessed at:
+    the legacy script counts flares with pws < start <= pws + 23:59:59
+    (labeling.py, create_labels()), while the package's window is
+    (t, t + w), the same rule. A flare whose start_time is exactly the
+    image time t is outside both; any such mismatch would be a bug.
     """
     print("\n=== Mismatch categorization (Task 7) ===")
     if not len(mismatches):
@@ -384,20 +378,19 @@ def _categorize_mismatches(mismatches: pd.DataFrame, image_report, catalog_path:
     duplicated_paths = set(image_report.duplicate_rows)
 
     counts = {
-        "legacy_23h59m59s_boundary": 0,
+        "image_time_boundary": 0,
         "duplicate_policy_candidate": 0,
         "unknown_unexplained": 0,
     }
     boundary_examples = []
     for _, row in mismatches.iterrows():
         ts = row["timestamp"]
-        window_end = ts + pd.Timedelta(hours=24)
-        flares = matcher.query(ts, 24, event_time="start", interval_mode="right_closed")
+        flares = matcher.query(ts, 24, event_time="start")
         qualifying = [f for f in flares if classifier.is_strong(f.goes_class, "M")]
-        at_boundary = bool(qualifying) and all(f.start_time == window_end for f in qualifying)
+        at_boundary = bool(qualifying) and all(f.start_time == ts for f in qualifying)
 
         if at_boundary:
-            counts["legacy_23h59m59s_boundary"] += 1
+            counts["image_time_boundary"] += 1
             boundary_examples.append((ts, qualifying[0].goes_class, qualifying[0].start_time))
         elif row["image_path"] in duplicated_paths:
             counts["duplicate_policy_candidate"] += 1
@@ -407,9 +400,9 @@ def _categorize_mismatches(mismatches: pd.DataFrame, image_report, catalog_path:
     for category, count in counts.items():
         print(f"  {category}: {count}")
     if boundary_examples:
-        print("\n  legacy_23h59m59s_boundary examples (image_time, qualifying_class, flare_start_time):")
+        print("\n  image_time_boundary examples (image_time, qualifying_class, flare_start_time):")
         for ts, goes_class, start_time in boundary_examples[:10]:
-            print(f"    {ts}  {goes_class}  start={start_time}  (== t + exactly 24h)")
+            print(f"    {ts}  {goes_class}  start={start_time}  (== the image time t)")
 
     print(
         "\n  malformed_legacy_row: excluded upstream, before comparison "
@@ -420,13 +413,6 @@ def _categorize_mismatches(mismatches: pd.DataFrame, image_report, catalog_path:
         "mismatch -- both orderings agree on whether ANY M/X-class flare is present in a "
         "window (the first character alone already sorts correctly both ways); it only "
         "affects which single flare legacy reports as 'the' max, not the M-threshold label."
-    )
-    print(
-        "  event_time / interval_boundary (basis) differences: not applicable to remaining "
-        "mismatches by construction -- this run already uses event_time='start', "
-        "interval_mode='right_closed' to match the legacy convention. Run this script "
-        "with the library's *default* settings (peak/left_closed) separately to see the "
-        "aggregate agreement-rate impact of that choice."
     )
     return counts
 

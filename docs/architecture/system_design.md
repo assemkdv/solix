@@ -135,10 +135,9 @@ are converted to flux. The two labelers are separate on purpose.
 ## Time and sequences
 
 The reference time is the image timestamp or the sequence's last timestamp.
-Current defaults match **peak time** in `[t, t+w)`: include the reference time
-and exclude the window end. Start-time matching and `(t, t+w]` are configurable.
-The legacy full-disk comparison uses start time and `(t, t+23h59m59s]`.
-These settings are distinct; they are not interchangeable for subsecond data.
+The window is always `(t, t+w)`: it excludes both the reference time and
+the window end. The flare's start time is matched by default; peak-time
+matching is configurable.
 
 - **Frame-count sequences:** select `sequence_length` rows, then advance by
   `stride`. Optional `cadence_minutes` checks spacing.
@@ -224,13 +223,10 @@ presence {'A': 0, 'B': 0, 'C': 1, 'M': 1, 'X': 0}
 
 ## Remaining limits
 
-The cumulative class index follows the reference formula; whether A/B
-flares should contribute, and whether the window should be the paper's
-closed `[t, t+24h]` (not expressible with the two `interval_mode`
-options, which are `[t, t+w)` and `(t, t+w]`) or the reference code's
-`(t, t+23:59:59]`, await confirmation. The relative-flux indices (rxfi) of
-the same paper need a per-flare background flux the catalogs do not carry
-and are not implemented. Core windows only look forward.
+The cumulative class index follows the reference formula, with A and B
+flares contributing 0. The relative-flux indices (rxfi) of the same paper
+need a per-flare background flux the catalogs do not carry and are not
+implemented yet. Core windows only look forward.
 There is no TAI/UTC conversion, catalog-coverage check, or sequence timestamp
 tolerance. Multiclass and counts reject positive flux below A1.0. These choices
 and limitations are recorded in [decision notes](../decisions.md).

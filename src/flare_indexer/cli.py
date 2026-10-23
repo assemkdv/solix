@@ -43,7 +43,6 @@ _FLAG_NAMES = {
     "sliding_window": "--sliding-window",
     "missing_active_region": "--missing-active-region",
     "event_time": "--event-time",
-    "interval_mode": "--interval-mode",
 }
 _ROW_BASED = ("sequence_length", "stride", "cadence_minutes")
 _TIME_BASED = ("start", "cadence", "observation_window", "sliding_window")
@@ -117,11 +116,9 @@ def build_parser() -> argparse.ArgumentParser:
                             "turns the index into 0/1 (index >= VALUE; default: write the raw index); "
                             "not accepted with other labelings")
     label.add_argument("--window", default="24h", metavar="DURATION",
-                       help="prediction window after each image (after the last image of a sequence)")
-    label.add_argument("--event-time", choices=("peak", "start"), default="peak",
+                       help="prediction window (t, t+w) after each image (after the last image of a sequence)")
+    label.add_argument("--event-time", choices=("peak", "start"), default="start",
                        help="which flare time must fall in the window")
-    label.add_argument("--interval-mode", choices=("left_closed", "right_closed"), default="left_closed",
-                       help="left_closed = [t, t+w), right_closed = (t, t+w]")
     label.add_argument("--target", choices=("full_disk", "active_region"), default="full_disk",
                        help="active_region matches only flares of the image's active_region column")
     label.add_argument("--missing-active-region", choices=("negative", "drop", "error"), default=argparse.SUPPRESS,
@@ -201,7 +198,6 @@ def _builder_kwargs(args: argparse.Namespace) -> dict:
         "prediction_window": args.window,
         "target": args.target,
         "event_time": args.event_time,
-        "interval_mode": args.interval_mode,
         # Single-image mode drops other index columns unless asked; the CLI
         # always keeps image paths and ids (sequence modes keep them anyway).
         "include_metadata": not row_given and not time_given,

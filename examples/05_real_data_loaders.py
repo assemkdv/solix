@@ -42,7 +42,7 @@ def main():
 
     labels = fidx.DatasetBuilder(
         prediction_window=24, strategy=fidx.BinaryThresholdStrategy("M"),
-        event_time="start", interval_mode="right_closed", include_metadata=True,
+        event_time="start", include_metadata=True,
     ).build(OUTPUT / "05_image_index.csv", OUTPUT / "05_flare_catalog.csv")
     print("\nLabels for the converted inputs")
     print(labels.to_string(index=False))

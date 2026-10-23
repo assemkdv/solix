@@ -108,7 +108,7 @@ def test_extract_events_event_time_start():
     events = pipeline.extract_events(
         matcher, pd.Timestamp("2024-01-01 00:00"), prediction_window=0.75, event_time="start",
     )
-    assert len(events) == 1  # start (00:30) is inside [00:00, 00:45)
+    assert len(events) == 1  # start (00:30) is inside (00:00, 00:45)
 
 
 def test_extract_events_event_time_peak():
@@ -123,10 +123,10 @@ def test_extract_events_event_time_peak():
     events = pipeline.extract_events(
         matcher, pd.Timestamp("2024-01-01 00:00"), prediction_window=0.75, event_time="peak",
     )
-    assert len(events) == 0  # peak (01:00) is outside [00:00, 00:45)
+    assert len(events) == 0  # peak (01:00) is outside (00:00, 00:45)
 
 
-def test_extract_events_interval_mode_left_closed():
+def test_extract_events_excludes_window_end():
     matcher = _matcher_with_flares([
         {
             "peak_time": pd.Timestamp("2024-01-01 01:00"), "start_time": pd.Timestamp("2024-01-01 00:50"),
@@ -136,24 +136,9 @@ def test_extract_events_interval_mode_left_closed():
     pipeline = _default_pipeline()
 
     events = pipeline.extract_events(
-        matcher, pd.Timestamp("2024-01-01 00:00"), prediction_window=1, interval_mode="left_closed",
+        matcher, pd.Timestamp("2024-01-01 00:00"), prediction_window=1,         event_time="peak",
     )
-    assert events == []  # peak exactly at t+1h excluded by [t, t+1h)
-
-
-def test_extract_events_interval_mode_right_closed():
-    matcher = _matcher_with_flares([
-        {
-            "peak_time": pd.Timestamp("2024-01-01 01:00"), "start_time": pd.Timestamp("2024-01-01 00:50"),
-            "goes_class": "X1.0", "active_region": None,
-        },
-    ])
-    pipeline = _default_pipeline()
-
-    events = pipeline.extract_events(
-        matcher, pd.Timestamp("2024-01-01 00:00"), prediction_window=1, interval_mode="right_closed",
-    )
-    assert len(events) == 1  # peak exactly at t+1h included by (t, t+1h]
+    assert events == []  # peak exactly at t+1h excluded by (t, t+1h)
 
 
 def test_extract_events_active_region_forwarding():
@@ -356,8 +341,8 @@ def test_full_disk_row_based_sequences_work_with_pipeline(tmp_path):
     index_path = tmp_path / "sequence_index.csv"
     pd.DataFrame({
         "timestamp": pd.to_datetime([
-            "2024-02-01T09:00:00", "2024-02-01T10:00:00",
-            "2024-02-01T11:00:00", "2024-02-01T12:00:00",
+            "2024-02-01T08:59:00", "2024-02-01T09:59:00",
+            "2024-02-01T10:59:00", "2024-02-01T11:59:00",
         ]),
     }).to_csv(index_path, index=False)
 
@@ -434,8 +419,8 @@ def test_active_region_sequences_work_with_pipeline(tmp_path):
     index_path = tmp_path / "ar_sequence_index.csv"
     pd.DataFrame({
         "timestamp": pd.to_datetime([
-            "2024-02-01T11:00:00", "2024-02-01T11:30:00", "2024-02-01T12:00:00",
-            "2024-02-05T09:00:00", "2024-02-05T09:30:00", "2024-02-05T10:00:00",
+            "2024-02-01T10:59:00", "2024-02-01T11:29:00", "2024-02-01T11:59:00",
+            "2024-02-05T08:59:00", "2024-02-05T09:29:00", "2024-02-05T09:59:00",
         ]),
         "active_region": ["11111", "11111", "11111", "22222", "22222", "22222"],
     }).to_csv(index_path, index=False)
@@ -444,6 +429,7 @@ def test_active_region_sequences_work_with_pipeline(tmp_path):
     builder = DatasetBuilder(
         prediction_window=1, strategy=pipeline, target="active_region",
         sequence_length=3, stride=3, cadence_minutes=30,
+        event_time="peak",
     )
     result = builder.build(index_path, CATALOG_PATH)
 
@@ -455,7 +441,7 @@ def test_extra_columns_preserved_with_pipeline(tmp_path):
     index_path = tmp_path / "index.csv"
     pd.DataFrame({
         "timestamp": pd.to_datetime([
-            "2024-02-01T09:00:00", "2024-02-01T10:00:00", "2024-02-01T11:00:00",
+            "2024-02-01T08:59:00", "2024-02-01T09:59:00", "2024-02-01T10:59:00",
         ]),
         "image_path": ["a.jpg", "b.jpg", "c.jpg"],
     }).to_csv(index_path, index=False)

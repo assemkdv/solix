@@ -41,14 +41,15 @@ def test_example_runs(script, tmp_path):
 
 def test_boundary_example_shows_label_change(tmp_path):
     output = _run(EXAMPLES_DIR / "02_window_boundaries.py", tmp_path)
-    assert "[t, t+24h)          label=0" in output
-    assert "(t, t+24h]         label=1" in output
-    assert "(t, t+23:59:59]    label=0" in output
+    assert "label=0  starts exactly at t+24h: excluded" in output
+    assert "label=1  window 10 min longer: included" in output
+    assert "label=0  peak exactly at t+w: excluded" in output
+    assert "label=0  starts exactly at t: excluded" in output
 
 
 def test_multiclass_example_shows_class_labels(tmp_path):
     output = _run(EXAMPLES_DIR / "09_multiclass_labels.py", tmp_path)
-    assert "label counts: NF=16, A=0, B=24, C=2, M=54, X=22" in output
+    assert "label counts: NF=18, A=0, B=23, C=2, M=54, X=21" in output
     assert "binary M label == (multiclass in {M, X}) for every image: True" in output
     assert "2024-03-01 12:00:00         13600     M               X" in output
 

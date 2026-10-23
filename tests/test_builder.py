@@ -218,7 +218,7 @@ def test_sequence_prediction_window_starts_at_final_image(tmp_path):
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
         "start_time,peak_time,end_time,class,active_region\n"
-        "2024-01-01 08:24:00,2024-01-01 08:24:00,2024-01-01 08:29:00,M1.0,4456\n"
+        "2024-01-01 08:25:00,2024-01-01 08:25:00,2024-01-01 08:29:00,M1.0,4456\n"
     )
     index_path = tmp_path / "index.csv"
     index_path.write_text(
@@ -240,7 +240,7 @@ def test_sequence_prediction_window_starts_at_final_image(tmp_path):
     assert len(result) == 1
     assert result.iloc[0]["sequence_end"] == pd.Timestamp("2024-01-01T08:24:00")
     # If matching incorrectly used sequence_start (08:00) instead of
-    # sequence_end (08:24), this M1.0 flare peaking exactly at 08:24 would
+    # sequence_end (08:24), this M1.0 flare peaking at 08:25 would
     # fall outside a 12-minute window measured from 08:00, and label would
     # come out 0 instead of 1.
     assert result.iloc[0]["label"] == 1
@@ -802,7 +802,7 @@ def test_active_region_sequence_label_uses_final_image_timestamp(tmp_path):
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
         "start_time,peak_time,end_time,class,active_region\n"
-        "2024-01-01 08:24:00,2024-01-01 08:24:00,2024-01-01 08:29:00,M1.0,3559\n"
+        "2024-01-01 08:25:00,2024-01-01 08:25:00,2024-01-01 08:29:00,M1.0,3559\n"
     )
     index_path = tmp_path / "index.csv"
     index_path.write_text(
@@ -824,7 +824,7 @@ def test_active_region_sequence_label_uses_final_image_timestamp(tmp_path):
 
     assert len(result) == 1
     # If matching incorrectly used sequence_start (08:00) instead of
-    # sequence_end (08:24), this M1.0 flare peaking exactly at 08:24 would
+    # sequence_end (08:24), this M1.0 flare peaking at 08:25 would
     # fall outside a 12-minute window measured from 08:00, and label would
     # come out 0 instead of 1.
     assert result.iloc[0]["label"] == 1
@@ -883,7 +883,7 @@ def test_active_region_sequence_preserves_extra_columns(tmp_path):
     assert result.iloc[0]["active_region"] == "3559"
 
 
-# ── event_time / interval_mode configuration ─────────────────────────────
+# ── event_time configuration and window boundaries ─────────────────────────────
 
 
 def test_event_time_invalid_value_raises():
@@ -891,13 +891,6 @@ def test_event_time_invalid_value_raises():
         DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy(), event_time="middle")
 
     assert "event_time" in str(excinfo.value)
-
-
-def test_interval_mode_invalid_value_raises():
-    with pytest.raises(ValueError) as excinfo:
-        DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy(), interval_mode="both_closed")
-
-    assert "interval_mode" in str(excinfo.value)
 
 
 def test_event_time_start_vs_peak_produce_different_labels(tmp_path):
@@ -916,33 +909,10 @@ def test_event_time_start_vs_peak_produce_different_labels(tmp_path):
     peak_result = peak_builder.build(index_path, catalog_path)
     start_result = start_builder.build(index_path, catalog_path)
 
-    # peak_time (09:01) falls outside [08:00, 09:00) -> 0.
-    # start_time (08:30) falls inside [08:00, 09:00) -> 1.
+    # peak_time (09:01) falls outside (08:00, 09:00) -> 0.
+    # start_time (08:30) falls inside (08:00, 09:00) -> 1.
     assert peak_result["label"].tolist() == [0]
     assert start_result["label"].tolist() == [1]
-
-
-def test_interval_mode_right_closed_includes_far_boundary(tmp_path):
-    catalog_path = tmp_path / "catalog.csv"
-    catalog_path.write_text(
-        "start_time,peak_time,end_time,class,active_region\n"
-        "2024-01-01 09:00:00,2024-01-01 09:00:00,2024-01-01 09:05:00,X1.0,4456\n"
-    )
-    index_path = tmp_path / "index.csv"
-    index_path.write_text("timestamp\n2024-01-01T08:00:00\n")
-
-    left_closed = DatasetBuilder(prediction_window=1, strategy=BinaryThresholdStrategy())
-    right_closed = DatasetBuilder(
-        prediction_window=1, strategy=BinaryThresholdStrategy(), interval_mode="right_closed"
-    )
-
-    left_result = left_closed.build(index_path, catalog_path)
-    right_result = right_closed.build(index_path, catalog_path)
-
-    # X1.0 peaks exactly at t + 1h (09:00): excluded by [t, t+1h), included
-    # by (t, t+1h].
-    assert left_result["label"].tolist() == [0]
-    assert right_result["label"].tolist() == [1]
 
 
 def test_full_disk_sequence_and_active_region_single_image_unchanged(tmp_path):

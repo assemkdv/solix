@@ -168,7 +168,7 @@ def catalog(tmp_path):
 
 def _builder(strategy, **kwargs):
     return fidx.DatasetBuilder(prediction_window="12h", strategy=strategy,
-                               event_time="start", interval_mode="right_closed", **kwargs)
+                               event_time="start", **kwargs)
 
 
 @pytest.fixture

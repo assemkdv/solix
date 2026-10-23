@@ -26,7 +26,7 @@ OUTPUT = Path(__file__).parent / "output"
 def build(**kwargs):
     return fidx.DatasetBuilder(
         prediction_window=24, strategy=fidx.BinaryThresholdStrategy("M"),
-        target="active_region", event_time="start", interval_mode="right_closed",
+        target="active_region", event_time="start",
         include_metadata=True, **kwargs,
     ).build(INDEX, CATALOG)
 
@@ -64,7 +64,7 @@ def main():
         warnings.simplefilter("ignore")
         sequences, report = fidx.DatasetBuilder(
             prediction_window=24, strategy=fidx.BinaryThresholdStrategy("M"),
-            target="active_region", event_time="start", interval_mode="right_closed",
+            target="active_region", event_time="start",
             missing_active_region="drop",
             cadence="6h", observation_window="12h", sliding_window="6h",
         ).build(INDEX, CATALOG, return_report=True)

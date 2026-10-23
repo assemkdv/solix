@@ -67,13 +67,12 @@ class DatasetBuildingPipeline:
         reference_time,
         prediction_window,
         active_region=None,
-        event_time: str = "peak",
-        interval_mode: str = "left_closed",
+        event_time: str = "start",
     ) -> list[FlareEvent]:
         """Stage 1: query EventMatcher and return the matched FlareEvents."""
         events = matcher.query(
             reference_time, prediction_window, active_region=active_region,
-            event_time=event_time, interval_mode=interval_mode,
+            event_time=event_time,
         )
         # Defensive copy: guarantees the list handed back is never a
         # reference a caller (or a later pipeline call) could share and
@@ -96,13 +95,12 @@ class DatasetBuildingPipeline:
         reference_time,
         prediction_window,
         active_region=None,
-        event_time: str = "peak",
-        interval_mode: str = "left_closed",
+        event_time: str = "start",
     ) -> PipelineResult:
         """Run all three stages for one reference time and return every intermediate value."""
         events = self.extract_events(
             matcher, reference_time, prediction_window,
-            active_region=active_region, event_time=event_time, interval_mode=interval_mode,
+            active_region=active_region, event_time=event_time,
         )
         reduced_value = self.reduce_events(events)
         label = self.assign_label(reduced_value)

@@ -51,7 +51,7 @@ def _load_example(name):
 def _builder(**sequence):
     return fidx.DatasetBuilder(
         prediction_window="24h", strategy=fidx.BinaryThresholdStrategy("M"), target="full_disk",
-        event_time="start", interval_mode="right_closed", include_metadata=not sequence, **sequence,
+        event_time="start", include_metadata=not sequence, **sequence,
     )
 
 

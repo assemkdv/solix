@@ -288,12 +288,12 @@ def test_query_with_an_offset_aware_image_time(catalog):
     matcher = EventMatcher(catalog)
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        # 14:00+05:00 is 09:00 UTC: [09:00, 10:00) excludes the 10:00 flare.
-        assert matcher.query(pd.Timestamp("2024-01-01 14:00+05:00"), 1) == []
-        # 14:30+05:00 is 09:30 UTC: [09:30, 10:30) includes it.
-        assert len(matcher.query(pd.Timestamp("2024-01-01 14:30+05:00"), 1)) == 1
+        # 14:00+05:00 is 09:00 UTC: (09:00, 10:00) excludes the 10:00 flare.
+        assert matcher.query(pd.Timestamp("2024-01-01 14:00+05:00"), 1, event_time="peak") == []
+        # 14:30+05:00 is 09:30 UTC: (09:30, 10:30) includes it.
+        assert len(matcher.query(pd.Timestamp("2024-01-01 14:30+05:00"), 1, event_time="peak")) == 1
         # The same instant written in UTC gives the same answer.
-        assert len(matcher.query(pd.Timestamp("2024-01-01 09:30Z"), 1)) == 1
+        assert len(matcher.query(pd.Timestamp("2024-01-01 09:30Z"), 1, event_time="peak")) == 1
 
 
 def test_time_based_start_with_an_offset_is_converted_to_utc(tmp_path, catalog):
@@ -369,8 +369,8 @@ def test_mixed_offsets_across_a_daylight_saving_change_convert_to_utc(tmp_path):
         pd.Timestamp("2024-03-31 00:30:00"), pd.Timestamp("2024-03-31 01:30:00"),
     ]
     assert matcher._catalog["start_time"].dt.tz is None
-    # The two flares are one hour apart in UTC, not two: [00:00, 02:00) holds both,
-    # [00:00, 01:00) only the first.
+    # The two flares are one hour apart in UTC, not two: (00:00, 02:00) holds both,
+    # (00:00, 01:00) only the first.
     assert len(matcher.query(pd.Timestamp("2024-03-31 00:00"), "2h", event_time="start")) == 2
     assert len(matcher.query(pd.Timestamp("2024-03-31 00:00"), "1h", event_time="start")) == 1
 
@@ -404,14 +404,14 @@ def test_offset_normalization_is_not_a_time_scale_correction():
 
 def test_prediction_window_number_means_hours_in_builder_and_query(tmp_path, catalog):
     index = _write(tmp_path, "index.csv", "timestamp\n2024-01-01 09:00:00\n")
-    # Flare starts/peaks at 10:00: a 1-hour window [09:00, 10:00) misses it, a 2-hour one has it.
-    assert _labels(DatasetBuilder(1, BinaryThresholdStrategy()), index, catalog) == [0]
-    assert _labels(DatasetBuilder(2, BinaryThresholdStrategy()), index, catalog) == [1]
-    assert _labels(DatasetBuilder("2h", BinaryThresholdStrategy()), index, catalog) == [1]
+    # Flare starts/peaks at 10:00: a 1-hour window (09:00, 10:00) misses it, a 2-hour one has it.
+    assert _labels(DatasetBuilder(1, BinaryThresholdStrategy(), event_time="peak"), index, catalog) == [0]
+    assert _labels(DatasetBuilder(2, BinaryThresholdStrategy(), event_time="peak"), index, catalog) == [1]
+    assert _labels(DatasetBuilder("2h", BinaryThresholdStrategy(), event_time="peak"), index, catalog) == [1]
     matcher = EventMatcher(catalog)
-    assert matcher.query(T0, 1) == []
-    assert len(matcher.query(T0, 2)) == 1
-    assert len(matcher.query(T0, 1.5)) == 1
+    assert matcher.query(T0, 1, event_time="peak") == []
+    assert len(matcher.query(T0, 2, event_time="peak")) == 1
+    assert len(matcher.query(T0, 1.5, event_time="peak")) == 1
 
 
 @pytest.mark.parametrize("name", ["cadence", "observation_window", "sliding_window"])

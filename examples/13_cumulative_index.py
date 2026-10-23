@@ -26,11 +26,10 @@ paper_events = [
 reducer = f.CumulativeClassIndexReducer()
 
 # Part 2: the same reducer inside DatasetBuilder on the synthetic data,
-# with the reference convention of the lab notebooks and SuryaBench:
-# start time, (t, t+23:59:59]. Any other window is a parameter change.
+# start time, window (t, t + 24h), i.e. t < start <= t + 23:59:59. Any other window is a parameter change.
 raw_pipeline = f.DatasetBuildingPipeline(f.CumulativeClassIndexReducer(), f.RegressionLabeler())
 binary_pipeline = f.DatasetBuildingPipeline(f.CumulativeClassIndexReducer(), f.NumericThresholdLabeler(10))
-settings = dict(prediction_window="23h59min59s", event_time="start", interval_mode="right_closed")
+settings = dict(prediction_window="24h", event_time="start")
 
 if __name__ == "__main__":
     print("paper window:", ", ".join(paper_classes))
@@ -54,7 +53,7 @@ if __name__ == "__main__":
         "label_cum_ge_10": binary["label"],
     })
     print()
-    print("full-disk images, start time, (t, t+23:59:59], first 12 rows:")
+    print("full-disk images, start time, (t, t+24h), first 12 rows:")
     print(table.head(12).to_string(index=False))
     print("images:", len(table), "| label_cum_ge_10 = 1:", int(table["label_cum_ge_10"].sum()),
           "| max index:", table["cumulative_index"].max())

@@ -363,7 +363,7 @@ message names the data row, 1 = first row after the header);
 
 ```python
 EventMatcher(...).query(image_time, prediction_window_hours, active_region=None,
-                        event_time="peak", interval_mode="left_closed") -> list[FlareEvent]
+                        event_time="start") -> list[FlareEvent]
 ```
 
 | Parameter | Type | Default | Accepted values / units |
@@ -371,8 +371,7 @@ EventMatcher(...).query(image_time, prediction_window_hours, active_region=None,
 | `image_time` | `pandas.Timestamp` (also `datetime`, `numpy.datetime64`) | – | reference time `t`; not missing/NaT; a UTC offset is converted to UTC first |
 | `prediction_window_hours` | number or duration | – | hours (`6`, `0.5`) or text/`Timedelta` with a unit (`"24h"`, `"23h59min59s"`); > 0 and finite; bare numeric text (`"24"`) is an error |
 | `active_region` | region identifier or `None` | `None` | `None` = any region (full disk); otherwise normalized like the catalog (`13700`, `13700.0`, `"13700"`, `"13700.0"` all mean `"13700"`); blank is an error |
-| `event_time` | `str` | `"peak"` | `"peak"` or `"start"` |
-| `interval_mode` | `str` | `"left_closed"` | `"left_closed"` = `[t, t+w)`, `"right_closed"` = `(t, t+w]` |
+| `event_time` | `str` | `"start"` | `"start"` (SuryaBench) or `"peak"` |
 
 **What it does.** Finds flares whose chosen time is in the window after
 `t` (binary search on a cached sorted column), then, if `active_region`
@@ -386,23 +385,24 @@ Run (requires Setup):
 matcher = fidx.EventMatcher(CATALOG)
 t = pd.Timestamp("2024-05-01 03:00")
 print([e.goes_class for e in matcher.query(t, 6)])
-print([e.goes_class for e in matcher.query(t, 6, event_time="start", interval_mode="right_closed")])
-print([e.goes_class for e in matcher.query(t, 6, active_region="13700", event_time="start", interval_mode="right_closed")])
-print([e.goes_class for e in matcher.query(pd.Timestamp("2024-05-01 18:00"), "6h", event_time="start", interval_mode="right_closed")])
+print([e.goes_class for e in matcher.query(t, 6, event_time="start")])
+print([e.goes_class for e in matcher.query(t, 6, active_region="13700", event_time="start")])
+print([e.goes_class for e in matcher.query(pd.Timestamp("2024-05-01 18:00"), "6h", event_time="start")])
 ```
 <!-- output: query -->
 ```text
 ['M2.0', 'X1.2']
 ['M2.0', 'X1.2']
 ['M2.0']
-['M1.0']
+[]
 ```
 
-**Output explained.** Line 1 (defaults, peak time, `[03:00, 09:00)`):
-M2.0 peaks 05:45, X1.2 peaks 08:10. Line 2 (start time): the same two.
-Line 3: only region 13700's flare. Line 4: M1.0 starts exactly at
-`18:00 + 6h`; the right-closed window includes it.
-**Errors.** `ValueError` for an invalid `event_time`, `interval_mode`,
+**Output explained.** The window is always `(t, t + w)` on the chosen
+flare time. Line 1 (defaults: start time, `(03:00, 09:00)`): M2.0 starts
+05:30, X1.2 starts 08:00. Line 2 (the same settings written out): the
+same two. Line 3: only region 13700's flare. Line 4: M1.0 starts exactly
+at `18:00 + 6h`, which `(t, t + w)` excludes.
+**Errors.** `ValueError` for an invalid `event_time`,
 window, a missing `image_time`, or a blank `active_region`.
 **Limitations.** The window always looks forward from `t`; there is no
 backward option. Time-zone policy: a timestamp with an explicit UTC
@@ -456,7 +456,7 @@ Run (requires `matcher` and `t` from `EventMatcher.query`):
 
 <!-- example: reduce -->
 ```python
-events = matcher.query(t, 6, event_time="start", interval_mode="right_closed")
+events = matcher.query(t, 6, event_time="start")
 print(fidx.MaxFluxReducer().reduce(events))
 print(fidx.MaxFluxReducer().reduce([]))
 ```
@@ -670,12 +670,12 @@ X1.0 are both `"X"`; exactly 1e-5 is `"M"`, the next float below it is
 
 Run through `DatasetBuilder` (requires Setup): full-disk images, the same
 images as time-based sequences (labeled from the last image), and
-active-region patches. Window `(t, t + 6h]` on the flare start time.
+active-region patches. Window `(t, t + 6h)` on the flare start time.
 
 <!-- example: multiclass_builder -->
 ```python
 multiclass = fidx.DatasetBuildingPipeline(reducer=fidx.MaxFluxReducer(), labeler=fidx.MulticlassLabeler())
-options = dict(prediction_window="6h", strategy=multiclass, event_time="start", interval_mode="right_closed")
+options = dict(prediction_window="6h", strategy=multiclass, event_time="start")
 
 print(fidx.DatasetBuilder(**options).build(IMAGES, CATALOG))
 sequences = fidx.DatasetBuilder(**options, cadence="3h", observation_window="6h", sliding_window="3h") \
@@ -691,7 +691,7 @@ print(ar.build(AR_IMAGES, CATALOG)[["timestamp", "active_region", "label"]])
 1 2024-05-01 03:00:00     X
 2 2024-05-01 06:00:00     X
 3 2024-05-01 09:00:00    NF
-4 2024-05-01 18:00:00     M
+4 2024-05-01 18:00:00    NF
        sequence_start        sequence_end label
 0 2024-05-01 00:00:00 2024-05-01 03:00:00     X
 1 2024-05-01 03:00:00 2024-05-01 06:00:00     X
@@ -705,8 +705,8 @@ print(ar.build(AR_IMAGES, CATALOG)[["timestamp", "active_region", "label"]])
 ```
 
 **Output explained.** Image 00:00 sees C4.0 and M2.0 → `"M"`; 03:00 and
-06:00 see X1.2 → `"X"`; 09:00 sees nothing → `"NF"`; 18:00 sees the M1.0
-starting at midnight → `"M"`. Each sequence takes the label of its last
+06:00 see X1.2 → `"X"`; 09:00 sees nothing → `"NF"`; 18:00 sees nothing
+either → `"NF"` (the M1.0 starts at exactly `t + 6h`, outside `(t, t + 6h)`). Each sequence takes the label of its last
 image's window (the 09:00–12:00 sequence is skipped: no image at 12:00).
 In active-region mode region 13701 at 00:00 is `"NF"` while full-disk
 says `"M"`: the M2.0 belongs to 13700. The patch without a region is
@@ -846,7 +846,7 @@ TypeError: reducer=<...> must provide a callable 'reduce' method (e.g. `def redu
 
 ```python
 pipeline.extract_events(matcher, reference_time, prediction_window, active_region=None,
-                        event_time="peak", interval_mode="left_closed") -> list[FlareEvent]
+                        event_time="start") -> list[FlareEvent]
 ```
 
 **Inputs.** An `EventMatcher` and the same window arguments as
@@ -874,7 +874,7 @@ Run (requires `pipeline`, `counting`, `matcher`, `t`):
 
 <!-- example: pipeline_stages -->
 ```python
-stage1 = pipeline.extract_events(matcher, t, 6, event_time="start", interval_mode="right_closed")
+stage1 = pipeline.extract_events(matcher, t, 6, event_time="start")
 stage2 = pipeline.reduce_events(stage1)
 stage3 = pipeline.assign_label(stage2)
 print(type(stage1).__name__, [e.goes_class for e in stage1])
@@ -898,7 +898,7 @@ same list to `2`.
 
 ```python
 pipeline.run_one(matcher, reference_time, prediction_window, active_region=None,
-                 event_time="peak", interval_mode="left_closed") -> PipelineResult
+                 event_time="start") -> PipelineResult
 ```
 
 Runs all three stages and returns a `PipelineResult`.
@@ -907,7 +907,7 @@ Run (requires `pipeline`, `matcher`, `t`):
 
 <!-- example: run_one -->
 ```python
-result = pipeline.run_one(matcher, t, 6, event_time="start", interval_mode="right_closed")
+result = pipeline.run_one(matcher, t, 6, event_time="start")
 print(type(result).__name__, [e.goes_class for e in result.events], result.reduced_value, result.label)
 ```
 <!-- output: run_one -->
@@ -929,13 +929,12 @@ Run (requires `pipeline`, `stage1`, `counting`):
 <!-- example: pipeline_label -->
 ```python
 print(pipeline.label(stage1), counting.label(stage1))
-print(fidx.DatasetBuilder(prediction_window=6, strategy=counting, event_time="start",
-                          interval_mode="right_closed").build(IMAGES, CATALOG)["label"].tolist())
+print(fidx.DatasetBuilder(prediction_window=6, strategy=counting, event_time="start").build(IMAGES, CATALOG)["label"].tolist())
 ```
 <!-- output: pipeline_label -->
 ```text
 1 2
-[2, 2, 1, 0, 1]
+[2, 2, 1, 0, 0]
 ```
 
 **Output explained.** The counting pipeline used as a strategy gives the
@@ -950,7 +949,7 @@ number of flares starting in each image's window.
 ```python
 from flare_indexer import DatasetBuilder
 DatasetBuilder(prediction_window, strategy, sequence_length=None, stride=None, cadence_minutes=None,
-               target="full_disk", event_time="peak", interval_mode="left_closed",
+               target="full_disk", event_time="start",
                start=None, cadence=None, observation_window=None, sliding_window=None,
                missing_active_region="negative", include_metadata=False)
 ```
@@ -965,8 +964,7 @@ DatasetBuilder(prediction_window, strategy, sequence_length=None, stride=None, c
 | `stride` | `int` | `None` (= 1) | row-based: rows between sequence starts, integer ≥ 1 |
 | `cadence_minutes` | number | `None` | row-based: required spacing, finite and > 0; sequences with other gaps are skipped |
 | `target` | `str` | `"full_disk"` | `"full_disk"` or `"active_region"` |
-| `event_time` | `str` | `"peak"` | `"peak"` or `"start"` |
-| `interval_mode` | `str` | `"left_closed"` | `"left_closed"` or `"right_closed"` |
+| `event_time` | `str` | `"start"` | `"start"` (SuryaBench) or `"peak"` |
 | `start` | timestamp | `None` | time-based: first sequence start; must be an image time; a UTC offset is converted to UTC |
 | `cadence` | duration text or `Timedelta` | `None` | time-based: spacing inside a sequence (`"1h"`, `"30min"`, `pd.Timedelta`); a bare number is rejected (it would be unit-less); multiple of the inferred source cadence |
 | `observation_window` | duration text or `Timedelta` | `None` | time-based: span of one sequence, same forms as `cadence`; multiple of `cadence` |
@@ -981,7 +979,7 @@ never guessed: `prediction_window` reads a number as hours,
 `cadence_minutes` as minutes, and the three time-based durations accept
 no bare number. **Public attributes.** The arguments as given
 (`prediction_window`, `strategy`, `target`, `event_time`,
-`interval_mode`, `missing_active_region`, `include_metadata`), plus
+`missing_active_region`, `include_metadata`), plus
 `time_based` (`bool`); row-based: `sequence_length`, `stride`,
 `cadence_minutes`; time-based: `cadence`, `observation_window`,
 `sliding_window` (parsed to `Timedelta`), `start`, `number_of_images`,
@@ -1014,7 +1012,7 @@ Run (requires Setup):
 <!-- example: build -->
 ```python
 single = fidx.DatasetBuilder(prediction_window=6, strategy=fidx.MaxFlareStrategy(),
-                             event_time="start", interval_mode="right_closed").build(IMAGES, CATALOG)
+                             event_time="start").build(IMAGES, CATALOG)
 print(single.to_string(index=False, float_format=lambda v: f"{v:.1e}"))
 print(list(single.columns), single["label"].dtype)
 ```
@@ -1025,12 +1023,12 @@ print(list(single.columns), single["label"].dtype)
 2024-05-01 03:00:00 1.2e-04
 2024-05-01 06:00:00 1.2e-04
 2024-05-01 09:00:00 0.0e+00
-2024-05-01 18:00:00 1.0e-05
+2024-05-01 18:00:00 0.0e+00
 ['timestamp', 'label'] float64
 ```
 
 **Output explained.** One row per image; with `MaxFlareStrategy` the
-label is the strongest flux (float W/m²), `0.0` for 09:00.
+label is the strongest flux (float W/m²), `0.0` for 09:00 and 18:00.
 **Warnings.** In AR mode: `UserWarning` when catalog flares have no
 region, and (policy `"negative"`) when images have no region.
 **Errors.** `ValueError` for a missing/empty index file or column,
@@ -1274,8 +1272,7 @@ Flare catalog at example.csv has 1 missing or invalid GOES class value(s) in col
 ```
 
 **Constants.** `flare_indexer.events.VALID_EVENT_TIMES` (`{"peak",
-"start"}`), `flare_indexer.events.VALID_INTERVAL_MODES`
-(`{"left_closed", "right_closed"}`),
+"start"}`),
 `flare_indexer.builder.VALID_MISSING_ACTIVE_REGION_POLICIES`
 (`{"negative", "drop", "error"}`), `flare_indexer.loaders.VALID_DUPLICATE_POLICIES`
 (`{"error", "first", "last"}`), `flare_indexer.loaders.GOES_CATALOG_REQUIRED_COLUMNS`
@@ -1393,10 +1390,7 @@ print(reducer.reduce(paper[:1] + [fidx.FlareEvent(None, "B5.0", None, None)]))
 B5.0 → 15: the B flare adds nothing under the selected convention.
 **Errors.** `InvalidGOESClassError` for a bad class (hand-built events
 only). **Limitations.** The reducer aggregates whatever the matcher
-returns; the reference implementations use `event_time="start"` and
-`interval_mode="right_closed"` with `prediction_window="23h59min59s"`,
-and the paper writes the window as `[t, t+24h]`, which is closed at both
-ends and is not one of the two `interval_mode` options.
+returns, with the package's window `(t, t + w)` on the chosen flare time.
 
 ### `NumericThresholdLabeler`
 

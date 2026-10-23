@@ -125,7 +125,7 @@ def main(argv=None):
     print(f"Image index: {len(index)} images -> {index_path}")
     print(index["timestamp"].astype(str).to_string(index=False, header=False))
     print(f"Catalog: {provenance['catalog_rows']} flares, queried {provenance['query_start']} .. "
-          f"{provenance['query_end']}; covers every (t, t+{PREDICTION_WINDOW}] window")
+          f"{provenance['query_end']}; covers every (t, t+{PREDICTION_WINDOW}) window")
 
     # 2. Sequences and labels.
     builder = fidx.DatasetBuilder(
@@ -133,7 +133,6 @@ def main(argv=None):
         strategy=fidx.BinaryThresholdStrategy("M"),  # 1 if any flare >= M1.0 in the window
         target="full_disk",
         event_time="start",
-        interval_mode="right_closed",                # (sequence_end, sequence_end + 24h]
         cadence=CADENCE,
         observation_window=OBSERVATION_WINDOW,
         sliding_window=SLIDING_WINDOW,
@@ -179,7 +178,7 @@ def main(argv=None):
         assert t == row["sequence_end"], (t, row)
         assert real.independent_m_label(catalog, t, PREDICTION_WINDOW)[0] == row["label"], (t, row)
     print(f"\nAll {len(sequences)} labels match an independent recomputation from the catalog.")
-    print("Independent check against catalog rows (start_time in (t_end, t_end+24h], class M or X):")
+    print("Independent check against catalog rows (start_time in [t_end, t_end+24h), class M or X):")
     for _, row in pd.concat([sequences[sequences["label"] == 1].head(1),
                              sequences[sequences["label"] == 0].tail(1)]).iterrows():
         _, strong = real.independent_m_label(catalog, row["sequence_end"], PREDICTION_WINDOW)

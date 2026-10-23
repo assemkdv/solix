@@ -43,7 +43,7 @@ def test_help_shows_commands_and_defaults(capsys):
         run("label", "--help")
     assert excinfo.value.code == 0
     out = " ".join(capsys.readouterr().out.split())   # argparse wraps long lines
-    for text in ("(default: 24h)", "(default: peak)", "(default: left_closed)", "(default: full_disk)",
+    for text in ("(default: 24h)", "(default: start)", "(default: full_disk)",
                  "(default: binary)", "--overwrite", "--sequence-length", "--observation-window", "--report"):
         assert text in out
 
@@ -68,10 +68,10 @@ def test_module_is_runnable_as_a_script():
 SINGLE_IMAGE_CASES = [
     pytest.param([], dict(prediction_window="24h", strategy=fidx.BinaryThresholdStrategy()), id="binary-defaults"),
     pytest.param(
-        ["--threshold", "C4.2", "--event-time", "start", "--interval-mode", "right_closed", "--window", "6h"],
+        ["--threshold", "C4.2", "--event-time", "start", "--window", "6h"],
         dict(prediction_window="6h", strategy=fidx.BinaryThresholdStrategy("C4.2"),
-             event_time="start", interval_mode="right_closed"),
-        id="binary-C4.2-start-right_closed-6h",
+             event_time="start"),
+        id="binary-C4.2-start-6h",
     ),
     pytest.param(["--labeling", "max-flux"], dict(prediction_window="24h", strategy=fidx.MaxFlareStrategy()), id="max-flux"),
     pytest.param(
@@ -81,8 +81,8 @@ SINGLE_IMAGE_CASES = [
         id="multiclass",
     ),
     pytest.param(
-        ["--labeling", "cumulative", "--window", "23h59min59s", "--event-time", "start", "--interval-mode", "right_closed"],
-        dict(prediction_window="23h59min59s", event_time="start", interval_mode="right_closed",
+        ["--labeling", "cumulative", "--window", "23h59min59s", "--event-time", "start"],
+        dict(prediction_window="23h59min59s", event_time="start",
              strategy=fidx.DatasetBuildingPipeline(fidx.CumulativeClassIndexReducer(), fidx.RegressionLabeler())),
         id="cumulative-raw",
     ),
@@ -124,7 +124,7 @@ def test_class_counts_and_presence_cells_are_json_dicts(tmp_path):
         output = tmp_path / f"{labeling}.csv"
         assert run("label", IMAGES, CATALOG, "--output", output, "--labeling", labeling) == 0
         expected = fidx.DatasetBuilder(
-            "24h", fidx.DatasetBuildingPipeline(fidx.ClassCountReducer(), labeler), include_metadata=True,
+            "23h59min59s", fidx.DatasetBuildingPipeline(fidx.ClassCountReducer(), labeler), include_metadata=True,
         ).build(IMAGES, CATALOG)
         got = pd.read_csv(output, converters={"label": json.loads})
         assert got["label"].tolist() == expected["label"].tolist()
@@ -330,5 +330,5 @@ def test_documented_example_command_runs(tmp_path):
     # The command shown in the researcher manual, section 18.
     output = tmp_path / "labels.csv"
     assert run("label", IMAGES, CATALOG, "--output", output, "--labeling", "cumulative", "--threshold", "10",
-               "--window", "23h59min59s", "--event-time", "start", "--interval-mode", "right_closed") == 0
+               "--window", "23h59min59s", "--event-time", "start") == 0
     assert set(pd.read_csv(output)["label"]) <= {0, 1}

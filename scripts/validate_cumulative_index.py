@@ -21,11 +21,9 @@ What is checked
    disagreements are printed with the flares the package matched, so each
    can be investigated. The rule is never adjusted to force agreement.
 
-Window convention: the reference code's (t, t+23:59:59] on start time is
-used because it is what produced the published numbers. It is not the only
-defensible choice; the paper writes [t, t+24h] (closed at both ends), which
-is not expressible with the package's two interval modes. Use
---prediction-window / --interval-mode to test other conventions.
+Window: the package's only window, (t, t + w) on start time (default
+w = 24h). The published SuryaBench code counts t < start <= t + 23:59:59,
+which is the same window for minute-resolution start times.
 
 Catalog handling: the lab catalog gets the documented peak_time corrections
 of scripts/catalog_corrections.py (they change peaks only; start-time
@@ -90,9 +88,8 @@ def parse_args():
     parser.add_argument("--suryabench-labels", default=DEFAULT_LABELS_URL,
                         help="Published SuryaBench data.csv (path or URL).")
     parser.add_argument("--no-published", action="store_true", help="Skip the comparison with published labels.")
-    parser.add_argument("--prediction-window", default="23h59min59s",
-                        help="Window length (default 23h59min59s, the reference convention).")
-    parser.add_argument("--interval-mode", choices=["left_closed", "right_closed"], default="right_closed")
+    parser.add_argument("--prediction-window", default="24h",
+                        help="Window length w of (t, t+w) (default 24h).")
     parser.add_argument("--cadence", default="1h", help="Grid step (default 1h).")
     parser.add_argument("--threshold", type=float, action="append", default=None,
                         help="Binary threshold(s) on the index (repeatable; default 10 and 20).")
@@ -238,16 +235,16 @@ def hourly_grid(first: pd.Timestamp, last: pd.Timestamp, cadence: str) -> pd.Dat
     return pd.date_range(start, last.ceil("D"), freq=cadence, inclusive="left")
 
 
-def package_index(index_path: Path, catalog_path: Path, window: str, interval_mode: str) -> pd.Series:
+def package_index(index_path: Path, catalog_path: Path, window: str) -> pd.Series:
     pipeline = DatasetBuildingPipeline(CumulativeClassIndexReducer(), RegressionLabeler())
     builder = DatasetBuilder(prediction_window=window, strategy=pipeline,
-                             event_time="start", interval_mode=interval_mode)
+                             event_time="start")
     result = builder.build(index_path, catalog_path)
     return pd.Series(result["label"].to_numpy(dtype=float), index=pd.DatetimeIndex(result["timestamp"]))
 
 
-def reference_index(catalog_path: Path, grid: pd.DatetimeIndex, window: pd.Timedelta, interval_mode: str) -> pd.Series:
-    """Literal SuryaBench rolling_window(): C=n, M=10n, X=100n, A/B -> None, window (t, t+w] by start time."""
+def reference_index(catalog_path: Path, grid: pd.DatetimeIndex, window: pd.Timedelta) -> pd.Series:
+    """SuryaBench rolling_window() formula (C=n, M=10n, X=100n, A/B -> None), on the window (t, t+w) by start time."""
     df = pd.read_csv(catalog_path, usecols=["start_time", "class"])
     df["start_time"] = pd.to_datetime(df["start_time"])
     df = df.sort_values("start_time", kind="stable").reset_index(drop=True)
@@ -264,12 +261,8 @@ def reference_index(catalog_path: Path, grid: pd.DatetimeIndex, window: pd.Timed
     starts = df["start_time"].to_numpy(dtype="datetime64[ns]")
     grid_np = grid.to_numpy(dtype="datetime64[ns]")
     window_np = np.timedelta64(window.to_timedelta64())
-    if interval_mode == "right_closed":      # t < start <= t + w   (SuryaBench)
-        lo = np.searchsorted(starts, grid_np, side="right")
-        hi = np.searchsorted(starts, grid_np + window_np, side="right")
-    else:                                    # t <= start < t + w
-        lo = np.searchsorted(starts, grid_np, side="left")
-        hi = np.searchsorted(starts, grid_np + window_np, side="left")
+    lo = np.searchsorted(starts, grid_np, side="right")              # t < start < t + w
+    hi = np.searchsorted(starts, grid_np + window_np, side="left")
     values = np.empty(len(grid), dtype=float)
     for i, (a, b) in enumerate(zip(lo, hi)):
         values[i] = sub_series.iloc[a:b].sum() if b > a else 0.0   # same call as the reference script
@@ -335,12 +328,12 @@ def _pct(part: int, whole: int) -> str:
 
 
 def describe_disagreements(package: pd.Series, other: pd.Series, matcher: EventMatcher, window: str,
-                           interval_mode: str, atol: float, limit: int, other_name: str) -> list[dict]:
+                           atol: float, limit: int, other_name: str) -> list[dict]:
     diff = (package - other).abs()
     bad = diff[diff > atol].sort_index()
     examples = []
     for ts in bad.index[:limit]:
-        events = matcher.query(ts, window, event_time="start", interval_mode=interval_mode)
+        events = matcher.query(ts, window, event_time="start")
         examples.append({
             "timestamp": str(ts),
             "package_index": float(package[ts]),
@@ -381,17 +374,15 @@ def main():
     window_td = _parse_prediction_window(args.prediction_window)
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-    print(f"Window: event_time=start, interval_mode={args.interval_mode}, prediction_window={args.prediction_window} "
+    print(f"Window: event_time=start, (t, t+w), prediction_window={args.prediction_window} "
           f"({window_td}), cadence={args.cadence}, thresholds={thresholds}, atol={args.atol}")
-    print("Reference convention of the lab notebooks and SuryaBench: t < start <= t + 23:59:59. "
-          "The paper's closed [t, t+24h] is not expressible with the two interval modes.\n")
+    print("SuryaBench's published code counts t < start <= t + 23:59:59, the same window.\n")
 
     summary = {
         "settings": {
-            "event_time": "start", "interval_mode": args.interval_mode,
+            "event_time": "start", "window": "(t, t+w)",
             "prediction_window": args.prediction_window, "prediction_window_seconds": window_td.total_seconds(),
             "cadence": args.cadence, "thresholds": thresholds, "atol": args.atol,
-            "paper_interval_note": "[t, t+24h] (closed) is not expressible; right_closed gives (t, t+w].",
         },
         "catalogs": {}, "reference_comparison": {}, "published_comparison": {},
     }
@@ -463,7 +454,7 @@ def main():
         print(f"  grid: {len(grid)} timestamps, {grid[0]} -> {grid[-1]}")
 
         t1 = time.monotonic()
-        pkg = package_index(index_path, catalog_path, args.prediction_window, args.interval_mode)
+        pkg = package_index(index_path, catalog_path, args.prediction_window)
         if not pkg.index.equals(grid):
             raise SystemExit("internal error: package output is not aligned with the grid")
         if not np.isfinite(pkg.to_numpy()).all():
@@ -471,7 +462,7 @@ def main():
         print(f"  package: {len(pkg)} rows in {time.monotonic() - t1:.1f}s, index>0 on {int((pkg > 0).sum())}, "
               f"max {pkg.max():g}")
         t1 = time.monotonic()
-        ref = reference_index(catalog_path, grid, window_td, args.interval_mode)
+        ref = reference_index(catalog_path, grid, window_td)
         print(f"  reference (SuryaBench re-implementation): {len(ref)} rows in {time.monotonic() - t1:.1f}s")
 
         raw = compare_raw(pkg, ref, args.atol)
@@ -540,7 +531,7 @@ def main():
                     "by_year": by_year(p, q, args.atol, 10.0),
                 }
             comparison["disagreement_examples_within_bounds"] = describe_disagreements(
-                pkg.loc[within], published.loc[within], matcher, args.prediction_window, args.interval_mode,
+                pkg.loc[within], published.loc[within], matcher, args.prediction_window,
                 args.atol, args.max_examples, "published")
             summary["published_comparison"][name] = comparison
 

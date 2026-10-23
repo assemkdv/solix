@@ -60,10 +60,10 @@ def test_end_to_end_sequences_against_real_fixture_catalog(tmp_path):
     index_path = tmp_path / "sequence_index.csv"
     pd.DataFrame({
         "timestamp": pd.to_datetime([
-            "2024-02-01T09:00:00",
-            "2024-02-01T10:00:00",
-            "2024-02-01T11:00:00",
-            "2024-02-01T12:00:00",
+            "2024-02-01T08:59:00",
+            "2024-02-01T09:59:00",
+            "2024-02-01T10:59:00",
+            "2024-02-01T11:59:00",
         ]),
     }).to_csv(index_path, index=False)
 
@@ -73,17 +73,18 @@ def test_end_to_end_sequences_against_real_fixture_catalog(tmp_path):
         sequence_length=2,
         stride=1,
         cadence_minutes=60,
+        event_time="peak",
     )
     result = builder.build(index_path, CATALOG_PATH)
 
     assert list(result.columns) == ["sequence_start", "sequence_end", "timestamps", "n_images", "label"]
     assert result["sequence_end"].tolist() == [
-        pd.Timestamp("2024-02-01T10:00:00"),
-        pd.Timestamp("2024-02-01T11:00:00"),
-        pd.Timestamp("2024-02-01T12:00:00"),
+        pd.Timestamp("2024-02-01T09:59:00"),
+        pd.Timestamp("2024-02-01T10:59:00"),
+        pd.Timestamp("2024-02-01T11:59:00"),
     ]
-    # Only the last sequence's 1-hour window ([12:00, 13:00)) catches a
-    # flare (C3.0, peak exactly at 12:00) -- and it's C-class, so the
+    # Only the last sequence's 1-hour window ((11:59, 12:59)) catches a
+    # flare (C3.0, peak at 12:00) -- and it's C-class, so the
     # M-threshold binary label is still 0 for all three sequences.
     assert result["label"].tolist() == [0, 0, 0]
 
@@ -93,6 +94,7 @@ def test_end_to_end_sequences_against_real_fixture_catalog(tmp_path):
         sequence_length=2,
         stride=1,
         cadence_minutes=60,
+        event_time="peak",
     ).build(index_path, CATALOG_PATH)
     assert max_result["label"].tolist() == [0.0, 0.0, 3e-6]
 
@@ -129,12 +131,12 @@ def test_end_to_end_active_region_sequences_against_real_fixture_catalog(tmp_pat
     index_path = tmp_path / "ar_sequence_index.csv"
     pd.DataFrame({
         "timestamp": pd.to_datetime([
-            "2024-02-01T11:00:00",
-            "2024-02-01T11:30:00",
-            "2024-02-01T12:00:00",
-            "2024-02-05T09:00:00",
-            "2024-02-05T09:30:00",
-            "2024-02-05T10:00:00",
+            "2024-02-01T10:59:00",
+            "2024-02-01T11:29:00",
+            "2024-02-01T11:59:00",
+            "2024-02-05T08:59:00",
+            "2024-02-05T09:29:00",
+            "2024-02-05T09:59:00",
         ]),
         "active_region": ["11111", "11111", "11111", "22222", "22222", "22222"],
     }).to_csv(index_path, index=False)
@@ -146,6 +148,7 @@ def test_end_to_end_active_region_sequences_against_real_fixture_catalog(tmp_pat
         sequence_length=3,
         stride=3,
         cadence_minutes=30,
+        event_time="peak",
     )
     result = builder.build(index_path, CATALOG_PATH)
 
@@ -153,11 +156,11 @@ def test_end_to_end_active_region_sequences_against_real_fixture_catalog(tmp_pat
         "sequence_start", "sequence_end", "timestamps", "n_images", "active_region", "label"
     ]
     assert result["sequence_end"].tolist() == [
-        pd.Timestamp("2024-02-01T12:00:00"),
-        pd.Timestamp("2024-02-05T10:00:00"),
+        pd.Timestamp("2024-02-01T11:59:00"),
+        pd.Timestamp("2024-02-05T09:59:00"),
     ]
-    # First sequence ends exactly at region 11111's C3.0 peak -> label 1.
-    # Second sequence's 1-hour window from 10:00 catches no region-22222
+    # First sequence ends one minute before region 11111's C3.0 peak -> label 1.
+    # Second sequence's 1-hour window from 09:59 catches no region-22222
     # flare (C1.0 peaked at 06:00, M4.0 peaks later at 18:00) -> label 0.
     assert result["label"].tolist() == [1, 0]
     assert result["active_region"].tolist() == ["11111", "22222"]
@@ -194,7 +197,7 @@ def test_end_to_end_synthetic_same_day_catalog(tmp_path):
     index_path = _write_index(tmp_path / "index.csv",
                               ["2030-01-10T00:00:00", "2030-01-12T00:00:00", "2030-01-13T00:00:00"])
 
-    # Defaults: event_time="peak", interval_mode="left_closed" -> [t, t + 24h).
+    # Window (t, t + 24h): excludes t and t + 24h.
     #   2030-01-10 00:00: M2.0 (peak 09:52) -> 1, max flux 2e-5
     #   2030-01-12 00:00: only C3.0 (peak 12:00), below M -> 0, max flux 3e-6
     #   2030-01-13 00:00: nothing -> 0, 0.0
@@ -224,7 +227,7 @@ def test_end_to_end_midnight_crossing_event(tmp_path):
     index_path = _write_index(tmp_path / "index.csv",
                               ["2030-01-11T00:00:00", "2030-01-12T00:00:00", "2030-01-13T00:00:00"])
 
-    # Windows [t, t + 24h) (default interval_mode):
+    # Windows (t, t + 24h):
     #   2030-01-11 00:00: start 01-11 23:50 inside; peak 01-12 00:05 outside
     #   2030-01-12 00:00: start before t; peak 01-12 00:05 inside
     #   2030-01-13 00:00: neither

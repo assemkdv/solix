@@ -2,7 +2,7 @@
 Example 9 -- multiclass labels: NF, A, B, C, M or X.
 
 Question answered for every image: "What is the GOES class of the
-strongest flare that starts in (t, t + 24h]?" ("NF" if there is none.)
+strongest flare that starts in (t, t + 24h)?" ("NF" if there is none.)
 
 The label is the class of the single flux value MaxFluxReducer selects,
 i.e. the strongest flare in the window. It does not record which other
@@ -23,7 +23,7 @@ import flare_indexer as fidx
 DATA = Path(__file__).parent / "data"
 OUTPUT = Path(__file__).parent / "output"
 CATALOG = DATA / "flare_catalog.csv"
-OPTIONS = dict(prediction_window="24h", event_time="start", interval_mode="right_closed")
+OPTIONS = dict(prediction_window="24h", event_time="start")
 
 
 def main():

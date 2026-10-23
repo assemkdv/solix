@@ -141,7 +141,7 @@ def test_tensorflow_and_pytorch_loaders_yield_the_same_samples(tmp_path):
     index_path = tmp_path / "index.csv"
     real.build_image_index(index_path)
     options = dict(prediction_window="24h", strategy=fidx.BinaryThresholdStrategy("M"), target="full_disk",
-                   event_time="start", interval_mode="right_closed")
+                   event_time="start")
     labels = fidx.DatasetBuilder(include_metadata=True, **options).build(index_path, real.CATALOG)
     sequences = fidx.DatasetBuilder(cadence="1h", observation_window="3h", sliding_window="1h", **options) \
         .build(index_path, real.CATALOG)

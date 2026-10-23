@@ -40,11 +40,10 @@ Python 3.10–3.13).
 import flare_indexer as fidx
 
 builder = fidx.DatasetBuilder(
-    prediction_window="24h",                      # look 24 h ahead of each image
+    prediction_window="24h",                      # window (t, t + 24h)
     strategy=fidx.BinaryThresholdStrategy("M"),   # 1 if any flare >= M1.0, else 0
     target="full_disk",                           # or "active_region"
-    event_time="peak",                            # which flare time is checked
-    interval_mode="left_closed",                  # [t, t + 24h)
+    event_time="start",                           # flare start time must be in the window
 )
 labels = builder.build("examples/data/full_disk_image_index.csv",
                        "examples/data/flare_catalog.csv")

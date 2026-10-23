@@ -117,7 +117,7 @@ def main(argv=None):
     print(f"TensorFlow {tf.__version__}")
     print(f"Image index: {len(index)} images -> {index_path}")
     print(f"Catalog: {provenance['catalog_rows']} flares, queried {provenance['query_start']} .. "
-          f"{provenance['query_end']}; covers every (t, t+{PREDICTION_WINDOW}] window")
+          f"{provenance['query_end']}; covers every (t, t+{PREDICTION_WINDOW}) window")
 
     # 2. Sequences and labels.
     builder = fidx.DatasetBuilder(
@@ -125,7 +125,6 @@ def main(argv=None):
         strategy=fidx.BinaryThresholdStrategy("M"),  # 1 if any flare >= M1.0 in the window
         target="full_disk",
         event_time="start",
-        interval_mode="right_closed",                # (sequence_end, sequence_end + 24h]
         cadence=CADENCE,
         observation_window=OBSERVATION_WINDOW,
         sliding_window=SLIDING_WINDOW,

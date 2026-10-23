@@ -22,7 +22,7 @@ What it does:
    and compares both the `label` and `goes_class` columns, file by file
    (the published "FQ" marker counts as "no flare").
 4. Labels every patch with flare_indexer (target="active_region",
-   start_time, (t, t+window], M threshold) and compares the binary label.
+   start_time, (t, t+window), M threshold) and compares the binary label.
 
 All inputs are pinned to fixed commits, so the comparison is repeatable.
 
@@ -230,10 +230,10 @@ def main():
     lexical_vs_numeric = int((lookback["goes_class"] != lookback["numeric_max_class"]).sum())
     print(f"  rows where the alphabetical max class differs from the numeric max: {lexical_vs_numeric}")
 
-    print(f"flare_indexer forward (t, t+{args.prediction_window}]:")
+    print(f"flare_indexer forward (t, t+{args.prediction_window}):")
     builder = DatasetBuilder(
         prediction_window=args.prediction_window, strategy=BinaryThresholdStrategy("M"),
-        target="active_region", event_time="start", interval_mode="right_closed",
+        target="active_region", event_time="start",
         missing_active_region="error", include_metadata=True,
     )
     with warnings.catch_warnings():
@@ -276,7 +276,7 @@ def main():
             "alphabetical_vs_numeric_max_differences": lexical_vs_numeric,
         },
         "flare_indexer_forward": {
-            "settings": f"target=active_region, event_time=start, (t, t+{args.prediction_window}], M threshold",
+            "settings": f"target=active_region, event_time=start, (t, t+{args.prediction_window}), M threshold",
             "label": forward_label,
             "positives": int(forward.sum()),
             "generated_1_published_0": int(((forward == 1) & (published_label == 0)).sum()),

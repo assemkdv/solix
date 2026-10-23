@@ -1,9 +1,10 @@
 """
 Example 2 -- exactly which flares fall inside the prediction window.
 
-Uses one image at 2024-03-04 00:00 and the synthetic M1.0 flare that
-starts at 2024-03-05 00:00 -- exactly 24 hours later -- to show how
-`event_time`, `interval_mode` and the window length change the answer.
+The window is always (t, t + w): a flare must start after the image
+time t and before t + w; one at exactly t or exactly t + w does not count. Uses the synthetic M1.0 flare that starts at
+2024-03-05 00:00 (peak 00:10) to show how the window length and
+`event_time` change the answer at the edges.
 
 Run:  python examples/02_window_boundaries.py
 """
@@ -19,25 +20,23 @@ DATA = Path(__file__).parent / "data"
 
 def main():
     matcher = fidx.EventMatcher(DATA / "flare_catalog.csv")
-    image_time = pd.Timestamp("2024-03-04 00:00:00")
 
-    settings = [
-        # (event_time, interval_mode, prediction_window, description)
-        ("peak", "left_closed", 24, "package default:  peak_time in [t, t+24h)"),
-        ("start", "right_closed", 24, "legacy-like:      start_time in (t, t+24h]"),
-        ("start", "right_closed", "23h59min59s", "legacy exact:     start_time in (t, t+23:59:59]"),
+    cases = [
+        # (image time t, window, event_time, description)
+        ("2024-03-04 00:00:00", "24h", "start", "starts exactly at t+24h: excluded"),
+        ("2024-03-04 00:00:00", "24h10min", "start", "window 10 min longer: included"),
+        ("2024-03-04 00:00:00", "24h10min", "peak", "peak exactly at t+w: excluded"),
+        ("2024-03-05 00:00:00", "1h", "start", "starts exactly at t: excluded"),
     ]
-    print(f"Image time t = {image_time}\n")
-    for event_time, interval_mode, window, description in settings:
-        flares = matcher.query(image_time, window, event_time=event_time, interval_mode=interval_mode)
+    for image_time, window, event_time, description in cases:
+        flares = matcher.query(pd.Timestamp(image_time), window, event_time=event_time)
         found = ", ".join(f"{f.goes_class} (start {f.start_time:%m-%d %H:%M})" for f in flares) or "none"
         label = fidx.BinaryThresholdStrategy("M").label(flares)
-        print(f"{description:<50} label={label}  flares: {found}")
+        print(f"t={image_time}  w={window:<8}  {event_time:<5}  label={label}  {description:<36} flares: {found}")
 
     print(
-        "\nThe M1.0 flare starts at exactly t + 24h. It is inside (t, t+24h] but outside\n"
-        "[t, t+24h) and outside (t, t+23:59:59]. On the real full-disk data this single\n"
-        "boundary choice explains all 6 differences from the legacy labels."
+        "\n(t, t+w) counts neither a flare that starts at the image time nor one that\n"
+        "starts exactly at t+w: a 24 h window means 't < start <= t + 23:59:59'."
     )
 
 

@@ -36,7 +36,6 @@ class FlareEvent:
 
 
 VALID_EVENT_TIMES = {"start", "peak"}
-VALID_INTERVAL_MODES = {"left_closed", "right_closed"}
 
 
 def _parse_prediction_window(value) -> pd.Timedelta:
@@ -326,8 +325,7 @@ class EventMatcher:
         image_time: pd.Timestamp,
         prediction_window_hours: int,
         active_region: str | None = None,
-        event_time: str = "peak",
-        interval_mode: str = "left_closed",
+        event_time: str = "start",
     ) -> list[FlareEvent]:
         """
         Returns all flares whose event time falls inside the prediction
@@ -335,25 +333,21 @@ class EventMatcher:
 
         event_time selects which of a flare's timestamps is checked against
         the window:
-        - "peak" (default, preserves original behavior): the flare's
-          peak_time.
-        - "start": the flare's start_time. This matches how Dr. Pandey's
-          legacy full-disk labeling script defines its prediction window.
+        - "start" (default): the flare's start_time. This matches
+          SuryaBench and the lab's labeling scripts.
+        - "peak": the flare's peak_time.
 
-        interval_mode selects the window's boundary convention, given
-        window_end = image_time + prediction_window_hours:
-        - "left_closed" (default, preserves original behavior):
-          [image_time, window_end) -- includes image_time itself, excludes
-          window_end exactly.
-        - "right_closed": (image_time, window_end] -- excludes image_time
-          itself, includes window_end exactly. This matches the legacy
-          full-disk script's convention.
+        The window is (image_time, image_time + prediction_window): a flare
+        must come strictly after image_time and strictly before the window
+        end, so a flare at exactly image_time or exactly the window end does
+        not count. With minute-resolution catalogs a 24 h window is
+        t < time <= t + 23:59:59, as in SuryaBench.
 
         prediction_window_hours is either a number of hours (e.g. 24) or a
         pandas-compatible duration (e.g. "23h59min59s", pd.Timedelta).
 
         Example: image taken at 10:00, window = 24 hours, defaults
-        → returns all flares with peak_time in [10:00, 10:00 next day)
+        → returns all flares with start_time in (10:00, 10:00 next day)
 
         If active_region is given, only flares attributed to that exact
         active region are returned; flares with a missing active_region
@@ -370,8 +364,6 @@ class EventMatcher:
         """
         if event_time not in VALID_EVENT_TIMES:
             raise ValueError(f"event_time must be one of {sorted(VALID_EVENT_TIMES)}, got {event_time!r}")
-        if interval_mode not in VALID_INTERVAL_MODES:
-            raise ValueError(f"interval_mode must be one of {sorted(VALID_INTERVAL_MODES)}, got {interval_mode!r}")
         if isinstance(image_time, (datetime.datetime, np.datetime64)) and not isinstance(image_time, pd.Timestamp):
             image_time = pd.Timestamp(image_time)
         if not isinstance(image_time, pd.Timestamp) or pd.isna(image_time):
@@ -395,12 +387,9 @@ class EventMatcher:
         image_time_np = np.datetime64(image_time)
         window_end_np = np.datetime64(window_end)
 
-        if interval_mode == "left_closed":
-            lo = np.searchsorted(sorted_values, image_time_np, side="left")
-            hi = np.searchsorted(sorted_values, window_end_np, side="left")
-        else:
-            lo = np.searchsorted(sorted_values, image_time_np, side="right")
-            hi = np.searchsorted(sorted_values, window_end_np, side="right")
+        # (image_time, window_end): exclude both image_time and window_end.
+        lo = np.searchsorted(sorted_values, image_time_np, side="right")
+        hi = np.searchsorted(sorted_values, window_end_np, side="left")
 
         candidate_positions = sort_positions[lo:hi]
         candidates = self._catalog.iloc[candidate_positions]

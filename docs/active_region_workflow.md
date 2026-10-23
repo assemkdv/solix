@@ -59,7 +59,6 @@ builder = fidx.DatasetBuilder(
     strategy=fidx.BinaryThresholdStrategy("M"),
     target="active_region",
     event_time="start",
-    interval_mode="right_closed",
     missing_active_region="error",   # see decision Q4
     include_metadata=True,           # keeps active_region and image_path
 )
@@ -83,7 +82,7 @@ sequences, so no splitting is needed:
 ```python
 seqs, report = fidx.DatasetBuilder(
     prediction_window=24, strategy=fidx.BinaryThresholdStrategy("M"),
-    target="active_region", event_time="start", interval_mode="right_closed",
+    target="active_region", event_time="start",
     missing_active_region="drop",
     cadence="1h", observation_window="6h", sliding_window="1h",
 ).build("ar_index.csv", "ar_catalog.csv", return_report=True)

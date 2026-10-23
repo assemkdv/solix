@@ -31,8 +31,8 @@ FLARES = [
     # No NOAA active region recorded (common for real catalogs).
     ("2024-03-02 12:00:00", "2024-03-02 12:09:00", "2024-03-02 12:25:00", "C8.0", None, None, None),
     ("2024-03-03 18:00:00", "2024-03-03 18:05:00", "2024-03-03 18:15:00", "B5.0", 13600, 10.0, 12.5),
-    # Starts exactly 24h after the 2024-03-04 00:00 image: inside (t, t+24h],
-    # outside [t, t+24h) on peak time and outside the legacy (t, t+23:59:59].
+    # Starts exactly 24h after the 2024-03-04 00:00 image: outside that
+    # image's (t, t+24h) window, inside the window of the 2024-03-05 00:00 image.
     ("2024-03-05 00:00:00", "2024-03-05 00:10:00", "2024-03-05 00:25:00", "M1.0", 13600, 25.0, 12.5),
     # A strong flare with no active region.
     ("2024-03-05 20:00:00", "2024-03-05 20:20:00", "2024-03-05 20:45:00", "M5.0", None, None, None),

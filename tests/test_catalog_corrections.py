@@ -136,7 +136,7 @@ def test_start_time_labels_are_unchanged_by_the_corrections(tmp_path):
     expected = [int(((starts > t) & (starts <= t + pd.Timedelta("24h")) & raw["goes_class"].str.startswith("C")).any())
                 for t in pd.to_datetime(pd.read_csv(index)["timestamp"])]
     result = DatasetBuilder(prediction_window="24h", strategy=BinaryThresholdStrategy("C"), target="full_disk",
-                            event_time="start", interval_mode="right_closed").build(index, tmp_path / "adapted.csv")
+                            event_time="start").build(index, tmp_path / "adapted.csv")
     assert result["label"].tolist() == expected == [1, 1, 1, 1, 0]
 
 

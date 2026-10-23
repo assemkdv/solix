@@ -38,20 +38,20 @@ def main():
     image_time = pd.Timestamp("2024-03-01 12:00:00")
 
     pipeline = fidx.DatasetBuildingPipeline(fidx.MaxFluxReducer(), fidx.BinaryThresholdLabeler("M"))
-    result = pipeline.run_one(matcher, image_time, 24, event_time="start", interval_mode="right_closed")
-    print(f"Image at {image_time}, window (t, t+24h] on start_time")
+    result = pipeline.run_one(matcher, image_time, 24, event_time="start")
+    print(f"Image at {image_time}, window (t, t+24h) on start_time")
     for event in result.events:
         print(f"  matched {event.goes_class:<5} start={event.start_time}  region={event.active_region}")
     print(f"  reduced value (max flux): {result.reduced_value:.1e} W/m^2")
     print(f"  label (>= M1.0):          {result.label}")
 
     custom = fidx.DatasetBuildingPipeline(FlareCountReducer(), AtLeastTwoFlares())
-    counted = custom.run_one(matcher, image_time, 24, event_time="start", interval_mode="right_closed")
+    counted = custom.run_one(matcher, image_time, 24, event_time="start")
     print(f"\nCustom pipeline: {counted.reduced_value} flares in the window -> label {counted.label}")
 
     # A pipeline is also a drop-in strategy for DatasetBuilder.
     labels = fidx.DatasetBuilder(prediction_window=24, strategy=custom,
-                                 event_time="start", interval_mode="right_closed") \
+                                 event_time="start") \
         .build(DATA / "full_disk_image_index.csv", DATA / "flare_catalog.csv")
     print(f"Custom pipeline over the whole sample index: {int(labels['label'].sum())} of "
           f"{len(labels)} images have >= 2 flares in their window")

@@ -116,7 +116,7 @@ def test_end_to_end_active_region_against_real_fixture_catalog(tmp_path):
     )
     result = builder.build(index_path, CATALOG_PATH)
 
-    assert list(result.columns) == ["timestamp", "label"]
+    assert list(result.columns) == ["timestamp", "active_region", "label"]
     assert result["label"].tolist() == [1, 0, 1]
 
 

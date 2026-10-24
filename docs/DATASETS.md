@@ -111,20 +111,19 @@ sequences = builder.build("image_index.csv", "flare_catalog.csv")
 ## Active regions
 
 ```python
-builder = fidx.ActiveRegionSingleImage("24h", fidx.BinaryThresholdStrategy("M"),
-                                       include_metadata=True)
+builder = fidx.ActiveRegionSingleImage("24h", fidx.BinaryThresholdStrategy("M"))
 labels = builder.build("active_region_image_index.csv", "flare_catalog.csv")
 ```
 
 ```text
-          timestamp active_region  label  image_path
-2024-03-01 00:00:00         13600      1  patches/13600/patch_13600_20240301_0000.jpg
-2024-03-01 00:00:00         13601      1  patches/13601/patch_13601_20240301_0000.jpg
+          timestamp active_region  label
+2024-03-01 00:00:00         13600      1
+2024-03-01 00:00:00         13601      1
 ```
 
 - Only the flares of a patch's own region count.
-- Several regions can share a timestamp. Use `include_metadata=True` to
-  keep the `active_region` column, so the rows can be told apart.
+- Several regions can share a timestamp, so the result always has an
+  `active_region` column.
 - `ActiveRegionSequence` takes the same settings as `FullDiskSequence` and
   builds each region's sequences from that region's patches only.
 - A catalog flare with no region can never match a patch, and a warning

@@ -391,7 +391,7 @@ def test_active_region_single_image_works_with_pipeline(tmp_path):
     builder = DatasetBuilder(prediction_window=24, strategy=pipeline, target="active_region")
     result = builder.build(index_path, CATALOG_PATH)
 
-    assert list(result.columns) == ["timestamp", "label"]
+    assert list(result.columns) == ["timestamp", "active_region", "label"]
     assert result["label"].tolist() == [1, 0, 1]
 
 

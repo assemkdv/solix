@@ -358,4 +358,4 @@ def test_full_disk_sequence_and_active_region_single_image_unchanged(tmp_path):
     ar_single_result = DatasetBuilder(
         prediction_window=24, strategy=BinaryThresholdStrategy(), target="active_region"
     ).build(ar_index_path, catalog_path)
-    assert list(ar_single_result.columns) == ["timestamp", "label"]
+    assert list(ar_single_result.columns) == ["timestamp", "active_region", "label"]

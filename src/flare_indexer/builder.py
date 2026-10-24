@@ -199,12 +199,12 @@ class DatasetBuilder:
         mode such images never join a region's sequence; with "negative"
         they form one extra group whose sequences get active_region=None.
     include_metadata : bool
-        Single-image mode only. False (default, preserves original
-        behavior) returns just (timestamp, label) -- or, for
-        target="active_region", the same. True also returns every other
-        image-index column (e.g. image_path); for target="active_region"
-        the normalized active_region is placed right before label, so
-        several regions observed at the same timestamp stay distinguishable.
+        Single-image mode only. False (default) returns just
+        (timestamp, label), or (timestamp, active_region, label) for
+        target="active_region": the normalized active_region is always
+        kept there, so several regions observed at the same timestamp stay
+        distinguishable. True also returns every other image-index column
+        (e.g. image_path).
     include_flares : bool
         False (default) returns only the label. True adds a "flares" column
         right after it: the GOES classes of the flares in each window, in
@@ -518,10 +518,8 @@ class DatasetBuilder:
             extra_columns = _extra_columns(index_df, ("timestamp", "active_region"), tuple(self._label_columns()), path)
         else:
             extra_columns = []
-        if self.include_metadata:
-            columns = ["timestamp", "active_region"] + self._label_columns() + extra_columns
-        else:
-            columns = ["timestamp"] + self._label_columns()
+        # active_region is always kept: several regions can share a timestamp.
+        columns = ["timestamp", "active_region"] + self._label_columns() + extra_columns
 
         records = []
         missing_rows = []

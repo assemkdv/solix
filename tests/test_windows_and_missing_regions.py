@@ -226,13 +226,15 @@ def test_include_metadata_keeps_regions_at_same_timestamp_distinguishable(multi_
     assert result["label"].tolist() == [1, 0, 0]
 
 
-def test_include_metadata_default_keeps_original_schema(multi_region_index, ar_catalog):
+def test_active_region_column_is_kept_without_include_metadata(multi_region_index, ar_catalog):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         result = DatasetBuilder(
             prediction_window=24, strategy=BinaryThresholdStrategy(), target="active_region",
         ).build(multi_region_index, ar_catalog)
-    assert list(result.columns) == ["timestamp", "label"]
+    assert list(result.columns) == ["timestamp", "active_region", "label"]
+    # Three patches share one timestamp; the region column tells them apart.
+    assert result["active_region"].tolist() == ["100", "200", None]
 
 
 def test_include_metadata_empty_index_keeps_columns(tmp_path, ar_catalog):

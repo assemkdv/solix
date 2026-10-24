@@ -13,6 +13,7 @@ from flare_indexer import (
     BinaryThresholdLabeler,
     BinaryThresholdStrategy,
     EventMatcher,
+    MaxFluxReducer,
     adapt_goes_catalog,
 )
 from flare_indexer.events import _normalize_active_region, _parse_prediction_window
@@ -517,3 +518,9 @@ def test_binary_labeler_rejects_unsupported_types(value):
 def test_binary_labeler_rejects_non_finite_values(value):
     with pytest.raises(ValueError, match="non-finite"):
         BinaryThresholdLabeler("M").assign(value)
+
+
+@pytest.mark.parametrize("strategy", [BinaryThresholdLabeler("M"), MaxFluxReducer(), "M", None])
+def test_a_strategy_without_label_is_rejected_clearly(strategy):
+    with pytest.raises(TypeError, match="must have a label\\(flares\\) method.*DatasetBuildingPipeline"):
+        DatasetBuilder(prediction_window=24, strategy=strategy)

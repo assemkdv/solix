@@ -206,6 +206,12 @@ class DatasetBuilder:
         verbose=False,
     ):
         parsed_prediction_window = _parse_prediction_window(prediction_window)
+        if not callable(getattr(strategy, "label", None)):
+            raise TypeError(
+                f"strategy={strategy!r} must have a label(flares) method, like BinaryThresholdStrategy('M'). "
+                "To use a reducer and a labeler, pass them together: "
+                "DatasetBuildingPipeline(MaxFluxReducer(), BinaryThresholdLabeler('M'))."
+            )
         if missing_active_region not in VALID_MISSING_ACTIVE_REGION_POLICIES:
             raise ValueError(
                 f"missing_active_region must be one of {sorted(VALID_MISSING_ACTIVE_REGION_POLICIES)}, "

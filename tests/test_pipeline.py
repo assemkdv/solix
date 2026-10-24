@@ -5,6 +5,7 @@ import pytest
 
 from flare_indexer.builder import DatasetBuilder
 from flare_indexer.events import EventMatcher, FlareEvent
+from flare_indexer.goes_class import InvalidGOESClassError
 from flare_indexer.labelers import BinaryThresholdLabeler, RegressionLabeler
 from flare_indexer.pipeline import DatasetBuildingPipeline, PipelineResult
 from flare_indexer.reducers import MaxFluxReducer
@@ -296,7 +297,7 @@ def test_invalid_goes_class_from_event_matcher_propagates_through_pipeline():
         },
     ])
     pipeline = _default_pipeline()
-    with pytest.raises(KeyError):
+    with pytest.raises(InvalidGOESClassError):
         pipeline.run_one(matcher, pd.Timestamp("2024-01-01 00:00"), prediction_window=1)
 
 

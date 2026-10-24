@@ -14,19 +14,8 @@ _GOES_CLASS_PATTERN = re.compile(r"^\s*([ABCMX])\s*(\d+(?:\.\d+)?)?\s*$", re.IGN
 _MAX_INVALID_EXAMPLES = 5
 
 
-class InvalidGOESClassError(ValueError, KeyError, IndexError):
-    """
-    Raised for a missing or malformed GOES class value.
-
-    Subclasses ValueError, and also KeyError/IndexError for backward
-    compatibility: earlier versions raised KeyError for an unknown letter
-    ("Z5.0") and IndexError for an empty string, and callers may still
-    catch those.
-    """
-
-    def __str__(self):
-        # KeyError.__str__ would wrap the message in quotes.
-        return str(self.args[0]) if self.args else ""
+class InvalidGOESClassError(ValueError):
+    """Raised for a missing or malformed GOES class value."""
 
 
 def parse_goes_class(goes_class) -> tuple[str, float]:

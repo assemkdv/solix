@@ -40,7 +40,7 @@ class BinaryThresholdLabeler:
         self.threshold = threshold
         try:
             self._threshold_flux = _flux_converter.to_flux(threshold)
-        except (KeyError, IndexError, ValueError) as exc:
+        except ValueError as exc:
             raise ValueError(f"Invalid GOES threshold {threshold!r}: {exc}") from exc
 
     def assign(self, reduced_value) -> int:

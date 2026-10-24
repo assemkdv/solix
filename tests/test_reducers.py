@@ -2,6 +2,7 @@ import pandas as pd
 import pytest
 
 from flare_indexer.events import FlareEvent
+from flare_indexer.goes_class import InvalidGOESClassError
 from flare_indexer.reducers import MaxFluxReducer
 
 
@@ -34,5 +35,5 @@ def test_max_flux_reducer_numeric_not_lexical_ordering():
 
 
 def test_max_flux_reducer_invalid_goes_class_propagates():
-    with pytest.raises(KeyError):
+    with pytest.raises(InvalidGOESClassError):
         MaxFluxReducer().reduce([_flare("Z5.0")])

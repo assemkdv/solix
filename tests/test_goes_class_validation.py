@@ -26,16 +26,10 @@ def test_invalid_goes_classes_raise_clear_error(value):
         FluxConverter().to_flux(value)
     message = str(excinfo.value)
     assert "GOES class" in message
-    assert not message.startswith("'")  # not KeyError's quoted repr
 
 
-def test_error_type_stays_backward_compatible():
-    # Older code caught KeyError (bad letter) or IndexError (empty string).
+def test_error_is_a_value_error():
     assert issubclass(InvalidGOESClassError, ValueError)
-    with pytest.raises(KeyError):
-        FluxConverter().to_flux("Z5.0")
-    with pytest.raises(IndexError):
-        FluxConverter().to_flux("")
 
 
 def test_catalog_with_invalid_classes_fails_at_load(tmp_path):

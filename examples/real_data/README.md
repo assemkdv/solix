@@ -48,7 +48,7 @@ JSOC has no records at 07:00 and 08:00.
 
 | HARP | NOAA region | Flares |
 |---|---|---|
-| 7115 | 12673 | M1.2 starting 2017-09-04 05:36, then M- and X-class flares |
+| 7115 | 12673 | M1.2 starting 2017-09-04 05:36, then more M-class flares (up to M5.5) |
 | 7120 | 12675 | none in 2017-09-01 .. 06 |
 
 Timestamps are the observation times from each file's header: `DATE_OBS`
@@ -110,6 +110,7 @@ different sizes can be batched.
 - The data cover one morning. They show how the package works; they are
   not a training set. The Helioviewer images are 8-bit display products,
   not calibrated data.
-- Sequences use exact timestamps. Some HMI times are 0.1 s or 35 s off the
-  hourly grid, so 6 of 8 candidate sequences are skipped. The package has
+- Sequences use exact timestamps. Some HMI times are 0.1 s or 45 s off the
+  hourly grid, and the 07:00 image is missing, so 6 of 8 candidate
+  sequences are skipped. The package has
   no tolerance for this, and the examples do not add one.

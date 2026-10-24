@@ -7,12 +7,12 @@ sequence is labeled from its FINAL observation time t_end: 1 if an M-class
 or stronger flare starts in [t_end, t_end + 24h), else 0.
 
 The grid uses the images' full-precision observation times (DATE_OBS,
-e.g. 00:59:49.9), starting at the first image. Three grid points in this
+e.g. 00:59:49.9), starting at the first image. Five grid points in this
 data have no image, and flare_indexer skips every sequence that needs one
 of them; no nearby image is used in its place and no time is rounded:
-- 04:59:49.9: the image for that hour was observed at 04:59:50.0, 0.1 s
-  later. It stays in the index and is labeled on its own (example 6), but
-  it is not on this grid;
+- 04:59:49.9, 05:59:49.9 and 07:59:49.9: the images for those hours were
+  observed 0.1 s later (04:59:50.0, ...). They stay in the index and are
+  labeled on their own (example 6), but they are not on this grid;
 - 06:59:49.9: the request for 07:00 had no image within 60 s (the closest
   was 07:36:35), so fetch_real_data.py recorded it as missing;
 - 08:59:49.9: the image near 09:00 was observed at 09:00:34.9.

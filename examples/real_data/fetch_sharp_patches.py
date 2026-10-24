@@ -4,7 +4,7 @@ Download the active-region patches used by examples 10 and 11.
 The patches are SDO/HMI SHARP magnetograms (hmi.sharp_cea_720s, segment
 "magnetogram") of two regions, hourly from 2017-09-03 00:00 to 09:00 TAI:
 
-    HARP 7115 = NOAA 12673 (M- and X-class flares on 2017-09-04 to 06)
+    HARP 7115 = NOAA 12673 (M-class flares from 2017-09-04, up to M5.5 in the catalog)
     HARP 7120 = NOAA 12675 (no flares in these days)
 
 The files are already in the repository (sharp_patches/), so the examples

@@ -1,13 +1,15 @@
 """
 Example 3 -- active-region (AR) labels.
 
-With target="active_region", an image patch only gets flares from its own
-NOAA active region. This example shows:
+With ActiveRegionSingleImage and ActiveRegionSequence, a patch only gets
+flares from its own NOAA active region. This example prints three parts:
 
-1. two regions observed at the same time get different labels;
-2. what happens to a patch with an unknown region (missing_active_region);
-3. catalog flares with no region can never be matched (a warning says so);
-4. sequences are built separately for each region.
+1) two regions observed at the same time get different labels, and two
+   warnings: a patch with an unknown region is labeled 0, and catalog
+   flares with no region can never be matched;
+2) missing_active_region="drop" leaves the unknown patch out, and "error"
+   stops instead;
+3) sequences are built separately for each region.
 
 Run:  python examples/03_active_region.py
 """
@@ -69,6 +71,7 @@ def main():
     print(sequences[["sequence_start", "sequence_end", "active_region", "label"]].head(8).to_string(index=False))
     print(f"   ... {len(sequences)} sequences from {report.region_count} regions, "
           f"{report.skipped_sequences} skipped for missing images")
+
 
 if __name__ == "__main__":
     main()

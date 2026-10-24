@@ -1,5 +1,6 @@
 """
-Reading the Helioviewer HMI JPEG 2000 files used by examples 06-09.
+Reading the Helioviewer HMI JPEG 2000 files used by examples 06-09
+(example 11 also uses to_channels_last).
 
 Kept apart from fetch_real_data.py so the examples can read and decode the
 cached files without any network code. Decoding needs Pillow built with
@@ -15,7 +16,7 @@ import pandas as pd
 
 HEADER_KEYS = ("DATE_OBS", "T_OBS", "T_REC", "TELESCOP", "INSTRUME", "CONTENT", "WAVELNTH", "QUALITY", "CROTA2")
 
-# Preprocessing shared by both examples (see decode_magnetogram).
+# Preprocessing shared by examples 06-09 (see decode_magnetogram).
 SOURCE_SIZE = 4096
 REDUCE = 4                      # decode at 1 / 2**4 of full resolution
 IMAGE_SIZE = SOURCE_SIZE >> REDUCE  # 256

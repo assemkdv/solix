@@ -10,7 +10,8 @@ import pandas as pd
 
 from .goes_class import FluxConverter, validate_goes_class_column
 from .events import (
-    _normalize_active_region, _parse_full_timestamp_column, _rename_columns, CATALOG_COLUMNS, XRAY_FLUX_COLUMNS,
+    _normalize_active_region, _parse_full_timestamp_column, _rename_columns, _validate_time_order,
+    CATALOG_COLUMNS, XRAY_FLUX_COLUMNS,
 )
 
 # File names like "HMI.m2010.12.21_21.00.00.jpg" (the basename only); the
@@ -362,6 +363,10 @@ def add_relative_flux(
     validate_goes_class_column(catalog["class"], catalog_path, column="class")
     starts = _parse_full_timestamp_column(catalog, "start_time", catalog_path)
     ends = _parse_full_timestamp_column(catalog, "end_time", catalog_path)
+    peaks = (_parse_full_timestamp_column(catalog, "peak_time", catalog_path) if "peak_time" in catalog.columns
+             else pd.Series(pd.NaT, index=catalog.index))
+    # The same start <= peak <= end check as build(), so a catalog it accepts loads there too.
+    _validate_time_order(pd.DataFrame({"start_time": starts, "peak_time": peaks, "end_time": ends}), catalog_path)
 
     times, raw = _read_xray_flux(xray_flux_path, xray_columns)
     if verbose:

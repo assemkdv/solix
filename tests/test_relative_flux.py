@@ -227,6 +227,13 @@ def test_catalog_that_already_has_rxfi_is_refused(tmp_path):
         add_relative_flux(path, _flux_file(tmp_path, {0: 1e-7}))
 
 
+def test_flare_that_ends_before_it_starts_is_refused(tmp_path):
+    # The same check as build(), so a catalog add_relative_flux accepts also loads there.
+    bad = "2024-01-02 00:00:00,2024-01-02 00:05:00,2024-01-01 23:00:00,M1.0,100\n"
+    with pytest.raises(ValueError, match="data row 1: times must satisfy start <= peak <= end"):
+        add_relative_flux(_catalog_file(tmp_path, [bad]), _flux_file(tmp_path, {0: 1e-7}))
+
+
 @pytest.mark.parametrize("content, message", [
     ("when,flux\n2024-01-01 00:00:00,1e-7\n", "missing required column"),
     ("time,flux\n2024-01-01 00:00:00,abc\n", "column 'flux', data row 1"),

@@ -12,9 +12,10 @@ Usage:
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
-from flare_indexer import adapt_goes_catalog
+from flare_indexer import FluxConverter, adapt_goes_catalog
 
 DATA_DIR = Path(__file__).parent
 
@@ -41,6 +42,29 @@ FLARES = [
 
 def _hmi_path(ts: pd.Timestamp) -> str:
     return f"hmi/{ts:%Y/%m/%d}/HMI.m{ts:%Y.%m.%d_%H.%M.%S}.jpg"
+
+
+def _xray_flux() -> pd.DataFrame:
+    """
+    One synthetic GOES 1-8 Angstrom flux value per minute: a quiet Sun that
+    slowly brightens over the days, plus a rise and decay for every flare.
+    """
+    minutes = pd.date_range("2024-02-29 00:00", "2024-03-06 23:59", freq="1min")
+    days = (minutes - minutes[0]) / pd.Timedelta(days=1)
+    flux = (3e-7 * (1 + 0.1 * days) * (1 + 0.2 * np.sin(2 * np.pi * days))).to_numpy()
+    converter = FluxConverter()
+    for start, peak, end, goes_class, *_ in FLARES:
+        start, peak, end = pd.Timestamp(start), pd.Timestamp(peak), pd.Timestamp(end)
+        top = converter.to_flux(goes_class)
+        rise = (minutes >= start) & (minutes <= peak)
+        decay = (minutes > peak) & (minutes <= end)
+        profile = np.zeros(len(minutes))
+        profile[rise] = top * ((minutes[rise] - start) / (peak - start)).to_numpy()
+        profile[decay] = top * ((end - minutes[decay]) / (end - peak)).to_numpy()
+        flux = np.maximum(flux, profile)
+    # A data gap: no measurement for one hour.
+    flux[(minutes >= "2024-03-03 03:00") & (minutes < "2024-03-03 04:00")] = np.nan
+    return pd.DataFrame({"time": minutes.strftime("%Y-%m-%d %H:%M:%S"), "flux": flux})
 
 
 def main():
@@ -85,6 +109,8 @@ def main():
     ar_index = pd.DataFrame(patches).sort_values(["timestamp", "image_path"], kind="stable")
     ar_index["active_region"] = ar_index["active_region"].astype("Int64")
     ar_index.to_csv(DATA_DIR / "active_region_image_index.csv", index=False)
+
+    _xray_flux().to_csv(DATA_DIR / "xray_flux.csv", index=False, float_format="%.4e")
 
     print(f"Sample data written to {DATA_DIR}")
 

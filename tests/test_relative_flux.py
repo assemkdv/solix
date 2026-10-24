@@ -140,3 +140,113 @@ def test_adapt_goes_catalog_carries_rxfi(tmp_path):
     adapted = adapt_goes_catalog(source)
     assert adapted["rxfi"].tolist()[0] == 4.5
     assert pd.isna(adapted["rxfi"].tolist()[1])
+
+
+# ── add_relative_flux: background flux and rxfi from 1-minute X-ray flux ──
+
+from flare_indexer import add_relative_flux  # noqa: E402
+
+FLARE = "2024-01-02 00:00:00,2024-01-02 00:05:00,2024-01-02 00:10:00,{cls},100\n"
+HEADER = "start_time,peak_time,end_time,class,active_region\n"
+
+
+def _flux_file(tmp_path, values, start="2024-01-01 00:00:00"):
+    """values: {minutes after start: flux}."""
+    path = tmp_path / "xray.csv"
+    t0 = pd.Timestamp(start)
+    pd.DataFrame({
+        "time": [t0 + pd.Timedelta(minutes=m) for m in values],
+        "flux": list(values.values()),
+    }).to_csv(path, index=False)
+    return path
+
+
+def _catalog_file(tmp_path, rows):
+    path = tmp_path / "flares.csv"
+    path.write_text(HEADER + "".join(rows))
+    return path
+
+
+def test_background_is_mean_of_quiet_minutes_below_start_flux(tmp_path):
+    # Flare starts 2024-01-02 00:00 (minute 1440). Window: minute 0 .. 1440.
+    flux = {0: 2e-7, 600: 4e-7, 1200: 6e-7, 1439: 9e-7, 1440: 8e-7, 1450: 5e-6}
+    result = add_relative_flux(_catalog_file(tmp_path, [FLARE.format(cls="M1.0")]), _flux_file(tmp_path, flux))
+    # Minute 1440 is inside the flare (dropped); 9e-7 is not below the start flux 8e-7.
+    assert result["background_flux"].iloc[0] == pytest.approx((2e-7 + 4e-7 + 6e-7) / 3)
+    assert result["rxfi"].iloc[0] == pytest.approx(1e-5 / 4e-7)
+
+
+def test_minutes_before_window_and_bad_values_are_ignored(tmp_path):
+    flux = {-1: 1e-8, 0: 3e-7, 5: 1e-9, 6: 0.0, 1440: 8e-7}
+    result = add_relative_flux(_catalog_file(tmp_path, [FLARE.format(cls="C2.0")]),
+                               _flux_file(tmp_path, flux, start="2024-01-01 00:00:00"))
+    assert result["background_flux"].iloc[0] == pytest.approx(3e-7)
+    assert result["rxfi"].iloc[0] == pytest.approx(2e-6 / 3e-7)
+
+
+def test_other_flares_are_removed_from_the_background(tmp_path):
+    other = "2024-01-01 10:00:00,2024-01-01 10:05:00,2024-01-01 10:30:00,C5.0,200\n"
+    flux = {0: 2e-7, 600: 7e-7, 620: 7e-7, 640: 4e-7, 1440: 8e-7}
+    result = add_relative_flux(_catalog_file(tmp_path, [FLARE.format(cls="M1.0"), other]),
+                               _flux_file(tmp_path, flux))
+    # Minutes 600 and 620 (10:00, 10:20) fall inside the C5.0 flare.
+    assert result["background_flux"].iloc[0] == pytest.approx((2e-7 + 4e-7) / 2)
+
+
+def test_flare_without_flux_at_start_is_left_blank_with_warning(tmp_path):
+    flux = {0: 2e-7, 1439: 3e-7}
+    with pytest.warns(UserWarning, match="1 of 1 flare"):
+        result = add_relative_flux(_catalog_file(tmp_path, [FLARE.format(cls="M1.0")]), _flux_file(tmp_path, flux))
+    assert pd.isna(result["background_flux"].iloc[0]) and pd.isna(result["rxfi"].iloc[0])
+
+
+def test_flare_with_no_value_below_start_flux_is_left_blank(tmp_path):
+    flux = {0: 9e-7, 1440: 8e-7}
+    with pytest.warns(UserWarning, match="no rxfi"):
+        result = add_relative_flux(_catalog_file(tmp_path, [FLARE.format(cls="M1.0")]), _flux_file(tmp_path, flux))
+    assert pd.isna(result["rxfi"].iloc[0])
+
+
+def test_output_keeps_rows_and_columns_and_feeds_the_labels(tmp_path):
+    second = "2024-01-02 06:00:00,2024-01-02 06:05:00,2024-01-02 06:10:00,C1.0,200\n"
+    flux = {0: 2e-7, 600: 1e-7, 1440: 8e-7, 1800: 3e-7}
+    catalog_path = _catalog_file(tmp_path, [FLARE.format(cls="M1.0"), second])
+    out = tmp_path / "flares_rxfi.csv"
+    result = add_relative_flux(catalog_path, _flux_file(tmp_path, flux), output_path=out)
+    assert list(result.columns) == ["start_time", "peak_time", "end_time", "class", "active_region",
+                                    "background_flux", "rxfi"]
+    assert result["class"].tolist() == ["M1.0", "C1.0"]
+    assert pd.read_csv(out).shape == (2, 7)
+
+    index_path = tmp_path / "index.csv"
+    pd.DataFrame({"timestamp": ["2024-01-01 12:00:00"]}).to_csv(index_path, index=False)
+    labels = _build(index_path, out, MaxRelativeFluxReducer())
+    assert labels["label"].iloc[0] == pytest.approx(result["rxfi"].iloc[0])
+
+
+def test_catalog_that_already_has_rxfi_is_refused(tmp_path):
+    path = tmp_path / "flares.csv"
+    path.write_text(CATALOG)
+    with pytest.raises(ValueError, match="already has rxfi"):
+        add_relative_flux(path, _flux_file(tmp_path, {0: 1e-7}))
+
+
+@pytest.mark.parametrize("content, message", [
+    ("when,flux\n2024-01-01 00:00:00,1e-7\n", "missing required column"),
+    ("time,flux\n2024-01-01 00:00:00,abc\n", "column 'flux', data row 1"),
+    ("time,flux\n2024-01-01 00:00:00,1e-7\n2024-01-01 00:00:00,2e-7\n", "appears more than once"),
+    ("time,flux\n,1e-7\n", "the time is blank"),
+])
+def test_bad_xray_file_is_refused(tmp_path, content, message):
+    xray = tmp_path / "xray.csv"
+    xray.write_text(content)
+    with pytest.raises(ValueError, match=message):
+        add_relative_flux(_catalog_file(tmp_path, [FLARE.format(cls="M1.0")]), xray)
+
+
+def test_unsorted_xray_file_gives_same_result(tmp_path):
+    flux = {0: 2e-7, 600: 4e-7, 1440: 8e-7}
+    catalog_path = _catalog_file(tmp_path, [FLARE.format(cls="M1.0")])
+    sorted_result = add_relative_flux(catalog_path, _flux_file(tmp_path, flux))
+    shuffled = _flux_file(tmp_path, dict(reversed(list(flux.items()))))
+    assert add_relative_flux(catalog_path, shuffled)["rxfi"].iloc[0] == sorted_result["rxfi"].iloc[0]

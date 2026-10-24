@@ -39,14 +39,16 @@ def test_example_runs(script, tmp_path):
     assert _run(copy / script.name, tmp_path)
 
 
-def test_cumulative_index_example_shows_paper_value_and_labels(tmp_path):
-    output = _run(EXAMPLES_DIR / "05_cumulative_index.py", tmp_path)
+def test_flare_indices_example_shows_paper_value_and_labels(tmp_path):
+    output = _run(EXAMPLES_DIR / "05_flare_indices.py", tmp_path)
     assert "cumulative index: 48.5" in output
     assert "label (index >= 10): 1" in output
     assert "label (index >= 20): 1" in output
     assert "label (index >= 50): 0" in output
     assert "empty window: 0.0" in output
     assert "A/B-only window: 0.0" in output
+    assert "2024-03-02 10:00:00  X1.1         3.26e-07   338" in output
+    assert "2024-03-01 12:00:00 0.00011     151      338      475              1" in output
 
 
 def test_sample_data_matches_generator(tmp_path):

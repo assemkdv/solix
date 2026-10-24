@@ -60,10 +60,22 @@ time instead.
 | Largest relative X-ray flux increase (RXF) | `DatasetBuildingPipeline(MaxRelativeFluxReducer(), RegressionLabeler())` |
 | Sum of RXF values | `DatasetBuildingPipeline(SumRelativeFluxReducer(), RegressionLabeler())` |
 
-RXF is a flare's peak X-ray flux divided by the background X-ray flux of the
-24 hours before it starts, read from the catalog's `rxfi` column. Add
-`NumericThresholdLabeler(10)` for a 0/1 label. The RXF labels are for single
-images only.
+RXF (relative X-ray flux increase) is a flare's peak X-ray flux divided by the
+background X-ray flux of the 24 hours before it starts. The RXF labels read it
+from the catalog's `rxfi` column and are for single images only. Add
+`NumericThresholdLabeler(10)` for a 0/1 label.
+
+If your catalog has no `rxfi` column, compute it once from GOES 1–8 Å X-ray
+flux (a CSV with columns `time, flux`, one value per minute):
+
+```python
+fidx.add_relative_flux("flare_catalog.csv", "xray_flux.csv",
+                       output_path="flare_catalog_rxfi.csv")
+```
+
+The background is the mean of the flux values in the 24 hours before the
+flare's start that are above 1e-9 W/m², outside every catalog flare, and below
+the flux at the flare's start.
 
 A pipeline is a reducer (flares → one value) and a labeler (value → label).
 Any object with a `label(events)` method can be passed as `strategy`.
@@ -121,7 +133,7 @@ format above.
 | `examples/02_sequences.py` | image sequences |
 | `examples/03_active_region.py` | active-region labels |
 | `examples/04_loaders.py` | preparing real inputs |
-| `examples/05_cumulative_index.py` | cumulative flare index |
+| `examples/05_flare_indices.py` | GC max, GC sum, RXF max, RXF sum |
 | `examples/06_pytorch_images.py`, `07_pytorch_sequences.py` | real HMI images in PyTorch |
 | `examples/08_tensorflow_images.py`, `09_tensorflow_sequences.py` | real HMI images in TensorFlow |
 

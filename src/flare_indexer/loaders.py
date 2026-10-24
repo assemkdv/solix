@@ -3,9 +3,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Union
 
+import warnings
+
+import numpy as np
 import pandas as pd
 
-from .classifier import validate_goes_class_column
+from .classifier import FluxConverter, validate_goes_class_column
 from .events import _normalize_active_region, _parse_full_timestamp_column
 
 # Matches filenames like "HMI.m2010.12.21_21.00.00.jpg", regardless of how
@@ -259,3 +262,142 @@ def adapt_goes_catalog(
         adapted.to_csv(output_path, index=False)
 
     return adapted
+
+
+# Flux values at or below this are treated as bad readings (rxfi_creator).
+XRAY_FLUX_FLOOR = 1e-9
+BACKGROUND_LOOKBACK = pd.Timedelta(hours=24)
+
+
+def add_relative_flux(
+    catalog_path: Union[str, Path],
+    xray_flux_path: Union[str, Path],
+    output_path: Union[str, Path, None] = None,
+) -> pd.DataFrame:
+    """
+    Add each flare's background X-ray flux and relative X-ray flux
+    increase (rxfi) to a flare catalog.
+
+    catalog_path is a catalog in the package schema (start_time,
+    peak_time, end_time, class, active_region, ...). xray_flux_path is a
+    CSV of GOES 1-8 Angstrom X-ray flux with the columns time and flux
+    (W/m^2, one value per minute).
+
+    The background of a flare follows the lab's rxfi_creator code
+    (Hong, Ji, Pandey, Aydin, DaWaK 2023):
+
+    1. flux values at or below 1e-9 W/m^2 are dropped;
+    2. every minute from start_time to end_time of any catalog flare is
+       dropped;
+    3. of the minutes from start_time - 24 h to start_time (both
+       included), only values below the flux at start_time are kept;
+    4. the background is the mean of the kept values.
+
+    rxfi = peak flux of the flare's GOES class / background. A flare with
+    no flux value at its start_time, or no kept value, gets a blank
+    background and rxfi, and a warning counts such flares.
+
+    Returns the catalog with two added columns, background_flux and rxfi,
+    in its original row order; writes it to output_path if given.
+    """
+    catalog_path = Path(catalog_path)
+    xray_flux_path = Path(xray_flux_path)
+
+    catalog = _read_csv(catalog_path, "Flare catalog")
+    missing = {"start_time", "end_time", "class"} - set(catalog.columns)
+    if missing:
+        raise ValueError(
+            f"Flare catalog at {catalog_path} is missing required column(s): {', '.join(sorted(missing))}"
+        )
+    existing = [c for c in ("background_flux", "rxfi") if c in catalog.columns]
+    if existing:
+        raise ValueError(
+            f"Flare catalog at {catalog_path} already has {', '.join(existing)}; "
+            "remove the column(s) to compute them again."
+        )
+    validate_goes_class_column(catalog["class"], catalog_path, column="class")
+    starts = _parse_full_timestamp_column(catalog, "start_time", catalog_path)
+    ends = _parse_full_timestamp_column(catalog, "end_time", catalog_path)
+
+    times, raw = _read_xray_flux(xray_flux_path)
+
+    # Steps 1 and 2: the flux that may count as background.
+    usable = np.where(raw > XRAY_FLUX_FLOOR, raw, np.nan)
+    flaring = np.zeros(len(times) + 1, dtype=np.int64)
+    both = starts.notna() & ends.notna()
+    lo = np.searchsorted(times, starts[both].to_numpy(), side="left")
+    hi = np.searchsorted(times, ends[both].to_numpy(), side="right")
+    np.add.at(flaring, lo, 1)
+    np.add.at(flaring, hi, -1)
+    usable[np.cumsum(flaring)[:-1] > 0] = np.nan
+
+    # Steps 3 and 4, one flare at a time.
+    background = np.full(len(catalog), np.nan)
+    for row, start in enumerate(starts):
+        if pd.isna(start):
+            continue
+        at_start = np.searchsorted(times, np.datetime64(start), side="left")
+        if at_start == len(times) or times[at_start] != np.datetime64(start) or np.isnan(raw[at_start]):
+            continue
+        first = np.searchsorted(times, np.datetime64(start - BACKGROUND_LOOKBACK), side="left")
+        window = usable[first:at_start + 1]
+        kept = window[window < raw[at_start]]
+        if len(kept):
+            background[row] = kept.mean()
+
+    converter = FluxConverter()
+    peak_flux = catalog["class"].map(converter.to_flux).to_numpy(dtype=float)
+    result = catalog.copy()
+    result["background_flux"] = background
+    result["rxfi"] = peak_flux / background
+
+    unknown = int(np.isnan(background).sum())
+    if unknown:
+        warnings.warn(
+            f"{unknown} of {len(catalog)} flare(s) in {catalog_path} have no rxfi: no X-ray flux value "
+            "at their start_time, or no usable value in the 24 hours before it.",
+            UserWarning,
+            stacklevel=2,
+        )
+
+    if output_path is not None:
+        result.to_csv(output_path, index=False)
+    return result
+
+
+def _read_csv(path: Path, what: str) -> pd.DataFrame:
+    try:
+        return pd.read_csv(path)
+    except pd.errors.EmptyDataError:
+        raise ValueError(f"{what} at {path} is empty: no header row / columns found.") from None
+
+
+def _read_xray_flux(path: Path) -> tuple[np.ndarray, np.ndarray]:
+    """Times (sorted) and flux values of an X-ray flux CSV with columns time, flux."""
+    df = _read_csv(path, "X-ray flux file")
+    missing = {"time", "flux"} - set(df.columns)
+    if missing:
+        raise ValueError(f"X-ray flux file at {path} is missing required column(s): {', '.join(sorted(missing))}")
+
+    times = _parse_full_timestamp_column(df, "time", path, what="X-ray flux file")
+    if times.isna().any():
+        position = int(np.flatnonzero(times.isna().to_numpy())[0])
+        raise ValueError(f"X-ray flux file at {path}, column 'time', data row {position + 1}: the time is blank.")
+    if times.duplicated().any():
+        position = int(np.flatnonzero(times.duplicated().to_numpy())[0])
+        raise ValueError(
+            f"X-ray flux file at {path}, column 'time', data row {position + 1}: "
+            f"{times.iloc[position]} appears more than once."
+        )
+
+    flux = pd.to_numeric(df["flux"], errors="coerce")
+    bad = df["flux"].notna() & flux.isna()
+    if bad.any():
+        position = int(np.flatnonzero(bad.to_numpy())[0])
+        raise ValueError(
+            f"X-ray flux file at {path}, column 'flux', data row {position + 1}: "
+            f"expected a number or a blank cell, got {df['flux'].iloc[position]!r}."
+        )
+
+    order = np.argsort(times.to_numpy(), kind="stable")
+    return times.to_numpy()[order], flux.to_numpy(dtype=float)[order]

@@ -12,9 +12,8 @@ from .events import (
 )
 
 
-# Cap on how many skipped-sequence-starts / missing-timestamps a
-# SequenceBuildReport keeps verbatim, so a very long-running build doesn't
-# blow up memory just to report on itself. Counts are always exact.
+# How many skipped starts / missing timestamps a SequenceBuildReport lists
+# (its counts are always exact).
 _MAX_SEQUENCE_REPORT_SAMPLES = 50
 
 VALID_MISSING_ACTIVE_REGION_POLICIES = {"negative", "drop", "error"}
@@ -26,9 +25,8 @@ class SequenceBuildReport:
     Validation/bookkeeping report returned by FullDiskSequence /
     ActiveRegionSequence .build(return_report=True).
 
-    inferred_source_cadence : the base cadence detected from the image
-        index's own timestamps (see DatasetBuilder's "Source cadence
-        inference" docs).
+    inferred_source_cadence : the most common gap between the image
+        index's timestamps.
     requested_cadence, observation_window, sliding_window : the
         (parsed, pd.Timedelta) values this build used.
     effective_start : the actual starting timestamp used (either the
@@ -107,13 +105,9 @@ def _parse_timestamp_param(value, name: str) -> pd.Timestamp:
 
 def _parse_image_timestamps(column: pd.Series, path: Path) -> pd.Series:
     """
-    Parse the image index's timestamp column, refusing anything that
-    would otherwise produce samples silently: a numeric column (read as
-    nanoseconds since 1970), an unparseable cell, or a blank cell (NaT,
-    which single-image mode would crash on and sequence mode would drop
-    without a trace).
-    Values with a UTC offset are converted to UTC and stored naive, as in
-    the catalog (see events._to_naive_utc).
+    Parse the image index's timestamp column. A numeric column, an
+    unparseable cell or a blank cell raises ValueError. UTC offsets are
+    converted to UTC and dropped, as in the catalog.
     """
     parsed = _parse_time_text_column(column, "timestamp", "Image index", path)
     missing = parsed.isna()
@@ -129,15 +123,7 @@ def _parse_image_timestamps(column: pd.Series, path: Path) -> pd.Series:
 
 
 def _infer_source_cadence(timestamps: pd.Series) -> pd.Timedelta:
-    """
-    Infer an image index's base cadence as the mode (most common value) of
-    its sorted-unique timestamps' positive consecutive differences.
-
-    Using the mode rather than, say, the minimum or largest gap makes this
-    robust to a dataset with occasional missing images (larger, rarer gaps
-    don't affect the result as long as the "normal" spacing is still the
-    most frequent one).
-    """
+    """The most common positive gap between the index's unique timestamps (robust to missing images)."""
     unique_sorted = pd.Series(timestamps.unique()).sort_values().reset_index(drop=True)
     if len(unique_sorted) < 2:
         raise ValueError(
@@ -165,120 +151,31 @@ def _validate_requested_cadence(requested: pd.Timedelta, inferred: pd.Timedelta)
 
 class DatasetBuilder:
     """
-    Maps image timestamps to flare labels using a configurable strategy.
+    The engine behind the four dataset classes in datasets.py: maps image
+    timestamps to flare labels with a strategy.
 
     Parameters
     ----------
-    prediction_window : int | float | str | pd.Timedelta
-        How far after each image timestamp (or, for sequences, after the
-        final image in the sequence) to search for flares. A plain number
-        is hours (e.g. 24); a string/Timedelta is a pandas duration with
-        a unit (e.g. "24h", "23h59min59s"). Bare numeric text ("24") is
-        rejected. This hours convention is specific to prediction_window:
-        the sequence durations below accept no bare number at all.
-    strategy : BinaryThresholdStrategy | MaxFlareStrategy
-        Labeling strategy that converts a list of FlareEvents to a label.
-    target : str
-        "full_disk" (default) matches any flare in the window, preserving
-        original behavior. "active_region" matches only flares from the
-        specific active region each image is assigned to (requires an
-        active_region column in the image index). In sequence mode the
-        index is first grouped by region and each region's sequences are
-        built from that region's images only, so several regions may be
-        observed at the same timestamps; see "Active-region sequences".
-    event_time : str
-        Which of a flare's timestamps EventMatcher checks against the
-        prediction window: "start" (default) or "peak". See EventMatcher.query.
-    missing_active_region : str
-        Only used when target="active_region". What to do with images
-        whose image-side active_region is missing:
-        "negative" (default, preserves original behavior) labels them as
-        if no flare occurred and emits a UserWarning with the count, since
-        such a label is unknown, not a confirmed negative; "drop" leaves
-        them out of the output; "error" raises ValueError. In sequence
-        mode such images never join a region's sequence; with "negative"
-        they form one extra group whose sequences get active_region=None.
-    include_metadata : bool
-        Single-image mode only. False (default) returns just
-        (timestamp, label), or (timestamp, active_region, label) for
-        target="active_region": the normalized active_region is always
-        kept there, so several regions observed at the same timestamp stay
-        distinguishable. True also returns every other image-index column
-        (e.g. image_path).
-    include_flares : bool
-        False (default) returns only the label. True adds a "flares" column
-        right after it: the GOES classes of the flares in each window, in
-        order of event time (e.g. ["C3.2", "M1.4"]; [] for an empty
-        window), so every label can be checked by eye. All modes.
-    verbose : bool
-        False (default) prints nothing. True prints a short summary of each
-        build: images and flares loaded, the settings used, and the result
-        (row count and label counts or range). The returned table is the
-        same either way.
-
-    Sequence parameters (observation_window or sliding_window builds
-    sequences; cadence and start alone thin out single images -- see
-    "Sequence mode selection")
-    ----------------------------------------------------------------------
-    start : pandas-compatible timestamp | None
-        The first candidate sequence's starting timestamp. Inclusive: an
-        image must exist at exactly this timestamp, or build() raises
-        ValueError -- it never silently moves to the next available image.
-        If omitted, defaults to the image index's earliest timestamp.
-    cadence : duration text with a unit, or Timedelta | None
-        The spacing between consecutive images *within* a sequence (e.g.
-        "1h", "30min", pd.Timedelta(hours=1)). A bare number is rejected
-        as unit-less (it is not hours and not minutes). Required whenever
-        any sequence parameter is used. Must be an exact multiple of
-        the image index's own inferred cadence (see "Source cadence
-        inference"). observation_window and sliding_window take the same
-        forms.
-    observation_window : pandas-compatible duration | None
-        The half-open span [sequence_start, sequence_start +
-        observation_window) covered by one sequence. Required in
-        sequence mode. Must be an exact multiple of `cadence`; the
-        number of images per sequence is observation_window / cadence
-        (e.g. cadence="1h", observation_window="6h" -> 6 images at
-        t, t+1h, ..., t+5h -- note the *last* image is at
-        t + observation_window - cadence, since the interval excludes its
-        own right endpoint).
-    sliding_window : pandas-compatible duration | None
-        How far forward the next candidate sequence's start moves relative
-        to the current one. Required in sequence mode. Must be an exact
-        multiple of `cadence`.
-
-    Active-region sequences
-    ----------------------------------------------------------------------
-    With target="active_region", sequences are built per region: rows
-    are grouped by normalized active_region, and the uniqueness check and
-    the time grid apply within each region. Duplicate timestamps within
-    one region raise ValueError; the same timestamp in different regions
-    is fine. The source cadence is inferred from all image timestamps, `start`
-    must be an image time somewhere in the index, and every region uses
-    the grid start + k * sliding_window (or, without `start`, a grid
-    beginning at the region's own first image). Output rows are sorted
-    by sequence_start, then active_region (missing region last).
-
-    Sequence mode selection
-    ----------------------------------------------------------------------
-    Supplying observation_window or sliding_window builds sequences, in
-    which cadence, observation_window, and sliding_window are all required
-    (start remains optional). cadence (and optionally start) without them
-    keeps single images, but only those at start, start + cadence,
-    start + 2 * cadence, ... (start defaults to the earliest image; for
-    target="active_region" all regions share this grid).
-
-    Source cadence inference
-    ----------------------------------------------------------------------
-    In sequence mode, build() infers the image index's own base cadence
-    as the mode (most common value) of its sorted-unique timestamps'
-    positive consecutive differences -- robust to occasional missing
-    images/larger gaps, unlike using the timestamps' minimum or maximum
-    gap. The requested `cadence` must be greater than or equal to this
-    inferred cadence and an exact integer multiple of it (e.g. a 30-minute
-    source image index accepts cadence="1h", producing a compatible
-    downsampled sequence -- but rejects cadence="1min", since that would
-    require images finer than the source actually provides).
+    prediction_window : hours (number) or a duration with a unit ("24h").
+        Flares in [t, t + prediction_window) count, where t is the image
+        time or, for a sequence, the time of its last image.
+    strategy : any object with label(flares).
+    target : "full_disk" (all flares count) or "active_region" (only the
+        flares of the image's own region; the index needs active_region).
+    event_time : "start" or "peak", the flare time matched to the window.
+    missing_active_region : "negative", "drop" or "error", for
+        active-region images without a region.
+    include_metadata : single images only; keep the other index columns.
+    include_flares : add a "flares" column listing each window's classes.
+    verbose : print a short summary of each build.
+    start, cadence, observation_window, sliding_window : observation_window
+        or sliding_window makes sequences, and then cadence,
+        observation_window and sliding_window are required; each sequence
+        holds observation_window / cadence images. cadence (and start)
+        alone keep only the single images at start, start + cadence, ....
+        cadence must be a multiple of the index's own cadence (the most
+        common gap between its timestamps), and start must be an image time.
+        Active-region sequences are built per region.
     """
 
     VALID_TARGETS = {"full_disk", "active_region"}
@@ -373,7 +270,6 @@ class DatasetBuilder:
                 )
 
             self.number_of_images = round(self.observation_window / self.cadence)
-            self.slide_steps = round(self.sliding_window / self.cadence)
 
     def build(
         self, image_index_path: str | Path, event_catalog_path: str | Path, return_report: bool = False,
@@ -420,7 +316,7 @@ class DatasetBuilder:
         if return_report and not self.time_based:
             raise ValueError(
                 "return_report=True is only supported for sequences "
-                "(i.e. when start/cadence/observation_window/sliding_window were used)."
+                "(when observation_window and sliding_window are given)."
             )
 
         image_index_path = Path(image_index_path)
@@ -676,7 +572,7 @@ class DatasetBuilder:
         region's group; missing_active_region decides what happens to them:
         "error" raises, "drop" leaves them out, "negative" puts them in one
         extra group (key None) whose sequences are labeled as if no flare
-        occurred -- the closest equivalent of the pre-grouping behavior.
+        occurred.
         """
         regions = index_df["active_region"].map(_normalize_active_region)
         missing = regions.isna()

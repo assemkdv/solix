@@ -20,12 +20,8 @@ class EventReducer(Protocol):
 
 class MaxFluxReducer:
     """
-    Reduces a list of FlareEvents to the numeric maximum physical X-ray
-    flux among them, via FluxConverter -- never by comparing goes_class
-    strings lexically (see FluxConverter's docstring for why that matters:
-    "M9.0" < "M10.0" numerically, despite sorting the other way as text).
-
-    Returns 0.0 for an empty event list (no flare in the window).
+    The largest peak X-ray flux (W/m^2) among the events, compared as
+    numbers, not as class text. Returns 0.0 for an empty window.
     """
 
     def reduce(self, events: list[FlareEvent]) -> float:
@@ -49,7 +45,7 @@ class MaxRelativeFluxReducer:
     """Largest relative X-ray flux increase (rxfi) among the events.
 
     rxfi = peak X-ray flux / background X-ray flux, read from the catalog's
-    rxfi column (Hong, Ji, Pandey, Aydin, DaWaK 2023). Events without a
+    rxfi column. Events without a
     value are skipped; 0.0 if no event has one. Single images only.
     """
 
@@ -106,29 +102,16 @@ class ClassCountReducer:
 class CumulativeClassIndexReducer:
     """Cumulative normalized GOES subclass index of all events in the window.
 
-    Formula (Hong, Ji, Pandey, Aydin, DaWaK 2023, Sec. 2.2):
-
         index = sum(C_i) + 10 * sum(M_j) + 100 * sum(X_k)
 
     where C_i, M_j, X_k are the numbers written in the class text
-    (C2.6 -> 2.6, M1.5 -> 15, X1.0 -> 100). The unit is "one C1.0 flare";
-    the value is dimensionless. The paper's worked window (M1.5, C2.6,
-    C1.4, M2.1, C2.8, C4.2, C1.5) gives 48.5.
+    (C2.6 -> 2.6, M1.5 -> 15, X1.0 -> 100), so the unit is one C1.0
+    flare. A- and B-class events add 0, so "B15.0" adds 0 although its
+    flux equals C1.5; the weights per letter are in WEIGHTS.
 
-    A- and B-class events contribute 0, as in the paper's formula.
-    Consequences: "C10.0" and "M1.0" both add 10; "B15.0" adds 0
-    although its flux equals C1.5. The weights are per letter, in
-    WEIGHTS; a letter missing from WEIGHTS weighs 0.
-
-    The sum is formed in decimal arithmetic from the class text and
-    rounded to a float once, so values written differently but equal
-    (C10.0 and M1.0) give the identical result and the paper's 48.5 is
-    exact. Returns 0.0 for an empty window. An invalid class raises
-    InvalidGOESClassError (only possible for hand-built events; loaded
-    catalogs are already checked).
-
-    This reducer only aggregates; it does not choose the prediction
-    window.
+    The sum is formed in decimal arithmetic and rounded to a float once,
+    so equal values written differently (C10.0 and M1.0) give the same
+    result. Returns 0.0 for an empty window.
     """
 
     WEIGHTS = {"C": 1, "M": 10, "X": 100}

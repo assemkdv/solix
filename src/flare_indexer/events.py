@@ -23,18 +23,18 @@ _INTEGER_REGION_TEXT = re.compile(r"^[+-]?\d+(?:\.0*)?$")
 _OFFSET_SUFFIX = re.compile(r"(?:Z|[+-]\d{2}:?\d{2})$", re.IGNORECASE)
 
 
-# A simple container that holds the details of one flare event
-# Think of it like a row from the NOAA catalog, but as a Python object
 @dataclass
 class FlareEvent:
-    peak_time: pd.Timestamp          # when the flare was at its strongest
-    goes_class: str                  # flare class letter + number, e.g. "M2.3"
-    start_time: pd.Timestamp         # when the flare started
-    active_region: str | None        # which region of the sun it came from (can be empty)
-    end_time: pd.Timestamp | None = None   # when the flare ended (not all catalogs carry this)
-    fl_lon: float | None = None            # heliographic longitude, when the source catalog has it
-    fl_lat: float | None = None            # heliographic latitude, when the source catalog has it
-    rxfi: float | None = None              # relative X-ray flux increase, when the catalog has it
+    """One flare from the catalog."""
+
+    peak_time: pd.Timestamp
+    goes_class: str                  # e.g. "M2.3"
+    start_time: pd.Timestamp
+    active_region: str | None        # NOAA region, or None if unknown
+    end_time: pd.Timestamp | None = None
+    fl_lon: float | None = None      # heliographic longitude, if the catalog has it
+    fl_lat: float | None = None      # heliographic latitude, if the catalog has it
+    rxfi: float | None = None        # relative X-ray flux increase, if the catalog has it
 
 
 VALID_EVENT_TIMES = {"start", "peak"}
@@ -44,10 +44,8 @@ def _parse_prediction_window(value) -> pd.Timedelta:
     """
     Normalize a prediction window into a strictly positive pd.Timedelta.
 
-    A plain number (int or float) is interpreted as hours, preserving the
-    original `prediction_window=24` behavior. Anything else is parsed as a
-    pandas-compatible duration, e.g. "24h", "23h59min59s", or a
-    pd.Timedelta.
+    A plain number (int or float) is hours. Anything else is parsed as a
+    pandas duration, e.g. "24h" or a pd.Timedelta.
     """
     if isinstance(value, bool):
         raise ValueError(f"prediction_window must be a number of hours or a duration, got {value!r}")
@@ -204,17 +202,9 @@ def _reject_numeric_time_column(series: pd.Series, column: str, what: str, path)
 
 def _parse_full_timestamp_column(df: pd.DataFrame, column: str, path, what: str = "Flare catalog") -> pd.Series:
     """
-    Parse a column of full datetime strings (e.g. "2010-05-01 01:39:00"),
-    raising a clear ValueError naming the file/column/value on failure.
-
-    Each cell carries its own complete calendar date, so a flare that
-    crosses midnight (start_time on one date, peak_time/end_time on the
-    next) is represented as written. A blank cell becomes NaT: the flare
-    stays in the catalog, but it can never be matched through that
-    column (a flare with a blank start_time is invisible to
-    event_time="start", one with a blank peak_time to event_time="peak";
-    a blank end_time never affects matching). Numeric columns, time-zone
-    offsets and mixed conventions are handled by _parse_time_text_column.
+    Parse a column of full date-time strings (e.g. "2010-05-01 01:39:00").
+    A blank cell becomes NaT, so that flare can never match through this
+    column. Errors name the file, column and value.
     """
     return _parse_time_text_column(df[column], column, what, path)
 
@@ -306,22 +296,17 @@ def _validate_time_order(df: pd.DataFrame, path) -> None:
 
 class EventMatcher:
     """
-    Given an image timestamp, finds all flares that happened
-    within a certain number of hours after that image was taken.
+    Loads a flare catalog and finds the flares in the prediction window of
+    an image time.
 
     The catalog is a CSV with the columns start_time, peak_time, end_time,
-    class, active_region (optionally fl_lon, fl_lat, rxfi). Every time cell is a
-    complete date-time string, so a flare whose start, peak and end fall on
-    different calendar dates is written as it happened. This is the schema
-    `flare_indexer.loaders.adapt_goes_catalog` produces from an integrated
-    GOES catalog.
+    class, active_region (optionally fl_lon, fl_lat, rxfi); every time cell
+    is a full date-time.
     """
 
     REQUIRED_CATALOG_COLUMNS = {"start_time", "peak_time", "end_time", "class", "active_region"}
 
     def __init__(self, catalog_path: str | Path, columns=None):
-        # Load the catalog once when the object is created
-        # so we don't re-read the file every time we query.
         # columns: optional {your column name: package column name}.
         self._catalog = self._load_catalog(catalog_path, columns)
         # Lazily built, cached {event_time: (sorted_values, original_positions)}
@@ -462,8 +447,6 @@ class EventMatcher:
             normalized_catalog_ar = candidates["active_region"].apply(_normalize_active_region)
             candidates = candidates[normalized_catalog_ar.to_numpy() == active_region]
 
-        # Convert the matching rows into FlareEvent objects and return them
-        # If no flares match, this returns an empty list → label will be 0
         return [
             FlareEvent(
                 peak_time=row["peak_time"],

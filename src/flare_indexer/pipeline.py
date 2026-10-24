@@ -18,41 +18,17 @@ def _require_method(component: object, method_name: str, role: str) -> None:
     if method is None or not callable(method):
         raise TypeError(
             f"{role}={component!r} must provide a callable {method_name!r} method "
-            f"(e.g. `def {method_name}(self, ...): ...`); duck typing is fine, "
-            "subclassing a base class is not required."
+            f"(e.g. `def {method_name}(self, ...): ...`)."
         )
 
 
 class DatasetBuildingPipeline:
     """
-    Modular, scikit-learn-inspired composition of the labeling process into
-    three independently callable stages:
-
-        image/sequence reference time
-              |
-              v
-        [ EventMatcher ]   -> extract_events(): list[FlareEvent]
-              |
-              v
-        [ EventReducer ]   -> reduce_events(): a single reduced value
-              |
-              v
-        [ LabelAssigner ]  -> assign_label(): the final label
-              |
-              v
-             label
-
-    Each method takes its inputs explicitly and returns its output
-    directly -- none of them read or write any mutable state on the
-    pipeline instance, so extract_events(), reduce_events(), and
-    assign_label() can be called in any combination, independently.
-    DatasetBuildingPipeline itself stores no per-call intermediate state;
-    reuse or concurrent sharing of an instance is safe when the supplied
-    reducer and labeler are themselves stateless or thread-safe.
-
-    reducer and labeler may be any object exposing a callable `reduce`
-    (EventReducer) or `assign` (LabelAssigner) method respectively --
-    project-provided or entirely custom, duck-typed classes both work.
+    A label in two steps: a reducer turns the flares of a window into one
+    value (reduce), and a labeler turns that value into the label (assign).
+    Any objects with those methods work. extract_events, reduce_events and
+    assign_label run the steps one at a time; label(flares) runs both
+    steps, so a pipeline can be passed to a dataset class as strategy.
     """
 
     def __init__(self, reducer, labeler):
@@ -74,16 +50,11 @@ class DatasetBuildingPipeline:
             reference_time, prediction_window, active_region=active_region,
             event_time=event_time,
         )
-        # Defensive copy: guarantees the list handed back is never a
-        # reference a caller (or a later pipeline call) could share and
-        # accidentally mutate, regardless of EventMatcher's own internals.
         return list(events)
 
     def reduce_events(self, events: list[FlareEvent]):
         """Stage 2: reduce a list of FlareEvents to a single value via self.reducer."""
-        # Pass the reducer a copy so nothing it does to its argument can
-        # ever mutate the caller's own events list.
-        return self.reducer.reduce(list(events))
+        return self.reducer.reduce(list(events))   # a copy, so the caller's list is never changed
 
     def assign_label(self, reduced_value):
         """Stage 3: turn a reduced value into a final label via self.labeler."""
@@ -107,14 +78,6 @@ class DatasetBuildingPipeline:
         return PipelineResult(events=events, reduced_value=reduced_value, label=label)
 
     def label(self, events: list[FlareEvent]):
-        """
-        The method the dataset classes call.
-
-        FullDiskSingleImage and the other dataset classes only ever call
-        `strategy.label(flares)` on whatever object they were given as
-        `strategy=`. Implementing that same method here lets a
-        DatasetBuildingPipeline be passed directly as the strategy, e.g.
-        `FullDiskSingleImage("24h", strategy=pipeline)`.
-        """
+        """Reduce, then assign: the method the dataset classes call on their strategy."""
         reduced_value = self.reduce_events(events)
         return self.assign_label(reduced_value)

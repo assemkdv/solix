@@ -13,12 +13,8 @@ from .events import (
     _normalize_active_region, _parse_full_timestamp_column, _rename_columns, CATALOG_COLUMNS, XRAY_FLUX_COLUMNS,
 )
 
-# Matches filenames like "HMI.m2010.12.21_21.00.00.jpg", regardless of how
-# deep the surrounding directory path is -- only the basename is checked.
-# Year/month/day/hour/minute/second are captured as raw 2-4 digit groups;
-# calendar validity (e.g. month <= 12) is checked separately when the
-# timestamp is actually constructed, so a shape-valid but date-invalid
-# filename (e.g. "HMI.m2010.13.40_...") is still caught and reported.
+# File names like "HMI.m2010.12.21_21.00.00.jpg" (the basename only); the
+# date itself is checked when the timestamp is built.
 _FILENAME_PATTERN = re.compile(
     r"^HMI\.m(?P<year>\d{4})\.(?P<month>\d{2})\.(?P<day>\d{2})_"
     r"(?P<hour>\d{2})\.(?P<minute>\d{2})\.(?P<second>\d{2})\.jpg$"
@@ -41,9 +37,7 @@ VALID_DUPLICATE_POLICIES = {"error", "first", "last"}
 # lists kept four digits, so a later region 13324 is written 3324.
 NOAA_FIVE_DIGIT_START = pd.Timestamp("2002-06-14")
 
-# Cap on how many excluded/duplicate rows a report keeps verbatim, so a
-# badly-formed multi-million-row file doesn't blow up memory just to report
-# on itself. Counts in the report are always exact regardless of this cap.
+# How many excluded / duplicate rows a report lists (its counts are always exact).
 _MAX_REPORT_SAMPLES = 200
 
 
@@ -105,14 +99,9 @@ def build_image_index_from_filenames(
     "HMI.m{YYYY}.{MM}.{DD}_{HH}.{MM}.{SS}.jpg"; directory depth doesn't
     matter, only the basename is parsed.
 
-    strict controls how rows that aren't valid HMI image filenames are
-    handled (real source files, e.g. a directory walk over an entire data
-    root, can contain unrelated non-image paths mixed in):
-    - True (default, matches the original behavior): raise ValueError
-      naming the first offending path.
-    - False: exclude those rows rather than raising. They are never
-      silently dropped without a trace -- pass return_report=True to see
-      exactly what was excluded and why.
+    strict controls rows that are not valid HMI image file names:
+    - True (default): raise ValueError naming the first one.
+    - False: leave them out; return_report=True lists them.
 
     duplicate_policy controls what happens when multiple rows parse to the
     exact same timestamp:
@@ -214,7 +203,7 @@ def adapt_goes_catalog(
     output_path: Union[str, Path, None] = None,
 ) -> pd.DataFrame:
     """
-    Adapt a lab GOES flare catalog (goes_flares_integrated.csv-shaped) into
+    Adapt an integrated GOES flare catalog into
     the full-timestamp `start_time, peak_time, end_time, class,
     active_region[, fl_lon, fl_lat, rxfi]` schema EventMatcher accepts directly.
 
@@ -306,7 +295,7 @@ def _restore_five_digit_regions(catalog: pd.DataFrame, path: Path) -> pd.DataFra
     return catalog[~dropped].reset_index(drop=True)
 
 
-# Flux values at or below this are treated as bad readings (rxfi_creator).
+# Flux values at or below this are treated as bad readings.
 XRAY_FLUX_FLOOR = 1e-9
 BACKGROUND_LOOKBACK = pd.Timedelta(hours=24)
 
@@ -329,8 +318,7 @@ def add_relative_flux(
     CSV of GOES 1-8 Angstrom X-ray flux with the columns time and flux
     (W/m^2, one value per minute).
 
-    The background of a flare follows the lab's rxfi_creator code
-    (Hong, Ji, Pandey, Aydin, DaWaK 2023):
+    The background of a flare:
 
     1. flux values at or below 1e-9 W/m^2 are dropped;
     2. every minute from start_time to end_time of any catalog flare is

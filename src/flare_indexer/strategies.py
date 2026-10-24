@@ -8,13 +8,7 @@ _max_flux_reducer = MaxFluxReducer()
 class BinaryThresholdStrategy:
     """
     Returns 1 if any flare in the window meets or exceeds the threshold
-    class, else 0.
-
-    Implemented as MaxFluxReducer -> BinaryThresholdLabeler under the hood
-    (see flare_indexer.pipeline for the modular, composable form of this
-    same computation); numerically identical to comparing every flare's
-    flux against the threshold individually, since the maximum of a set
-    meets a threshold if and only if at least one element does.
+    class, else 0 (MaxFluxReducer followed by BinaryThresholdLabeler).
     """
 
     def __init__(self, threshold: str = "M"):
@@ -28,11 +22,8 @@ class BinaryThresholdStrategy:
 
 class MaxFlareStrategy:
     """
-    Returns the numeric flux of the strongest flare in the window, or 0.0.
-
-    Implemented as MaxFluxReducer -> RegressionLabeler under the hood (see
-    flare_indexer.pipeline for the modular, composable form of this same
-    computation).
+    Returns the peak flux (W/m^2) of the strongest flare in the window, or
+    0.0 (MaxFluxReducer followed by RegressionLabeler).
     """
 
     def __init__(self):

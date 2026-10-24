@@ -12,7 +12,7 @@ shared DatasetBuilder engine. All four are used the same way:
     labels = FullDiskSingleImage("24h", BinaryThresholdStrategy("M")).build(
         "image_index.csv", "flare_catalog.csv")
 
-Sequences are built on a time grid (Dr. Pandey's terms): `cadence` is the
+Sequences are built on a time grid: `cadence` is the
 time between images, `observation_window` the time a sequence covers,
 `sliding_window` the step between sequence starts, and `start` the
 optional first sequence start. Each sequence is labeled from its last

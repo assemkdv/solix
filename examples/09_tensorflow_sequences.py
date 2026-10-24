@@ -117,7 +117,7 @@ def main(argv=None):
     print(f"TensorFlow {tf.__version__}")
     print(f"Image index: {len(index)} images -> {index_path}")
     print(f"Catalog: {provenance['catalog_rows']} flares, queried {provenance['query_start']} .. "
-          f"{provenance['query_end']}; covers every (t, t+{PREDICTION_WINDOW}) window")
+          f"{provenance['query_end']}; covers every [t, t+{PREDICTION_WINDOW}) window")
 
     # 2. Sequences and labels.
     builder = fidx.DatasetBuilder(

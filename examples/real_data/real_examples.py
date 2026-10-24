@@ -76,7 +76,7 @@ def build_image_index(output_path: Path) -> pd.DataFrame:
 
 def check_catalog_coverage(reference_times, prediction_window) -> dict:
     """
-    Stop unless every prediction window (t, t + prediction_window) lies
+    Stop unless every prediction window [t, t + prediction_window) lies
     inside the interval the catalog was queried for. This is the only
     coverage the example can establish: a flare list cannot show that the
     instrument observed without gaps.
@@ -96,11 +96,11 @@ def check_catalog_coverage(reference_times, prediction_window) -> dict:
 def flares_in_window(catalog: pd.DataFrame, t: pd.Timestamp, prediction_window) -> pd.DataFrame:
     """
     Independent of flare_indexer: catalog rows whose start_time is in
-    (t, t + prediction_window), i.e. event_time="start" and the
+    [t, t + prediction_window), i.e. event_time="start" and the
     package's window rule.
     """
     end = t + pd.Timedelta(prediction_window)
-    return catalog[(catalog["start_time"] > t) & (catalog["start_time"] < end)]
+    return catalog[(catalog["start_time"] >= t) & (catalog["start_time"] < end)]
 
 
 _EXPONENT = {"A": -8, "B": -7, "C": -6, "M": -5, "X": -4}
@@ -114,7 +114,7 @@ def _at_least_m1(goes_class: str) -> bool:
 
 
 def independent_m_label(catalog: pd.DataFrame, t: pd.Timestamp, prediction_window) -> tuple[int, pd.DataFrame]:
-    """1 if any flare of M1.0 or stronger starts in (t, t + prediction_window), else 0."""
+    """1 if any flare of M1.0 or stronger starts in [t, t + prediction_window), else 0."""
     flares = flares_in_window(catalog, t, prediction_window)
     strong = flares[flares["class"].map(_at_least_m1)]
     return int(not strong.empty), strong

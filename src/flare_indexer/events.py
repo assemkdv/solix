@@ -355,17 +355,15 @@ class EventMatcher:
         - "start" (default): the flare's start_time.
         - "peak": the flare's peak_time.
 
-        The window is (image_time, image_time + prediction_window): a flare
-        must come strictly after image_time and strictly before the window
-        end, so a flare at exactly image_time or exactly the window end does
-        not count. With minute-resolution catalogs a 24 h window is
-        t < time <= t + 23:59:59.
+        The window is [image_time, image_time + prediction_window): it
+        includes image_time itself and excludes the window end, so a 24 h
+        window means "less than 24 hours after the image".
 
         prediction_window_hours is either a number of hours (e.g. 24) or a
         pandas-compatible duration (e.g. "23h59min59s", pd.Timedelta).
 
         Example: image taken at 10:00, window = 24 hours, defaults
-        → returns all flares with start_time in (10:00, 10:00 next day)
+        → returns all flares with start_time in [10:00, 10:00 next day)
 
         If active_region is given, only flares attributed to that exact
         active region are returned; flares with a missing active_region
@@ -405,8 +403,8 @@ class EventMatcher:
         image_time_np = np.datetime64(image_time)
         window_end_np = np.datetime64(window_end)
 
-        # (image_time, window_end): exclude both image_time and window_end.
-        lo = np.searchsorted(sorted_values, image_time_np, side="right")
+        # [image_time, window_end): include image_time, exclude window_end.
+        lo = np.searchsorted(sorted_values, image_time_np, side="left")
         hi = np.searchsorted(sorted_values, window_end_np, side="left")
 
         candidate_positions = sort_positions[lo:hi]

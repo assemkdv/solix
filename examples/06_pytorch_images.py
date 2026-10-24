@@ -2,7 +2,7 @@
 Example 6 -- real full-disk images, one label per image, loaded with PyTorch.
 
 Question answered for every image: "Does an M-class or stronger flare start
-in (t, t + 24h), where t is the image's own observation time?"
+in [t, t + 24h), where t is the image's own observation time?"
 
 Steps
 1. Image index: built from examples/real_data/image_manifest.csv, which
@@ -85,7 +85,7 @@ def main(argv=None):
     provenance = real.check_catalog_coverage(index["timestamp"], PREDICTION_WINDOW)
     print(f"Image index: {len(index)} images -> {index_path}")
     print(f"Catalog: {provenance['catalog_rows']} flares, queried {provenance['query_start']} .. "
-          f"{provenance['query_end']}; covers every (t, t+{PREDICTION_WINDOW}) window")
+          f"{provenance['query_end']}; covers every [t, t+{PREDICTION_WINDOW}) window")
 
     # 2. Labels.
     builder = fidx.DatasetBuilder(
@@ -127,7 +127,7 @@ def main(argv=None):
         assert t == row["timestamp"], (t, row)
         assert real.independent_m_label(catalog, t, PREDICTION_WINDOW)[0] == row["label"], (t, row)
     print(f"\nAll {len(labels)} labels match an independent recomputation from the catalog.")
-    print("Independent check against catalog rows (start_time in (t, t+24h), class M or X):")
+    print("Independent check against catalog rows (start_time in [t, t+24h), class M or X):")
     for _, row in pd.concat([labels[labels["label"] == 1].head(1), labels[labels["label"] == 0].tail(1)]).iterrows():
         expected_label, strong = real.independent_m_label(catalog, row["timestamp"], PREDICTION_WINDOW)
         assert expected_label == row["label"], row

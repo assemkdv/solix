@@ -138,7 +138,7 @@ def test_extract_events_excludes_window_end():
     events = pipeline.extract_events(
         matcher, pd.Timestamp("2024-01-01 00:00"), prediction_window=1,         event_time="peak",
     )
-    assert events == []  # peak exactly at t+1h excluded by (t, t+1h)
+    assert events == []  # peak exactly at t+1h excluded by [t, t+1h)
 
 
 def test_extract_events_active_region_forwarding():

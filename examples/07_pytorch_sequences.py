@@ -125,7 +125,7 @@ def main(argv=None):
     print(f"Image index: {len(index)} images -> {index_path}")
     print(index["timestamp"].astype(str).to_string(index=False, header=False))
     print(f"Catalog: {provenance['catalog_rows']} flares, queried {provenance['query_start']} .. "
-          f"{provenance['query_end']}; covers every (t, t+{PREDICTION_WINDOW}) window")
+          f"{provenance['query_end']}; covers every [t, t+{PREDICTION_WINDOW}) window")
 
     # 2. Sequences and labels.
     builder = fidx.DatasetBuilder(

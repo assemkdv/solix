@@ -65,7 +65,7 @@ def main():
         table = labels[["timestamp"]].copy() if table is None else table
         table[name] = labels["label"]
     table["rxf_max_ge_10"] = (table["rxf_max"] >= 10).astype(int)
-    print("\nfull-disk images, window (t, t+24h), every 12th shown:")
+    print("\nfull-disk images, window [t, t+24h), every 12th shown:")
     print(table.iloc[::12].to_string(index=False, float_format="%.3g"))
 
 

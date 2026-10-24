@@ -33,7 +33,7 @@ Two CSV files:
 import flare_indexer as fidx
 
 builder = fidx.DatasetBuilder(
-    prediction_window="24h",                     # window (t, t + 24h)
+    prediction_window="24h",                     # window [t, t + 24h)
     strategy=fidx.BinaryThresholdStrategy("M"),  # 1 if a flare >= M1.0 starts in it
 )
 labels = builder.build("examples/data/full_disk_image_index.csv",
@@ -43,8 +43,8 @@ labels = builder.build("examples/data/full_disk_image_index.csv",
 The result is a pandas DataFrame with one row per image and a `label`
 column.
 
-The window is `(t, t + w)`: a flare counts if its start time is after the
-image time `t` and before `t + w`. Use `event_time="peak"` to match the peak
+The window is `[t, t + w)`: a flare counts if it starts at the image time `t`
+or later, and before `t + w`. Use `event_time="peak"` to match the peak
 time instead.
 
 ## Labels

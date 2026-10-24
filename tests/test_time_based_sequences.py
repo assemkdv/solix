@@ -208,7 +208,7 @@ def test_observation_window_is_half_open_last_image_at_t_plus_5h(tmp_path):
     result = builder.build(index_path, catalog_path)
 
     assert len(result) == 1
-    # (t, t+6h) -> images at t..t+5h, NOT t+6h.
+    # [t, t+6h) -> images at t..t+5h, NOT t+6h.
     assert result.iloc[0]["sequence_end"] == pd.Timestamp("2024-01-01T05:00:00")
     assert result.iloc[0]["n_images"] == 6
     assert pd.Timestamp("2024-01-01T06:00:00") not in result.iloc[0]["timestamps"]
@@ -631,7 +631,7 @@ def test_time_based_event_time_peak(tmp_path):
 def test_time_based_window_excludes_its_end(tmp_path):
     timestamps = _hourly("2024-01-01T00:00:00", 6)
     index_path = _write_index(tmp_path, timestamps)
-    # Flare peaks exactly at sequence_end + prediction_window -- excluded by (t, t+w).
+    # Flare peaks exactly at sequence_end + prediction_window -- excluded by [t, t+w).
     catalog_path = _catalog_with_flare(tmp_path, "2024-01-01", "0600", "0600", "0605", "X1.0", "4456")
 
     builder = DatasetBuilder(

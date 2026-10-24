@@ -348,7 +348,7 @@ def test_event_time_invalid_value_raises():
     assert "event_time" in str(excinfo.value)
 
 
-# ── window boundaries: (t, t + w) ──────────────────────────
+# ── window boundaries: [t, t + w) ──────────────────────────
 
 
 def _boundary_matcher():
@@ -372,15 +372,16 @@ def _boundary_matcher():
     return matcher
 
 
-def test_window_excludes_t_and_window_end():
+def test_window_includes_t_and_excludes_window_end():
     matcher = _boundary_matcher()
     window_start = pd.Timestamp("2024-01-01 00:00:00")
 
     results = matcher.query(window_start, prediction_window_hours=1)
     peak_times = sorted(r.peak_time for r in results)
 
-    # (t, t+1h): excludes t and t+1h exactly, includes t+1s and t+1h-1s.
+    # [t, t+1h): includes t itself and t+1h-1s, excludes t+1h exactly.
     assert peak_times == [
+        pd.Timestamp("2024-01-01 00:00:00"),
         pd.Timestamp("2024-01-01 00:00:01"),
         pd.Timestamp("2024-01-01 00:59:59"),
     ]

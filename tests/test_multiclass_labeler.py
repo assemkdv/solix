@@ -183,7 +183,7 @@ def full_disk_index(tmp_path):
 
 def test_single_image_full_disk(catalog, full_disk_index):
     labels = _builder(_multiclass_pipeline(), include_metadata=True).build(full_disk_index, catalog)
-    # Windows (t, t+12h]: day 1 00h holds C3.0 and M10.0 -> X; day 2 00h holds B2.0 and A4.0 -> B.
+    # Windows [t, t+12h): day 1 00h holds C3.0 and M10.0 -> X; day 2 00h holds B2.0 and A4.0 -> B.
     assert labels["label"].tolist() == ["X", "NF", "B", "NF", "C", "NF", "X", "NF"]
     assert labels["image_path"].tolist() == [f"img{i}.jpg" for i in range(8)]
 

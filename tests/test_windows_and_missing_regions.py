@@ -53,7 +53,7 @@ def test_prediction_window_accepts_hours_and_durations(tmp_path, boundary_catalo
         event_time="start",
     )
     # Every spelling means the same 24 h window; the M1.0 starts exactly at
-    # t + 24h, so (t, t + 24h) excludes it.
+    # t + 24h, so [t, t + 24h) excludes it.
     assert builder.build(index_path, boundary_catalog)["label"].tolist() == [0]
     longer = DatasetBuilder(prediction_window="24h1min", strategy=BinaryThresholdStrategy(), event_time="start")
     assert longer.build(index_path, boundary_catalog)["label"].tolist() == [1]

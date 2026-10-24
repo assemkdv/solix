@@ -80,12 +80,12 @@ def test_raw_and_thresholded_labels(tmp_path):
     assert binary["label"].tolist() == [1, 0, 0]
 
 
-def test_window_excludes_image_time(tmp_path):
+def test_window_includes_image_time(tmp_path):
     index_path, catalog_path = _files(tmp_path, times=("2024-01-01 05:00:00",))
     with pytest.warns(UserWarning):
         result = _build(index_path, catalog_path, SumRelativeFluxReducer())
-    # The M1.0 starting exactly at t does not count; B5.0 (blank) and C1.0 (2.5) do.
-    assert result["label"].tolist() == [2.5]
+    # The M1.0 starting exactly at t counts (12.0); B5.0 (blank) adds nothing; C1.0 adds 2.5.
+    assert result["label"].tolist() == [14.5]
 
 
 def test_active_region(tmp_path):

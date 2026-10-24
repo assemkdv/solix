@@ -185,7 +185,7 @@ def test_pipeline_label_from_events():
 def test_pipeline_run_one_with_fixture_catalog():
     # tests/fixtures/catalog.csv: C3.0 starts 2024-02-01 11:50, X1.0 starts
     # 2024-02-02 00:00 (exactly 24 h after the image), C1.0 and M4.0 on
-    # 2024-02-05. Start time, window (t, t + w).
+    # 2024-02-05. Start time, window [t, t + w).
     matcher = EventMatcher(FIXTURES_DIR / "catalog.csv")
     pipeline = DatasetBuildingPipeline(CumulativeClassIndexReducer(), NumericThresholdLabeler(10))
     result = pipeline.run_one(
@@ -224,4 +224,4 @@ def test_default_matching_settings():
     builder = DatasetBuilder(prediction_window=24, strategy=DatasetBuildingPipeline(
         CumulativeClassIndexReducer(), RegressionLabeler()))
     assert builder.event_time == "start"
-    assert not hasattr(builder, "interval_mode")   # the window is always (t, t+w)
+    assert not hasattr(builder, "interval_mode")   # the window is always [t, t+w)

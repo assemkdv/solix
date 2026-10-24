@@ -135,7 +135,7 @@ for 2017-09-01 00:00 to 2017-09-06 00:00 (exact URL in
 with a GOES class. Raw result: [`hek_swpc_flares.csv`](hek_swpc_flares.csv);
 in the package schema: [`flare_catalog.csv`](flare_catalog.csv).
 
-Before labeling, the examples stop unless every window `(t, t + 24h)`
+Before labeling, the examples stop unless every window `[t, t + 24h)`
 lies inside the queried interval (last window ends 2017-09-04 09:59:50).
 A flare list cannot show that GOES observed without gaps, so a 0 label
 means "no M/X flare in this list", as discussed in Q5.
@@ -179,7 +179,7 @@ batch 2: images [1, 1, 256, 256] torch.float32 range [0.000, 1.000]  labels [1]
 
 The label changes between 04:59:50.0 and 05:59:50.0 because the first
 M-class flare in the catalog after the images, M1.2 from NOAA 12673,
-starts 2017-09-04 05:36, which is inside `(t, t + 24h)` only from 05:36 on
+starts 2017-09-04 05:36, which is inside `[t, t + 24h)` only from 05:36 on
 09-03.
 
 Example 07 — 8 candidate sequences, 2 emitted, 6 skipped, both labeled 0:
@@ -254,7 +254,7 @@ strings.
 - DataLoader / tf.data order, labels and image paths equal the label table.
 - Batch shapes and dtype (`float32`, values in [0, 1]) in every batch.
 - Every label is recomputed without `flare_indexer` from the catalog rows
-  (`t < start_time ≤ t + 24h`, class M or X), with `t` parsed directly from
+  (`t ≤ start_time < t + 24h`, class M or X), with `t` parsed directly from
   the full-precision `DATE_OBS` string in the manifest (which must equal
   the index timestamp; for sequences, the last image's).
 - `image_path` survives into the single-image labels and the sequence table.

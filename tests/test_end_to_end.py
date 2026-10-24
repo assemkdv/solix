@@ -197,7 +197,7 @@ def test_end_to_end_synthetic_same_day_catalog(tmp_path):
     index_path = _write_index(tmp_path / "index.csv",
                               ["2030-01-10T00:00:00", "2030-01-12T00:00:00", "2030-01-13T00:00:00"])
 
-    # Window (t, t + 24h): excludes t and t + 24h.
+    # Window [t, t + 24h): excludes t and t + 24h.
     #   2030-01-10 00:00: M2.0 (peak 09:52) -> 1, max flux 2e-5
     #   2030-01-12 00:00: only C3.0 (peak 12:00), below M -> 0, max flux 3e-6
     #   2030-01-13 00:00: nothing -> 0, 0.0
@@ -227,7 +227,7 @@ def test_end_to_end_midnight_crossing_event(tmp_path):
     index_path = _write_index(tmp_path / "index.csv",
                               ["2030-01-11T00:00:00", "2030-01-12T00:00:00", "2030-01-13T00:00:00"])
 
-    # Windows (t, t + 24h):
+    # Windows [t, t + 24h):
     #   2030-01-11 00:00: start 01-11 23:50 inside; peak 01-12 00:05 outside
     #   2030-01-12 00:00: start before t; peak 01-12 00:05 inside
     #   2030-01-13 00:00: neither

@@ -68,7 +68,7 @@ def test_load_catalog_parses_midnight(tmp_path):
     assert matcher._catalog.loc[0, "peak_time"] == pd.Timestamp("2024-01-23 00:00:00")
 
 
-def test_load_catalog_rejects_non_numeric_time(tmp_path):
+def test_load_catalog_rejects_unparseable_time(tmp_path):
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
         "start_time,peak_time,end_time,class,active_region\n"
@@ -386,14 +386,14 @@ def test_query_returns_flares_within_window():
     matcher = EventMatcher.__new__(EventMatcher)  # create object without calling __init__
     matcher._catalog = pd.DataFrame({
         "peak_time": pd.to_datetime([
-            "2024-01-01 00:30",  # inside a 1-hour window starting at 00:00
-            "2024-01-01 01:30",  # outside — too late
-            "2024-01-01 00:59",  # inside — right at the edge
+            "2024-01-01 00:30",
+            "2024-01-01 01:30",
+            "2024-01-01 00:59",
         ]),
-        "start_time": pd.to_datetime([
-            "2024-01-01 00:20",
-            "2024-01-01 01:20",
-            "2024-01-01 00:50",
+        "start_time": pd.to_datetime([  # matched by default (event_time="start")
+            "2024-01-01 00:20",  # inside a 1-hour window starting at 00:00
+            "2024-01-01 01:20",  # outside — too late
+            "2024-01-01 00:50",  # inside
         ]),
         "goes_class": ["M2.3", "X1.0", "C4.5"],
         "active_region": [None, None, None],

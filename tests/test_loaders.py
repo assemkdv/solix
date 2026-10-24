@@ -17,7 +17,7 @@ def test_build_image_index_from_filename_list():
 
     assert list(result.columns) == ["timestamp", "image_path"]
     assert pd.api.types.is_datetime64_any_dtype(result["timestamp"])
-    # Sorted ascending, required for DatasetBuilder sequence mode.
+    # Sorted ascending by time.
     assert result["timestamp"].is_monotonic_increasing
     assert result["timestamp"].tolist() == [
         pd.Timestamp("2010-12-21 20:00:00"),

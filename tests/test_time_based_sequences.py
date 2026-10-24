@@ -623,7 +623,7 @@ def test_active_region_time_based_regions_are_grouped(tmp_path):
     assert report.missing_timestamps == [pd.Timestamp("2024-01-01T02:00:00")]
 
 
-def test_active_region_time_based_missing_active_region_matches_nothing(tmp_path):
+def test_active_region_time_based_missing_active_region_breaks_the_region_grid(tmp_path):
     timestamps = _hourly("2024-01-01T00:00:00", 6)
     index_path = _write_index(
         tmp_path, timestamps, active_regions=["3559", "3559", None, "3559", "3559", "3559"]

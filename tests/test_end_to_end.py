@@ -11,16 +11,16 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 CATALOG_PATH = FIXTURES_DIR / "catalog.csv"
 IMAGE_INDEX_PATH = FIXTURES_DIR / "image_index.csv"
 
-# tests/fixtures/catalog.csv has four flares:
-#   C3.0 peak 2024-02-01T12:00:00  (flux=3e-6)
-#   X1.0 peak 2024-02-02T00:00:00  (flux=1e-4)  <- exactly on a 24h window end
-#   C1.0 peak 2024-02-05T06:00:00  (flux=1e-6)
-#   M4.0 peak 2024-02-05T18:00:00  (flux=4e-5)
+# tests/fixtures/catalog.csv has four flares (start time, the default event_time):
+#   C3.0 starts 2024-02-01T11:50:00  (flux=3e-6)
+#   X1.0 starts 2024-02-02T00:00:00  (flux=1e-4)  <- exactly on a 24h window end
+#   C1.0 starts 2024-02-05T05:50:00  (flux=1e-6)
+#   M4.0 starts 2024-02-05T17:50:00  (flux=4e-5)
 #
 # tests/fixtures/image_index.csv has three timestamps, each with a
 # prediction_window of 24 hours:
 #   2024-02-01T00:00:00 -> window [2024-02-01T00:00, 2024-02-02T00:00)
-#       Only C3.0 is inside. X1.0 peaks exactly at the window end and must
+#       Only C3.0 is inside. X1.0 starts exactly at the window end and must
 #       be excluded by the half-open interval.
 #   2024-02-05T00:00:00 -> window [2024-02-05T00:00, 2024-02-06T00:00)
 #       Both C1.0 and M4.0 are inside; M4.0 qualifies the binary threshold.
@@ -46,14 +46,14 @@ def test_end_to_end_max_flare_strategy():
     result = builder.build(IMAGE_INDEX_PATH, CATALOG_PATH)
 
     # Row 1: max is C3.0's 3e-6 — X1.0's 1e-4 must be excluded since its
-    # peak lands exactly on the window boundary. If the boundary were
+    # start lands exactly on the window boundary. If the boundary were
     # mistakenly inclusive, this would be 1e-4 instead.
     # Row 2: max of C1.0 (1e-6) and M4.0 (4e-5) is 4e-5.
     # Row 3: no flares in the window -> 0.0.
     assert result["label"].tolist() == [3e-6, 4e-5, 0.0]
 
 
-def test_end_to_end_sequences_against_real_fixture_catalog(tmp_path):
+def test_end_to_end_sequences_against_fixture_catalog(tmp_path):
     # Uses the same tests/fixtures/catalog.csv as
     # the tests above, but drives it through sequence labeling rather than
     # single-image labeling.
@@ -95,7 +95,7 @@ def test_end_to_end_sequences_against_real_fixture_catalog(tmp_path):
     assert max_result["label"].tolist() == [0.0, 0.0, 3e-6]
 
 
-def test_end_to_end_active_region_against_real_fixture_catalog(tmp_path):
+def test_end_to_end_active_region_against_fixture_catalog(tmp_path):
     # tests/fixtures/catalog.csv has two active regions: 11111 (C3.0, X1.0
     # on 2024-02-01/02) and 22222 (C1.0, M4.0 on 2024-02-05). Using
     # threshold="C" so C-class flares count as qualifying.
@@ -120,7 +120,7 @@ def test_end_to_end_active_region_against_real_fixture_catalog(tmp_path):
     assert result["label"].tolist() == [1, 0, 1]
 
 
-def test_end_to_end_active_region_sequences_against_real_fixture_catalog(tmp_path):
+def test_end_to_end_active_region_sequences_against_fixture_catalog(tmp_path):
     # tests/fixtures/catalog.csv has region 11111 (C3.0 peak 2024-02-01T12:00,
     # X1.0 peak 2024-02-02T00:00) and region 22222 (C1.0/M4.0 on 2024-02-05).
     # Using threshold="C" so C-class flares count as qualifying.
@@ -191,7 +191,7 @@ def test_end_to_end_synthetic_same_day_catalog(tmp_path):
     index_path = _write_index(tmp_path / "index.csv",
                               ["2030-01-10T00:00:00", "2030-01-12T00:00:00", "2030-01-13T00:00:00"])
 
-    # Window [t, t + 24h): excludes t and t + 24h.
+    # Window [t, t + 24h): includes t, excludes t + 24h.
     #   2030-01-10 00:00: M2.0 (peak 09:52) -> 1, max flux 2e-5
     #   2030-01-12 00:00: only C3.0 (peak 12:00), below M -> 0, max flux 3e-6
     #   2030-01-13 00:00: nothing -> 0, 0.0

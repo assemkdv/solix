@@ -1,10 +1,12 @@
 """
-Checks for the real-image TensorFlow examples (examples 08 and 09).
+Checks for the real-image TensorFlow examples (examples 08, 09 and 11).
 
 The layout conversion and the sequence checks (shared helpers in
-examples/real_data) need neither TensorFlow nor images. Running the examples needs TensorFlow, Pillow with JPEG 2000
-support and the images from examples/real_data/fetch_real_data.py; the
-comparison with the PyTorch examples (06, 07) also needs PyTorch. Tests
+examples/real_data) need neither TensorFlow nor images. Running 08 and 09
+needs TensorFlow, Pillow with JPEG 2000 support and the images from
+examples/real_data/fetch_real_data.py; 11 needs TensorFlow, astropy and the
+SHARP patches. The comparison with the PyTorch examples (06, 07) also needs
+PyTorch. Tests
 whose requirements are missing are skipped, so the base suite runs without
 any framework installed.
 """

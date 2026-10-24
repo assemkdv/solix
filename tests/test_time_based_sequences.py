@@ -186,7 +186,7 @@ def test_observation_window_is_half_open_last_image_at_t_plus_5h(tmp_path):
 def test_label_uses_final_image_timestamp_not_sequence_start(tmp_path):
     timestamps = _hourly("2024-01-01T00:00:00", 6)
     index_path = _write_index(tmp_path, timestamps)
-    # Flare peaks one minute after the final image's timestamp (05:00); a
+    # Flare starts one minute after the final image's timestamp (05:00); a
     # window measured from sequence_start (00:00) with a short
     # prediction_window would miss it, but one from sequence_end catches it.
     catalog_path = _catalog_with_flare(tmp_path, "2024-01-01", "0501", "0501", "0505", "M1.0", "4456")

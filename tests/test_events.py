@@ -315,16 +315,16 @@ def _boundary_matcher():
     matcher = EventMatcher.__new__(EventMatcher)
     matcher._catalog = pd.DataFrame({
         "peak_time": pd.to_datetime([
-            "2024-01-01 00:00:00",  # exactly at t
-            "2024-01-01 00:00:01",  # one second after t
-            "2024-01-01 00:59:59",  # one second before t + window
-            "2024-01-01 01:00:00",  # exactly at t + window
-        ]),
-        "start_time": pd.to_datetime([
             "2024-01-01 00:00:00",
             "2024-01-01 00:00:01",
             "2024-01-01 00:59:59",
             "2024-01-01 01:00:00",
+        ]),
+        "start_time": pd.to_datetime([
+            "2024-01-01 00:00:00",  # exactly at t
+            "2024-01-01 00:00:01",  # one second after t
+            "2024-01-01 00:59:59",  # one second before t + window
+            "2024-01-01 01:00:00",  # exactly at t + window
         ]),
         "goes_class": ["A1.0", "A1.0", "A1.0", "A1.0"],
         "active_region": [None, None, None, None],
@@ -337,10 +337,10 @@ def test_window_includes_t_and_excludes_window_end():
     window_start = pd.Timestamp("2024-01-01 00:00:00")
 
     results = matcher.query(window_start, prediction_window=1)
-    peak_times = sorted(r.peak_time for r in results)
+    start_times = sorted(r.start_time for r in results)
 
     # [t, t+1h): includes t itself and t+1h-1s, excludes t+1h exactly.
-    assert peak_times == [
+    assert start_times == [
         pd.Timestamp("2024-01-01 00:00:00"),
         pd.Timestamp("2024-01-01 00:00:01"),
         pd.Timestamp("2024-01-01 00:59:59"),

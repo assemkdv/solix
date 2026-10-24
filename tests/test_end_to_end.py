@@ -70,9 +70,7 @@ def test_end_to_end_sequences_against_real_fixture_catalog(tmp_path):
     builder = DatasetBuilder(
         prediction_window=1,
         strategy=BinaryThresholdStrategy(),
-        sequence_length=2,
-        stride=1,
-        cadence_minutes=60,
+        cadence="1h", observation_window="2h", sliding_window="1h",
         event_time="peak",
     )
     result = builder.build(index_path, CATALOG_PATH)
@@ -91,9 +89,7 @@ def test_end_to_end_sequences_against_real_fixture_catalog(tmp_path):
     max_result = DatasetBuilder(
         prediction_window=1,
         strategy=MaxFlareStrategy(),
-        sequence_length=2,
-        stride=1,
-        cadence_minutes=60,
+        cadence="1h", observation_window="2h", sliding_window="1h",
         event_time="peak",
     ).build(index_path, CATALOG_PATH)
     assert max_result["label"].tolist() == [0.0, 0.0, 3e-6]
@@ -145,9 +141,7 @@ def test_end_to_end_active_region_sequences_against_real_fixture_catalog(tmp_pat
         prediction_window=1,
         strategy=BinaryThresholdStrategy(threshold="C"),
         target="active_region",
-        sequence_length=3,
-        stride=3,
-        cadence_minutes=30,
+        cadence="30min", observation_window="90min", sliding_window="90min",
         event_time="peak",
     )
     result = builder.build(index_path, CATALOG_PATH)

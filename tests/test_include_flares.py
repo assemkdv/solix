@@ -65,17 +65,6 @@ def test_single_image_active_region_lists_only_that_region(tmp_path):
     assert result["flares"].tolist() == [["C2.0", "M1.0"], ["C5.0"]]
     assert result["label"].tolist() == [1, 0]
 
-
-def test_row_based_sequences(tmp_path):
-    index, catalog = _files(tmp_path, HOURS[:6])
-    result = DatasetBuilder(
-        "4h", BinaryThresholdStrategy("M"), sequence_length=3, stride=3, include_flares=True,
-    ).build(index, catalog)
-    assert list(result.columns) == ["sequence_start", "sequence_end", "timestamps", "n_images", "label", "flares"]
-    # Labeled from the last image: 02:00 -> [02:00, 06:00), 05:00 -> [05:00, 09:00).
-    assert result["flares"].tolist() == [["C2.0", "M1.0"], ["M1.0"]]
-
-
 def test_time_based_sequences(tmp_path):
     index, catalog = _files(tmp_path, HOURS)
     result = DatasetBuilder(
@@ -89,7 +78,7 @@ def test_time_based_sequences(tmp_path):
 
 def test_active_region_sequences(tmp_path):
     index, catalog = _files(tmp_path, HOURS[:3] * 2, regions=["13324"] * 3 + ["13325"] * 3)
-    for kwargs in (dict(sequence_length=3), dict(cadence="1h", observation_window="3h", sliding_window="3h")):
+    for kwargs in (dict(cadence="1h", observation_window="3h", sliding_window="3h"),):
         result = DatasetBuilder(
             "8h", BinaryThresholdStrategy("M"), target="active_region", include_flares=True, **kwargs,
         ).build(index, catalog)
@@ -105,7 +94,8 @@ def test_index_column_named_flares_is_refused(tmp_path):
     with pytest.raises(ValueError, match="flares"):
         DatasetBuilder("6h", BinaryThresholdStrategy("M"), include_flares=True, include_metadata=True).build(index, catalog)
     with pytest.raises(ValueError, match="flares"):
-        DatasetBuilder("6h", BinaryThresholdStrategy("M"), sequence_length=2, include_flares=True).build(index, catalog)
+        DatasetBuilder("6h", BinaryThresholdStrategy("M"), cadence="1h", observation_window="2h", sliding_window="1h",
+                       include_flares=True).build(index, catalog)
 
 
 @pytest.mark.parametrize("value", ["yes", 1, None])

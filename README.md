@@ -108,8 +108,7 @@ sequences = builder.build("examples/data/full_disk_image_index.csv",
 ```
 
 Each sequence is labeled from the time of its last image. Sequences with a
-missing image are skipped. For fixed-length sequences of consecutive rows,
-use `sequence_length=` and `stride=` instead.
+missing image are skipped.
 
 ## Active regions
 

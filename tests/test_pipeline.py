@@ -336,26 +336,6 @@ def test_dataset_builder_works_with_old_max_flare_strategy(tmp_path):
     result = builder.build(IMAGE_INDEX_PATH, CATALOG_PATH)
     assert result["label"].tolist() == [3e-6, 4e-5, 0.0]
 
-
-def test_full_disk_row_based_sequences_work_with_pipeline(tmp_path):
-    index_path = tmp_path / "sequence_index.csv"
-    pd.DataFrame({
-        "timestamp": pd.to_datetime([
-            "2024-02-01T08:59:00", "2024-02-01T09:59:00",
-            "2024-02-01T10:59:00", "2024-02-01T11:59:00",
-        ]),
-    }).to_csv(index_path, index=False)
-
-    pipeline = _default_pipeline()
-    builder = DatasetBuilder(
-        prediction_window=1, strategy=pipeline, sequence_length=2, stride=1, cadence_minutes=60,
-    )
-    result = builder.build(index_path, CATALOG_PATH)
-
-    assert list(result.columns) == ["sequence_start", "sequence_end", "timestamps", "n_images", "label"]
-    assert result["label"].tolist() == [0, 0, 0]
-
-
 def test_full_disk_time_based_sequences_work_with_pipeline(tmp_path):
     index_path = tmp_path / "index.csv"
     pd.DataFrame({
@@ -428,7 +408,7 @@ def test_active_region_sequences_work_with_pipeline(tmp_path):
     pipeline = DatasetBuildingPipeline(reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("C"))
     builder = DatasetBuilder(
         prediction_window=1, strategy=pipeline, target="active_region",
-        sequence_length=3, stride=3, cadence_minutes=30,
+        cadence="30min", observation_window="90min", sliding_window="90min",
         event_time="peak",
     )
     result = builder.build(index_path, CATALOG_PATH)
@@ -447,7 +427,7 @@ def test_extra_columns_preserved_with_pipeline(tmp_path):
     }).to_csv(index_path, index=False)
 
     pipeline = _default_pipeline()
-    builder = DatasetBuilder(prediction_window=1, strategy=pipeline, sequence_length=2, stride=1)
+    builder = DatasetBuilder(prediction_window=1, strategy=pipeline, cadence="1h", observation_window="2h", sliding_window="1h")
     result = builder.build(index_path, CATALOG_PATH)
 
     assert "image_path" in result.columns

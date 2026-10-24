@@ -9,8 +9,7 @@ Regression tests for the input-validation defects found in the
 4. a blank image timestamp crashed, misled, or was dropped silently;
 5. time-zone policy: explicit UTC offsets are converted to UTC;
 6. a catalog with both `class` and `goes_class` gave a wrong diagnosis;
-7. BinaryThresholdLabeler.assign labeled NaN/bool/Decimal silently;
-8. float sequence_length/stride passed the constructor and failed at build.
+7. BinaryThresholdLabeler.assign labeled NaN/bool/Decimal silently.
 """
 
 import datetime
@@ -202,7 +201,6 @@ def test_whitespace_only_image_region_counts_as_missing(tmp_path, catalog):
 def _builders_for_every_mode(**common):
     return [
         DatasetBuilder(24, BinaryThresholdStrategy(), **common),
-        DatasetBuilder(24, BinaryThresholdStrategy(), sequence_length=2, **common),
         DatasetBuilder(24, BinaryThresholdStrategy(), cadence="1h", observation_window="2h", sliding_window="1h", **common),
     ]
 
@@ -438,15 +436,6 @@ def test_time_based_durations_accept_text_and_timedelta_forms():
     )
     assert builder.cadence == pd.Timedelta(hours=1)
 
-
-def test_cadence_minutes_counts_minutes(tmp_path, catalog):
-    index = _write(tmp_path, "index.csv", "timestamp\n2024-01-01 00:00:00\n2024-01-01 01:00:00\n2024-01-01 02:00:00\n")
-    hourly = DatasetBuilder(24, BinaryThresholdStrategy(), sequence_length=2, cadence_minutes=60)
-    assert len(hourly.build(index, catalog)) == 2
-    per_minute = DatasetBuilder(24, BinaryThresholdStrategy(), sequence_length=2, cadence_minutes=1)
-    assert len(per_minute.build(index, catalog)) == 0
-
-
 # --- 2b. all-blank timestamp column; catalog missing-time policy -----------
 
 def test_all_blank_image_timestamp_column_raises_in_every_mode(tmp_path, catalog):
@@ -540,36 +529,3 @@ def test_binary_labeler_rejects_unsupported_types(value):
 def test_binary_labeler_rejects_non_finite_values(value):
     with pytest.raises(ValueError, match="non-finite"):
         BinaryThresholdLabeler("M").assign(value)
-
-
-# --- 8. constructor validation of row-based parameters ---------------------
-
-@pytest.mark.parametrize("name", ["sequence_length", "stride"])
-@pytest.mark.parametrize("bad", [2.0, 2.5, "2", True, np.float64(2)])
-def test_sequence_length_and_stride_must_be_integers(name, bad):
-    with pytest.raises(TypeError, match=f"{name} must be an integer"):
-        DatasetBuilder(24, BinaryThresholdStrategy(), **{name: bad})
-
-
-def test_sequence_length_and_stride_accept_numpy_integers():
-    builder = DatasetBuilder(24, BinaryThresholdStrategy(), sequence_length=np.int64(3), stride=np.int32(2))
-    assert builder.sequence_length == 3 and isinstance(builder.sequence_length, int)
-    assert builder.stride == 2 and isinstance(builder.stride, int)
-
-
-@pytest.mark.parametrize("bad", ["60", True, [60]])
-def test_cadence_minutes_must_be_a_number(bad):
-    with pytest.raises(TypeError, match="cadence_minutes must be a number"):
-        DatasetBuilder(24, BinaryThresholdStrategy(), sequence_length=2, cadence_minutes=bad)
-
-
-@pytest.mark.parametrize("bad", [0, -5, float("nan"), float("inf")])
-def test_cadence_minutes_must_be_positive_and_finite(bad):
-    with pytest.raises(ValueError, match="cadence_minutes must be > 0"):
-        DatasetBuilder(24, BinaryThresholdStrategy(), sequence_length=2, cadence_minutes=bad)
-
-
-def test_cadence_minutes_accepts_real_numbers():
-    assert DatasetBuilder(24, BinaryThresholdStrategy(), sequence_length=2, cadence_minutes=60).cadence_minutes == 60
-    assert DatasetBuilder(24, BinaryThresholdStrategy(), sequence_length=2, cadence_minutes=1.5).cadence_minutes == 1.5
-    assert DatasetBuilder(24, BinaryThresholdStrategy(), sequence_length=2, cadence_minutes=np.int64(60)).cadence_minutes == 60

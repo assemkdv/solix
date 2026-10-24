@@ -67,7 +67,7 @@ def test_invalid_counts(value, error, labeler):
 
 
 @pytest.mark.parametrize('target', ['full_disk', 'active_region'])
-@pytest.mark.parametrize('mode', ['single', 'row', 'time'])
+@pytest.mark.parametrize('mode', ['single', 'time'])
 @pytest.mark.parametrize('labeler', [f.ClassCountLabeler, f.ClassPresenceLabeler])
 def test_builder_all_modes(tmp_path, target, mode, labeler):
     index = tmp_path / 'images.csv'
@@ -78,8 +78,7 @@ def test_builder_all_modes(tmp_path, target, mode, labeler):
                   'peak_time': ['2024-01-01 00:35', '2024-01-01 01:35', '2024-01-01 01:35'],
                   'end_time': ['2024-01-01 00:40', '2024-01-01 01:40', '2024-01-01 01:40'],
                   'class': ['B2', 'C2', 'X1'], 'active_region': [100, 100, 200]}).to_csv(catalog, index=False)
-    options = {} if mode == 'single' else ({'sequence_length': 2} if mode == 'row' else
-                {'cadence': '1h', 'observation_window': '2h', 'sliding_window': '1h'})
+    options = {} if mode == 'single' else {'cadence': '1h', 'observation_window': '2h', 'sliding_window': '1h'}
     pipeline = f.DatasetBuildingPipeline(f.ClassCountReducer(), labeler())
     result = f.DatasetBuilder('1h', pipeline, target=target, event_time='start', **options).build(index, catalog)
     assert len(result) == (2 if mode == 'single' else 1)

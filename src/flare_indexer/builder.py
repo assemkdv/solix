@@ -1,4 +1,3 @@
-import math
 import numbers
 import warnings
 
@@ -12,7 +11,6 @@ from .events import (
     VALID_EVENT_TIMES,
 )
 
-_ROW_BASED_PARAM_NAMES = ("sequence_length", "stride", "cadence_minutes")
 _TIME_BASED_PARAM_NAMES = ("start", "cadence", "observation_window", "sliding_window")
 
 # Cap on how many skipped-sequence-starts / missing-timestamps a
@@ -72,14 +70,14 @@ def _parse_duration(value, name: str) -> pd.Timedelta:
     sliding_window): duration text with a unit ("1h", "30min"), a
     pd.Timedelta, a datetime.timedelta or a numpy.timedelta64, strictly
     positive. A bare number is rejected: pandas would read it as
-    nanoseconds, and unlike prediction_window (hours) and cadence_minutes
-    (minutes) these parameters give a number no unit.
+    nanoseconds, and unlike prediction_window (hours) these parameters
+    give a number no unit.
     """
     if isinstance(value, bool) or (isinstance(value, numbers.Real) and not isinstance(value, np.timedelta64)):
         raise ValueError(
             f"{name} must be a duration with a unit (e.g. '1h', '30min') or a Timedelta, got the bare "
             f"number {value!r}. A number has no unit here; only prediction_window reads a number as "
-            "hours and cadence_minutes as minutes."
+            "hours."
         )
     _reject_unitless_duration_text(value, name)
     try:
@@ -108,31 +106,13 @@ def _parse_timestamp_param(value, name: str) -> pd.Timestamp:
     return _to_naive_utc(timestamp)
 
 
-def _require_positive_int(value, name: str) -> int:
-    """sequence_length / stride: an integer >= 1 (not a bool, not a float)."""
-    if isinstance(value, bool) or not isinstance(value, numbers.Integral):
-        raise TypeError(f"{name} must be an integer >= 1, got {value!r} ({type(value).__name__})")
-    if value < 1:
-        raise ValueError(f"{name} must be >= 1, got {value}")
-    return int(value)
-
-
-def _require_positive_number(value, name: str):
-    """cadence_minutes: a finite real number > 0 (not a bool, not text)."""
-    if isinstance(value, bool) or not isinstance(value, numbers.Real):
-        raise TypeError(f"{name} must be a number > 0, got {value!r} ({type(value).__name__})")
-    if not math.isfinite(value) or value <= 0:
-        raise ValueError(f"{name} must be > 0, got {value}")
-    return value
-
-
 def _parse_image_timestamps(column: pd.Series, path: Path) -> pd.Series:
     """
     Parse the image index's timestamp column, refusing anything that
     would otherwise produce samples silently: a numeric column (read as
     nanoseconds since 1970), an unparseable cell, or a blank cell (NaT,
-    which single-image mode would crash on, row-based mode would report
-    as "not sorted", and time-based mode would drop without a trace).
+    which single-image mode would crash on and sequence mode would drop
+    without a trace).
     Values with a UTC offset are converted to UTC and stored naive, as in
     the catalog (see events._to_naive_utc).
     """
@@ -196,15 +176,14 @@ class DatasetBuilder:
         is hours (e.g. 24); a string/Timedelta is a pandas duration with
         a unit (e.g. "24h", "23h59min59s"). Bare numeric text ("24") is
         rejected. This hours convention is specific to prediction_window:
-        cadence_minutes counts minutes, and the time-based durations
-        below accept no bare number at all.
+        the sequence durations below accept no bare number at all.
     strategy : BinaryThresholdStrategy | MaxFlareStrategy
         Labeling strategy that converts a list of FlareEvents to a label.
     target : str
         "full_disk" (default) matches any flare in the window, preserving
         original behavior. "active_region" matches only flares from the
         specific active region each image is assigned to (requires an
-        active_region column in the image index). In sequence modes the
+        active_region column in the image index). In sequence mode the
         index is first grouped by region and each region's sequences are
         built from that region's images only, so several regions may be
         observed at the same timestamps; see "Active-region sequences".
@@ -218,7 +197,7 @@ class DatasetBuilder:
         if no flare occurred and emits a UserWarning with the count, since
         such a label is unknown, not a confirmed negative; "drop" leaves
         them out of the output; "error" raises ValueError. In sequence
-        modes such images never join a region's sequence; with "negative"
+        mode such images never join a region's sequence; with "negative"
         they form one extra group whose sequences get active_region=None.
     include_metadata : bool
         Single-image mode only. False (default, preserves original
@@ -238,24 +217,8 @@ class DatasetBuilder:
         (row count and label counts or range). The returned table is the
         same either way.
 
-    Row-based sequence parameters (mutually exclusive with the time-based
-    ones below -- see "Sequence mode selection")
-    ----------------------------------------------------------------------
-    sequence_length : int | None
-        Number of consecutive images per sample. Omitted/None (default)
-        resolves to 1, preserving the original single-image behavior and
-        output schema exactly.
-    stride : int | None
-        Step size between the start of consecutive sequences. Omitted/None
-        (default) resolves to 1. Only meaningful when sequence_length > 1.
-    cadence_minutes : int | None
-        Expected number of minutes between consecutive images inside a
-        sequence. When set, a candidate sequence is skipped (not raised on)
-        if any adjacent pair inside it doesn't differ by exactly this many
-        minutes. Only used when sequence_length > 1.
-
-    Time-based sequence parameters (mutually exclusive with the row-based
-    ones above)
+    Sequence parameters (giving any of them builds sequences instead of
+    single images)
     ----------------------------------------------------------------------
     start : pandas-compatible timestamp | None
         The first candidate sequence's starting timestamp. Inclusive: an
@@ -266,14 +229,14 @@ class DatasetBuilder:
         The spacing between consecutive images *within* a sequence (e.g.
         "1h", "30min", pd.Timedelta(hours=1)). A bare number is rejected
         as unit-less (it is not hours and not minutes). Required whenever
-        any time-based parameter is used. Must be an exact multiple of
+        any sequence parameter is used. Must be an exact multiple of
         the image index's own inferred cadence (see "Source cadence
         inference"). observation_window and sliding_window take the same
         forms.
     observation_window : pandas-compatible duration | None
         The half-open span [sequence_start, sequence_start +
         observation_window) covered by one sequence. Required in
-        time-based mode. Must be an exact multiple of `cadence`; the
+        sequence mode. Must be an exact multiple of `cadence`; the
         number of images per sequence is observation_window / cadence
         (e.g. cadence="1h", observation_window="6h" -> 6 images at
         t, t+1h, ..., t+5h -- note the *last* image is at
@@ -281,17 +244,16 @@ class DatasetBuilder:
         own right endpoint).
     sliding_window : pandas-compatible duration | None
         How far forward the next candidate sequence's start moves relative
-        to the current one. Required in time-based mode. Must be an exact
+        to the current one. Required in sequence mode. Must be an exact
         multiple of `cadence`.
 
     Active-region sequences
     ----------------------------------------------------------------------
     With target="active_region", sequences are built per region: rows
-    are grouped by normalized active_region, and the ordering/uniqueness
-    checks, cadence_minutes, and the time-based grid apply within each
-    region. Duplicate timestamps within one region raise ValueError;
-    the same timestamp in different regions is fine. In time-based mode
-    the source cadence is inferred from all image timestamps, `start`
+    are grouped by normalized active_region, and the uniqueness check and
+    the time grid apply within each region. Duplicate timestamps within
+    one region raise ValueError; the same timestamp in different regions
+    is fine. The source cadence is inferred from all image timestamps, `start`
     must be an image time somewhere in the index, and every region uses
     the grid start + k * sliding_window (or, without `start`, a grid
     beginning at the region's own first image). Output rows are sorted
@@ -300,14 +262,12 @@ class DatasetBuilder:
     Sequence mode selection
     ----------------------------------------------------------------------
     Supplying any of start/cadence/observation_window/sliding_window
-    activates time-based mode, in which cadence, observation_window, and
-    sliding_window are all required (start remains optional). Explicitly
-    mixing row-based parameters (sequence_length/stride/cadence_minutes)
-    with time-based ones raises ValueError -- pick one mode.
+    builds sequences, in which cadence, observation_window, and
+    sliding_window are all required (start remains optional).
 
     Source cadence inference
     ----------------------------------------------------------------------
-    In time-based mode, build() infers the image index's own base cadence
+    In sequence mode, build() infers the image index's own base cadence
     as the mode (most common value) of its sorted-unique timestamps'
     positive consecutive differences -- robust to occasional missing
     images/larger gaps, unlike using the timestamps' minimum or maximum
@@ -324,9 +284,6 @@ class DatasetBuilder:
         self,
         prediction_window,
         strategy,
-        sequence_length=None,
-        stride=None,
-        cadence_minutes=None,
         target="full_disk",
         event_time="start",
         start=None,
@@ -349,28 +306,13 @@ class DatasetBuilder:
         if event_time not in VALID_EVENT_TIMES:
             raise ValueError(f"event_time must be one of {sorted(VALID_EVENT_TIMES)}, got {event_time!r}")
 
-        row_based_given = [
-            name for name, value in zip(_ROW_BASED_PARAM_NAMES, (sequence_length, stride, cadence_minutes))
-            if value is not None
-        ]
         time_based_given = [
             name for name, value in zip(_TIME_BASED_PARAM_NAMES, (start, cadence, observation_window, sliding_window))
             if value is not None
         ]
 
-        if row_based_given and time_based_given:
-            raise ValueError(
-                "Cannot mix row-based sequence parameters "
-                f"({', '.join(row_based_given)}) with time-based sequence parameters "
-                f"({', '.join(time_based_given)}). Choose either row-based mode "
-                "(sequence_length/stride/cadence_minutes) or time-based mode "
-                "(start/cadence/observation_window/sliding_window), not both."
-            )
-
         reducer = getattr(strategy, "reducer", None)
-        if getattr(reducer, "single_image_only", False) and (
-            time_based_given or (sequence_length is not None and sequence_length != 1)
-        ):
+        if getattr(reducer, "single_image_only", False) and time_based_given:
             raise ValueError(
                 f"{type(reducer).__name__} labels single images only; "
                 "it cannot be used with sequence parameters."
@@ -402,8 +344,8 @@ class DatasetBuilder:
             ]
             if missing_required:
                 raise ValueError(
-                    f"Time-based sequence mode also requires: {', '.join(missing_required)} "
-                    "(start is the only optional time-based parameter)."
+                    f"Sequence mode also requires: {', '.join(missing_required)} "
+                    "(start is the only optional sequence parameter)."
                 )
 
             self.cadence = _parse_duration(cadence, "cadence")
@@ -424,60 +366,40 @@ class DatasetBuilder:
             self.number_of_images = round(self.observation_window / self.cadence)
             self.slide_steps = round(self.sliding_window / self.cadence)
 
-            self.sequence_length = None
-            self.stride = None
-            self.cadence_minutes = None
-        else:
-            self.sequence_length = 1 if sequence_length is None else _require_positive_int(sequence_length, "sequence_length")
-            self.stride = 1 if stride is None else _require_positive_int(stride, "stride")
-            self.cadence_minutes = (
-                None if cadence_minutes is None else _require_positive_number(cadence_minutes, "cadence_minutes")
-            )
-
     def build(
         self, image_index_path: str | Path, event_catalog_path: str | Path, return_report: bool = False,
     ) -> pd.DataFrame:
         """
         Build a labeled dataset.
 
-        For sequence_length == 1 (default, row-based mode), returns a
-        DataFrame with columns (timestamp, label) -- identical to v0.1.0
-        behavior. An image index with a header row but zero data rows is
-        valid and produces an empty result with the same columns.
+        Single images (no sequence parameters): returns a DataFrame with
+        columns (timestamp, label). An image index with a header row but
+        zero data rows is valid and produces an empty result with the same
+        columns.
 
-        For sequence_length > 1 (row-based mode), returns one row per
-        sequence with columns (sequence_start, sequence_end, timestamps,
-        n_images, label) -- or, when target="active_region",
-        (sequence_start, sequence_end, timestamps, n_images, active_region,
-        label) -- plus one additional list-column per any other column
-        present in the image index (e.g. an image path or ID column),
-        preserving that column's values for each image in the sequence.
-        Timestamps must be sorted ascending and contain no duplicates in
-        this mode (within each region when target="active_region").
-        An image-index column whose name equals an output column (e.g.
-        "label") raises ValueError instead of overwriting it. Fewer rows
-        than sequence_length produces an empty result with the same
-        (sequence-mode) columns.
+        Sequences (see the class docstring): returns one row per sequence
+        with columns (sequence_start, sequence_end, timestamps, n_images,
+        label) -- or, when target="active_region", (sequence_start,
+        sequence_end, timestamps, n_images, active_region, label) -- plus
+        one list-column per other image-index column (e.g. an image path),
+        holding that column's values for each image in the sequence.
+        Sequences are built on an exact timestamp grid (candidate_start +
+        i * cadence), which also allows downsampling a finer-cadence image
+        index. A candidate whose grid is missing any timestamp is skipped,
+        not interpolated or substituted. An image-index column whose name
+        equals an output column (e.g. "label") raises ValueError instead of
+        overwriting it.
 
-        In time-based mode (see the class docstring), returns the same
-        sequence-mode schema as row-based sequences, built instead from an
-        exact timestamp grid (candidate_start + i * cadence) rather than
-        positional row-slicing -- this is what allows compatible
-        downsampling of a finer-cadence image index. A candidate whose
-        required grid is missing any timestamp is skipped, not
-        interpolated or substituted.
-
-        return_report=True is only supported in time-based mode, where it
+        return_report=True is only supported for sequences, where it
         returns (DataFrame, SequenceBuildReport) instead of just the
-        DataFrame; passing it in row-based/single-image mode raises
-        ValueError.
+        DataFrame; passing it for single images raises ValueError.
 
         A completely empty image index (no header) raises ValueError, as
         does an image index missing the required timestamp column.
         """
         if return_report and not self.time_based:
             raise ValueError(
-                "return_report=True is only supported in time-based sequence mode "
+                "return_report=True is only supported for sequences "
                 "(i.e. when start/cadence/observation_window/sliding_window were used)."
             )
 
@@ -519,16 +441,10 @@ class DatasetBuilder:
                 result, report = self._build_time_based_sequences_active_region(index_df, matcher, image_index_path)
             else:
                 result, report = self._build_time_based_sequences(index_df, matcher, image_index_path)
-        elif self.sequence_length == 1:
-            if self.target == "active_region":
-                result = self._build_single_image_active_region(index_df, matcher, image_index_path)
-            else:
-                result = self._build_single_image(index_df, matcher, image_index_path)
         elif self.target == "active_region":
-            result = self._build_sequences_active_region(index_df, matcher, image_index_path)
+            result = self._build_single_image_active_region(index_df, matcher, image_index_path)
         else:
-            self._validate_sequence_timestamps(index_df["timestamp"], image_index_path)
-            result = self._build_sequences(index_df, matcher, image_index_path)
+            result = self._build_single_image(index_df, matcher, image_index_path)
 
         if self.verbose:
             self._print_result(result, report)
@@ -548,14 +464,12 @@ class DatasetBuilder:
         if self.time_based:
             mode = (f"sequences of {self.number_of_images} images {_format_duration(self.cadence)} apart, "
                     f"new sequence every {_format_duration(self.sliding_window)}")
-        elif self.sequence_length == 1:
-            mode = "single images"
         else:
-            mode = f"sequences of {self.sequence_length} consecutive images, stride {self.stride}"
+            mode = "single images"
         print(f"Settings: window [t, t + {_format_duration(self._window)}) on {self.event_time}_time, {target}, {mode}")
 
     def _print_result(self, result: pd.DataFrame, report) -> None:
-        unit = "rows" if self.sequence_length == 1 and not self.time_based else "sequences"
+        unit = "sequences" if self.time_based else "rows"
         line = f"Result: {len(result):,} {unit}"
         if report is not None and report.skipped_sequences:
             line += f" ({report.skipped_sequences:,} skipped: missing images)"
@@ -717,15 +631,6 @@ class DatasetBuilder:
                 stacklevel=3,
             )
 
-    def _validate_sequence_timestamps(self, timestamps: pd.Series, path: Path, group: str | None = None) -> None:
-        if not timestamps.is_monotonic_increasing:
-            within = f" within {group}" if group else ""
-            raise ValueError(
-                f"Image index at {path} must have timestamps sorted in ascending "
-                f"order{within} to build sequences."
-            )
-        self._validate_unique_timestamps(timestamps, path, group)
-
     def _validate_unique_timestamps(self, timestamps: pd.Series, path: Path, group: str | None = None) -> None:
         duplicated = timestamps[timestamps.duplicated()]
         if not duplicated.empty:
@@ -735,51 +640,6 @@ class DatasetBuilder:
             raise ValueError(
                 f"Image index at {path} contains duplicate timestamp(s){within}: {dupe_list}{more}"
             )
-
-    def _sequence_violates_cadence(self, window_timestamps: list) -> bool:
-        if self.cadence_minutes is None:
-            return False
-        expected_gap = pd.Timedelta(minutes=self.cadence_minutes)
-        for earlier, later in zip(window_timestamps, window_timestamps[1:]):
-            if (later - earlier) != expected_gap:
-                return True
-        return False
-
-    def _build_sequences(self, index_df: pd.DataFrame, matcher: EventMatcher, path: Path) -> pd.DataFrame:
-        timestamps = index_df["timestamp"].tolist()
-        extra_columns = _extra_columns(index_df, ("timestamp",), self._sequence_reserved(), path)
-        n = len(timestamps)
-        length = self.sequence_length
-
-        columns = ["sequence_start", "sequence_end", "timestamps", "n_images"] + self._label_columns() + extra_columns
-
-        records = []
-        start = 0
-        while start + length <= n:
-            window = timestamps[start:start + length]
-
-            if not self._sequence_violates_cadence(window):
-                sequence_end = window[-1]
-                flares = matcher.query(
-                    sequence_end, self._window,
-                    event_time=self.event_time,
-                )
-                record = {
-                    "sequence_start": window[0],
-                    "sequence_end": sequence_end,
-                    "timestamps": list(window),
-                    "n_images": len(window),
-                    **self._label_fields(flares),
-                }
-                for col in extra_columns:
-                    record[col] = index_df[col].iloc[start:start + length].tolist()
-                records.append(record)
-
-            start += self.stride
-
-        if not records:
-            return pd.DataFrame(columns=columns)
-        return pd.DataFrame(records)[columns]
 
     # ── Active-region sequences: one group of images per region ──────────
 
@@ -840,39 +700,6 @@ class DatasetBuilder:
             reference_time, self._window, active_region=region,
             event_time=self.event_time,
         )
-
-    def _build_sequences_active_region(self, index_df: pd.DataFrame, matcher: EventMatcher, path: Path) -> pd.DataFrame:
-        extra_columns = _extra_columns(index_df, ("timestamp", "active_region"), self._sequence_reserved(), path)
-        columns = ["sequence_start", "sequence_end", "timestamps", "n_images", "active_region"] + self._label_columns() + extra_columns
-        length = self.sequence_length
-
-        records = []
-        missing_sequences = 0
-        for region, rows in self._region_groups(index_df, path):
-            group_name = self._group_name(region)
-            self._validate_sequence_timestamps(rows["timestamp"], path, group_name)
-            timestamps = rows["timestamp"].tolist()
-            start = 0
-            while start + length <= len(timestamps):
-                window = timestamps[start:start + length]
-                if not self._sequence_violates_cadence(window):
-                    flares = self._query_region(matcher, window[-1], region)
-                    missing_sequences += region is None
-                    record = {
-                        "sequence_start": window[0],
-                        "sequence_end": window[-1],
-                        "timestamps": list(window),
-                        "n_images": len(window),
-                        "active_region": region,
-                        **self._label_fields(flares),
-                    }
-                    for col in extra_columns:
-                        record[col] = rows[col].iloc[start:start + length].tolist()
-                    records.append(record)
-                start += self.stride
-
-        self._warn_missing_region_sequences(index_df, missing_sequences)
-        return _sequence_frame(records, columns)
 
     # ── Time-based sequence mode ─────────────────────────────────────────
 

@@ -199,26 +199,6 @@ def test_multiclass_agrees_with_binary_and_regression_on_the_same_windows(catalo
     assert [int(c in ("M", "X")) for c in multiclass] == binary.tolist()
     assert [labeler.assign(f) for f in regression] == multiclass.tolist()
 
-
-def test_row_based_sequences_use_the_final_image(catalog, full_disk_index):
-    sequences = _builder(_multiclass_pipeline(), sequence_length=2, stride=2).build(full_disk_index, catalog)
-    assert sequences["sequence_end"].astype(str).tolist() == [
-        "2024-01-01 12:00:00", "2024-01-02 12:00:00", "2024-01-03 12:00:00", "2024-01-04 12:00:00",
-    ]
-    assert sequences["label"].tolist() == ["NF", "NF", "NF", "NF"]
-
-    shifted = _builder(_multiclass_pipeline(), sequence_length=2, stride=2).build(
-        _drop_first_row(full_disk_index), catalog)
-    assert shifted["label"].tolist() == ["B", "C", "X"]
-
-
-def _drop_first_row(path):
-    index = pd.read_csv(path).iloc[1:]
-    out = path.with_name("shifted.csv")
-    index.to_csv(out, index=False)
-    return out
-
-
 def test_time_based_sequences_use_the_final_image(catalog, full_disk_index):
     sequences, report = _builder(
         _multiclass_pipeline(), cadence="12h", observation_window="24h", sliding_window="12h",

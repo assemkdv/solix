@@ -24,7 +24,6 @@ pytestmark = [
 SETTINGS = {
     "single full disk": (FULL_DISK, dict(strategy=f.BinaryThresholdStrategy("M"))),
     "single active region": (ACTIVE_REGION, dict(strategy=f.BinaryThresholdStrategy("M"), target="active_region")),
-    "row sequences": (FULL_DISK, dict(strategy=f.MaxFlareStrategy(), sequence_length=3)),
     "time sequences": (FULL_DISK, dict(strategy=f.BinaryThresholdStrategy("M"), cadence="1h",
                                        observation_window="3h", sliding_window="1h")),
     "active region time sequences": (ACTIVE_REGION, dict(strategy=f.MaxFlareStrategy(), target="active_region",

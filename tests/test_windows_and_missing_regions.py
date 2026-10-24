@@ -148,17 +148,18 @@ def _ar_sequence_index(tmp_path):
 
 
 @pytest.mark.filterwarnings("ignore:.*flare\\(s\\) in the catalog:UserWarning")
-def test_missing_active_region_policies_for_row_based_sequences(tmp_path, ar_catalog):
-    # Region 100 has 00, 01, 03 (02 has no region). Without cadence_minutes,
-    # row-based sequences take consecutive rows of the region, as in
-    # full-disk mode, so (01, 03) is a sequence.
+def test_missing_active_region_policies_for_sequences(tmp_path, ar_catalog):
+    # Region 100 has 00, 01, 03 (02 has no region), so on a 1-hour grid only
+    # (00, 01) is a complete sequence of region 100; the 02 image without a
+    # region never fills region 100's gap.
     index_path = _ar_sequence_index(tmp_path)
-    kwargs = dict(prediction_window=24, strategy=BinaryThresholdStrategy(), target="active_region", sequence_length=2)
+    kwargs = dict(prediction_window=24, strategy=BinaryThresholdStrategy(), target="active_region",
+                  cadence="1h", observation_window="2h", sliding_window="1h")
 
     with pytest.warns(UserWarning, match="0 sequence\\(s\\) built only from such images"):
         default = DatasetBuilder(**kwargs).build(index_path, ar_catalog)
-    assert default["active_region"].tolist() == ["100", "100"]
-    assert [ts[-1].hour for ts in default["timestamps"]] == [1, 3]
+    assert default["active_region"].tolist() == ["100"]
+    assert [ts[-1].hour for ts in default["timestamps"]] == [1]
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -169,11 +170,6 @@ def test_missing_active_region_policies_for_row_based_sequences(tmp_path, ar_cat
         warnings.simplefilter("ignore")
         with pytest.raises(ValueError, match="1 image\\(s\\) .* have a missing active_region"):
             DatasetBuilder(missing_active_region="error", **kwargs).build(index_path, ar_catalog)
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        strict = DatasetBuilder(cadence_minutes=60, **kwargs).build(index_path, ar_catalog)
-    assert [ts[-1].hour for ts in strict["timestamps"]] == [1]
 
 
 def test_missing_active_region_group_is_labeled_negative(tmp_path, ar_catalog):
@@ -275,8 +271,6 @@ def test_missing_region_warning_points_at_caller(multi_region_index, ar_catalog)
 @pytest.mark.parametrize("kwargs", [
     {"include_metadata": True},
     {"include_metadata": True, "target": "active_region"},
-    {"sequence_length": 2},
-    {"sequence_length": 2, "target": "active_region"},
     {"cadence": "1h", "observation_window": "2h", "sliding_window": "1h"},
     {"cadence": "1h", "observation_window": "2h", "sliding_window": "1h", "target": "active_region"},
 ])

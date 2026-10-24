@@ -113,7 +113,6 @@ def test_invalid_rxfi_is_refused(tmp_path, bad):
 
 
 @pytest.mark.parametrize("sequence_kwargs", [
-    dict(sequence_length=3),
     dict(cadence="1h", observation_window="3h", sliding_window="1h"),
 ])
 @pytest.mark.parametrize("reducer", [MaxRelativeFluxReducer(), SumRelativeFluxReducer()])

@@ -44,7 +44,7 @@ NODES = {
             ["DatasetBuilder(window, strategy, target, ...)", ".build(index_csv, catalog_csv)"], 40, 51.5, 21, 7),
     "builder": ("pkg", "DatasetBuilder  (builder): sample construction",
                 ["target:  full_disk  |  active_region  (region from the index column)",
-                 "mode:    single image  |  row-based sequence  |  time-based sequence (grid, report)",
+                 "mode:    single image  |  sequence on a time grid (cadence, observation, sliding window)",
                  "per sample: reference time t = the image, or the last image of the sequence;",
                  "            window [t, t+w);  one row per image or sequence"], 40, 38, 44, 11),
     "matcher": ("pkg", "EventMatcher  (events)",

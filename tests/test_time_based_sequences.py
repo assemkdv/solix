@@ -123,36 +123,6 @@ def test_invalid_start_value_raises():
         )
     assert "start" in str(excinfo.value)
 
-
-def test_mixing_row_based_and_time_based_raises():
-    with pytest.raises(ValueError) as excinfo:
-        DatasetBuilder(
-            prediction_window=24, strategy=BinaryThresholdStrategy(),
-            sequence_length=3, cadence="1h", observation_window="6h", sliding_window="3h",
-        )
-    message = str(excinfo.value)
-    assert "sequence_length" in message
-    assert "cadence" in message
-
-
-def test_mixing_stride_and_time_based_raises():
-    with pytest.raises(ValueError) as excinfo:
-        DatasetBuilder(
-            prediction_window=24, strategy=BinaryThresholdStrategy(),
-            stride=2, cadence="1h", observation_window="6h", sliding_window="3h",
-        )
-    assert "stride" in str(excinfo.value)
-
-
-def test_mixing_cadence_minutes_and_time_based_raises():
-    with pytest.raises(ValueError) as excinfo:
-        DatasetBuilder(
-            prediction_window=24, strategy=BinaryThresholdStrategy(),
-            cadence_minutes=60, cadence="1h", observation_window="6h", sliding_window="3h",
-        )
-    assert "cadence_minutes" in str(excinfo.value)
-
-
 def test_durations_accept_timedelta_and_pd_timedelta():
     # datetime.timedelta and pd.Timedelta, not just strings.
     builder = DatasetBuilder(
@@ -534,17 +504,6 @@ def test_return_report_true_returns_dataframe_and_report(tmp_path):
     assert report.sliding_window == pd.Timedelta(hours=3)
     assert report.total_candidate_sequences == report.emitted_sequences + report.skipped_sequences
 
-
-def test_return_report_true_in_row_based_mode_raises(tmp_path):
-    catalog_path = _empty_catalog(tmp_path)
-    index_path = _write_index(tmp_path, _hourly("2024-01-01T00:00:00", 3))
-
-    builder = DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy(), sequence_length=2)
-    with pytest.raises(ValueError) as excinfo:
-        builder.build(index_path, catalog_path, return_report=True)
-    assert "return_report" in str(excinfo.value)
-
-
 def test_return_report_true_in_single_image_mode_raises(tmp_path):
     catalog_path = _empty_catalog(tmp_path)
     index_path = _write_index(tmp_path, _hourly("2024-01-01T00:00:00", 3))
@@ -555,39 +514,14 @@ def test_return_report_true_in_single_image_mode_raises(tmp_path):
     assert "return_report" in str(excinfo.value)
 
 
-# ── Legacy row-based compatibility (Task 2) ───────────────────────────────
+# ── Single-image mode is the default ──────────────────────────────────────
 
-
-def test_legacy_row_based_call_unaffected_by_new_defaults(tmp_path):
-    # sequence_length/stride/cadence_minutes now default to None internally,
-    # but explicit legacy calls must produce identical results.
-    timestamps = [
-        pd.Timestamp("2024-01-01T08:00:00"), pd.Timestamp("2024-01-01T08:12:00"),
-        pd.Timestamp("2024-01-01T08:24:00"), pd.Timestamp("2024-01-01T08:36:00"),
-    ]
-    index_path = _write_index(tmp_path, timestamps)
-    catalog_path = _empty_catalog(tmp_path)
-
-    builder = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(),
-        sequence_length=3, stride=1, cadence_minutes=12,
-    )
-    result = builder.build(index_path, catalog_path)
-
-    assert list(result.columns) == ["sequence_start", "sequence_end", "timestamps", "n_images", "label"]
-    assert len(result) == 2
-    assert builder.sequence_length == 3
-    assert builder.stride == 1
-
-
-def test_legacy_default_single_image_mode_still_default(tmp_path):
+def test_default_is_single_image_mode(tmp_path):
     timestamps = _hourly("2024-01-01T00:00:00", 2)
     index_path = _write_index(tmp_path, timestamps)
     catalog_path = _empty_catalog(tmp_path)
 
     builder = DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy())
-    assert builder.sequence_length == 1
-    assert builder.stride == 1
     assert builder.time_based is False
 
     result = builder.build(index_path, catalog_path)

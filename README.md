@@ -82,6 +82,16 @@ Add `include_flares=True` to `DatasetBuilder` to get a `flares` column next to
 the label, listing the classes of the flares in each window
 (e.g. `["C2.0", "M1.0"]`), so any label can be checked by eye.
 
+Add `verbose=True` to print a short summary of each build (the table is the
+same either way):
+
+```text
+Image index: 118 images (examples/data/full_disk_image_index.csv)
+Flare catalog: 8 flares (examples/data/flare_catalog.csv)
+Settings: window [t, t + 24h) on start_time, full disk, single images
+Result: 118 rows; label 0: 41, label 1: 77
+```
+
 A pipeline is a reducer (flares → one value) and a labeler (value → label).
 Any object with a `label(events)` method can be passed as `strategy`.
 

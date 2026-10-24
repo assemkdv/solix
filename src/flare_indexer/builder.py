@@ -232,6 +232,11 @@ class DatasetBuilder:
         right after it: the GOES classes of the flares in each window, in
         order of event time (e.g. ["C3.2", "M1.4"]; [] for an empty
         window), so every label can be checked by eye. All modes.
+    verbose : bool
+        False (default) prints nothing. True prints a short summary of each
+        build: images and flares loaded, the settings used, and the result
+        (row count and label counts or range). The returned table is the
+        same either way.
 
     Row-based sequence parameters (mutually exclusive with the time-based
     ones below -- see "Sequence mode selection")
@@ -331,6 +336,7 @@ class DatasetBuilder:
         missing_active_region="negative",
         include_metadata=False,
         include_flares=False,
+        verbose=False,
     ):
         parsed_prediction_window = _parse_prediction_window(prediction_window)
         if missing_active_region not in VALID_MISSING_ACTIVE_REGION_POLICIES:
@@ -380,6 +386,9 @@ class DatasetBuilder:
         if not isinstance(include_flares, bool):
             raise ValueError(f"include_flares must be True or False, got {include_flares!r}")
         self.include_flares = include_flares
+        if not isinstance(verbose, bool):
+            raise ValueError(f"verbose must be True or False, got {verbose!r}")
+        self.verbose = verbose
         self.time_based = bool(time_based_given)
 
         if self.time_based:
@@ -501,22 +510,57 @@ class DatasetBuilder:
         if self.target == "active_region":
             self._warn_catalog_missing_active_region(matcher, event_catalog_path)
 
+        if self.verbose:
+            self._print_inputs(index_df, image_index_path, matcher, event_catalog_path)
+
+        report = None
         if self.time_based:
             if self.target == "active_region":
                 result, report = self._build_time_based_sequences_active_region(index_df, matcher, image_index_path)
             else:
                 result, report = self._build_time_based_sequences(index_df, matcher, image_index_path)
-            return (result, report) if return_report else result
-
-        if self.sequence_length == 1:
+        elif self.sequence_length == 1:
             if self.target == "active_region":
-                return self._build_single_image_active_region(index_df, matcher, image_index_path)
-            return self._build_single_image(index_df, matcher, image_index_path)
+                result = self._build_single_image_active_region(index_df, matcher, image_index_path)
+            else:
+                result = self._build_single_image(index_df, matcher, image_index_path)
+        elif self.target == "active_region":
+            result = self._build_sequences_active_region(index_df, matcher, image_index_path)
+        else:
+            self._validate_sequence_timestamps(index_df["timestamp"], image_index_path)
+            result = self._build_sequences(index_df, matcher, image_index_path)
 
+        if self.verbose:
+            self._print_result(result, report)
+        return (result, report) if return_report else result
+
+    # ── verbose summary ─────────────────────────────────────────────────
+
+    def _print_inputs(self, index_df: pd.DataFrame, index_path: Path, matcher: EventMatcher, catalog_path) -> None:
+        images = f"{len(index_df):,} images"
         if self.target == "active_region":
-            return self._build_sequences_active_region(index_df, matcher, image_index_path)
-        self._validate_sequence_timestamps(index_df["timestamp"], image_index_path)
-        return self._build_sequences(index_df, matcher, image_index_path)
+            regions = index_df["active_region"].map(_normalize_active_region).dropna().nunique()
+            images += f", {regions:,} regions"
+        print(f"Image index: {images} ({index_path})")
+        print(f"Flare catalog: {len(matcher._catalog):,} flares ({catalog_path})")
+
+        target = "full disk" if self.target == "full_disk" else "active region"
+        if self.time_based:
+            mode = (f"sequences of {self.number_of_images} images {_format_duration(self.cadence)} apart, "
+                    f"new sequence every {_format_duration(self.sliding_window)}")
+        elif self.sequence_length == 1:
+            mode = "single images"
+        else:
+            mode = f"sequences of {self.sequence_length} consecutive images, stride {self.stride}"
+        print(f"Settings: window [t, t + {_format_duration(self._window)}) on {self.event_time}_time, {target}, {mode}")
+
+    def _print_result(self, result: pd.DataFrame, report) -> None:
+        unit = "rows" if self.sequence_length == 1 and not self.time_based else "sequences"
+        line = f"Result: {len(result):,} {unit}"
+        if report is not None and report.skipped_sequences:
+            line += f" ({report.skipped_sequences:,} skipped: missing images)"
+        summary = _label_summary(result["label"])
+        print(line + (f"; {summary}" if summary else ""))
 
     def _build_single_image(self, index_df: pd.DataFrame, matcher: EventMatcher, path: Path) -> pd.DataFrame:
         if self.include_metadata:
@@ -1024,6 +1068,30 @@ class DatasetBuilder:
 
 
 _SEQUENCE_OUTPUT_COLUMNS = ("sequence_start", "sequence_end", "timestamps", "n_images", "label")
+
+
+def _format_duration(value: pd.Timedelta) -> str:
+    """24h, 90min, 23h59min59s -- the shortest exact form of a duration."""
+    seconds = int(value.total_seconds())
+    if seconds != value.total_seconds():
+        return str(value)
+    hours, rest = divmod(seconds, 3600)
+    minutes, secs = divmod(rest, 60)
+    parts = [f"{hours}h" if hours else "", f"{minutes}min" if minutes else "", f"{secs}s" if secs else ""]
+    return "".join(parts) or "0s"
+
+
+def _label_summary(labels: pd.Series) -> str:
+    """Counts for 0/1 or class labels, the range for numbers, nothing for dicts."""
+    values = labels.dropna()
+    if values.empty:
+        return ""
+    if values.map(lambda v: isinstance(v, (dict, list))).any():
+        return ""
+    if values.map(lambda v: isinstance(v, str)).all() or set(values.unique()) <= {0, 1}:
+        counts = values.value_counts()
+        return ", ".join(f"label {key}: {int(count):,}" for key, count in sorted(counts.items(), key=lambda kv: str(kv[0])))
+    return f"values from {values.min():g} to {values.max():g}"
 
 
 def _extra_columns(index_df: pd.DataFrame, excluded: tuple, reserved: tuple, path: Path) -> list:

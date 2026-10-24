@@ -273,6 +273,7 @@ def add_relative_flux(
     catalog_path: Union[str, Path],
     xray_flux_path: Union[str, Path],
     output_path: Union[str, Path, None] = None,
+    verbose: bool = False,
 ) -> pd.DataFrame:
     """
     Add each flare's background X-ray flux and relative X-ray flux
@@ -299,7 +300,11 @@ def add_relative_flux(
 
     Returns the catalog with two added columns, background_flux and rxfi,
     in its original row order; writes it to output_path if given.
+    verbose=True prints a short summary (flares, flux minutes, how many
+    flares got an rxfi); the result is the same either way.
     """
+    if not isinstance(verbose, bool):
+        raise ValueError(f"verbose must be True or False, got {verbose!r}")
     catalog_path = Path(catalog_path)
     xray_flux_path = Path(xray_flux_path)
 
@@ -320,6 +325,10 @@ def add_relative_flux(
     ends = _parse_full_timestamp_column(catalog, "end_time", catalog_path)
 
     times, raw = _read_xray_flux(xray_flux_path)
+    if verbose:
+        print(f"Flare catalog: {len(catalog):,} flares ({catalog_path})")
+        span = f", {pd.Timestamp(times[0]):%Y-%m-%d} to {pd.Timestamp(times[-1]):%Y-%m-%d}" if len(times) else ""
+        print(f"X-ray flux: {len(times):,} minutes{span} ({xray_flux_path})")
 
     # Steps 1 and 2: the flux that may count as background.
     usable = np.where(raw > XRAY_FLUX_FLOOR, raw, np.nan)
@@ -352,6 +361,9 @@ def add_relative_flux(
     result["rxfi"] = peak_flux / background
 
     unknown = int(np.isnan(background).sum())
+    if verbose:
+        print(f"Result: rxfi computed for {len(catalog) - unknown:,} flares; {unknown:,} without "
+              "(no flux at start or no usable minutes before it)")
     if unknown:
         warnings.warn(
             f"{unknown} of {len(catalog)} flare(s) in {catalog_path} have no rxfi: no X-ray flux value "

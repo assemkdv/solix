@@ -23,8 +23,8 @@ VALID_MISSING_ACTIVE_REGION_POLICIES = {"negative", "drop", "error"}
 @dataclass
 class SequenceBuildReport:
     """
-    Validation/bookkeeping report for DatasetBuilder.build(return_report=True)
-    in time-based sequence mode.
+    Validation/bookkeeping report returned by FullDiskSequence /
+    ActiveRegionSequence .build(return_report=True).
 
     inferred_source_cadence : the base cadence detected from the image
         index's own timestamps (see DatasetBuilder's "Source cadence
@@ -560,7 +560,7 @@ class DatasetBuilder:
             raise ValueError(
                 f"{len(missing)} {unit} have a missing active_region (e.g. {sample}). "
                 "Their label is unknown, not negative. Fill in active_region, or pass "
-                "missing_active_region='drop' or 'negative' to DatasetBuilder."
+                "missing_active_region='drop' or 'negative'."
             )
         if self.missing_active_region == "negative":
             warnings.warn(
@@ -676,7 +676,7 @@ class DatasetBuilder:
                 f"{int(missing.sum())} image(s) in {path} have a missing active_region "
                 f"(e.g. {examples}{', ...' if missing.sum() > 5 else ''}). They cannot be assigned "
                 "to any region's sequence. Fill in active_region, or pass "
-                "missing_active_region='drop' or 'negative' to DatasetBuilder."
+                "missing_active_region='drop' or 'negative'."
             )
 
         groups = [

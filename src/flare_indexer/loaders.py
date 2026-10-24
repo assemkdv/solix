@@ -90,7 +90,7 @@ def build_image_index_from_filenames(
     return_report: bool = False,
 ):
     """
-    Build a DatasetBuilder-compatible image index from HMI image file paths.
+    Build an image index (the timestamp CSV the dataset classes read) from HMI image file paths.
 
     `paths` is either an iterable of file paths, or a path to a headerless
     single-column text/CSV file listing one path per line (a UTF-8 BOM at
@@ -115,7 +115,7 @@ def build_image_index_from_filenames(
     - "last": keep the last-encountered row for each duplicated timestamp.
 
     Returns a DataFrame with a `timestamp` column (pandas datetime, sorted
-    ascending -- required for DatasetBuilder's sequence mode) and an
+    ascending) and an
     `image_path` column preserving the original path. If return_report is
     True, instead returns (DataFrame, ImageIndexReport).
     """

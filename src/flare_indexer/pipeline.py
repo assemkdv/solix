@@ -108,13 +108,13 @@ class DatasetBuildingPipeline:
 
     def label(self, events: list[FlareEvent]):
         """
-        DatasetBuilder-compatibility shim.
+        The method the dataset classes call.
 
-        DatasetBuilder only ever calls `strategy.label(flares)` on
-        whatever object it was given as `strategy=`. Implementing that
-        same method here lets a DatasetBuildingPipeline be passed directly
-        as `DatasetBuilder(..., strategy=pipeline)`, with no changes to
-        DatasetBuilder itself.
+        FullDiskSingleImage and the other dataset classes only ever call
+        `strategy.label(flares)` on whatever object they were given as
+        `strategy=`. Implementing that same method here lets a
+        DatasetBuildingPipeline be passed directly as the strategy, e.g.
+        `FullDiskSingleImage("24h", strategy=pipeline)`.
         """
         reduced_value = self.reduce_events(events)
         return self.assign_label(reduced_value)

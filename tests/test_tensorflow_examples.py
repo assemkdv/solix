@@ -196,3 +196,45 @@ def test_tensorflow_datasets_train_with_model_fit(tmp_path):
         model.compile(optimizer="adam", loss="binary_crossentropy")
         history = model.fit(dataset, epochs=1, verbose=0)
         assert np.isfinite(history.history["loss"][0])
+
+
+# ── Active-region patches (example 11) ───────────────────────────────────
+
+def _patches_available():
+    manifest = pd.read_csv(REAL_DATA / "sharp_manifest.csv")
+    return all((REAL_DATA / p).exists() for p in manifest["image_path"])
+
+
+needs_tf_and_patches = pytest.mark.skipif(
+    not _has("tensorflow") or not _has("astropy") or not _patches_available(),
+    reason="needs tensorflow, astropy and the SHARP patches")
+
+
+@needs_tf_and_patches
+def test_tensorflow_active_region_example_runs(tmp_path):
+    output = _run("11_tensorflow_active_region.py", tmp_path)
+    assert "batch 3: patches [4, 128, 128, 1] float32  regions ['12673', '12675', '12673', '12675']  " \
+           "labels [1, 0, 1, 0]" in output
+    assert "16 patches: 2 positive, 14 negative; all checks passed" in output
+
+
+@needs_tf_and_patches
+@pytest.mark.skipif(not _has("torch"), reason="needs torch")
+def test_tensorflow_and_pytorch_active_region_loaders_yield_the_same_patches(tmp_path):
+    torch_example = _load("10_pytorch_active_region.py")
+    tf_example = _load("11_tensorflow_active_region.py")
+    real = tf_example.real
+    import flare_indexer as fidx
+
+    index_path = tmp_path / "patch_index.csv"
+    real.build_patch_index(index_path)
+    labels = fidx.ActiveRegionSingleImage("24h", fidx.BinaryThresholdStrategy("M"), include_metadata=True) \
+        .build(index_path, real.CATALOG)
+    torch_dataset = torch_example.FlareDataset(labels, real.REAL_DATA)
+    tf_dataset = tf_example.FlareDataset(labels, real.REAL_DATA, batch_size=4)
+    tf_samples = [sample for i in range(len(tf_dataset)) for sample in zip(*tf_dataset[i])]
+    assert len(torch_dataset) == len(tf_samples) == 16
+    for i, (tf_patch, tf_label) in enumerate(tf_samples):
+        patch, label = torch_dataset[i]
+        np.testing.assert_array_equal(patch.permute(1, 2, 0).numpy(), tf_patch)   # [C,H,W] -> [H,W,C]
+        assert int(label) == int(tf_label) == labels["label"].iloc[i]

@@ -12,12 +12,13 @@ from pathlib import Path
 import pytest
 
 EXAMPLES_DIR = Path(__file__).resolve().parent.parent / "examples"
-# Examples 07-08 (PyTorch) and 10-11 (TensorFlow) need downloaded real
+# Examples 06, 07, 10 (PyTorch) and 08, 09, 11 (TensorFlow) need real
 # images and a framework; they are checked in test_pytorch_examples.py and
 # test_tensorflow_examples.py instead.
 REAL_DATA_EXAMPLES = {
     "06_pytorch_images.py", "07_pytorch_sequences.py",
     "08_tensorflow_images.py", "09_tensorflow_sequences.py",
+    "10_pytorch_active_region.py", "11_tensorflow_active_region.py",
 }
 EXAMPLE_SCRIPTS = sorted(p for p in EXAMPLES_DIR.glob("[0-9][0-9]_*.py") if p.name not in REAL_DATA_EXAMPLES)
 

@@ -76,10 +76,12 @@ relative X-ray flux increase (RXF), or your own.
 | `examples/05_flare_indices.py` | GC max, GC sum, RXF max, RXF sum |
 | `examples/06_pytorch_images.py`, `07_pytorch_sequences.py` | real HMI images in PyTorch |
 | `examples/08_tensorflow_images.py`, `09_tensorflow_sequences.py` | real HMI images in TensorFlow |
+| `examples/10_pytorch_active_region.py`, `11_tensorflow_active_region.py` | real active-region patches in PyTorch and TensorFlow |
 
-Examples 01–05 use the synthetic data in `examples/data/`. Examples 06–09
-need `pip install ".[pytorch-examples]"` or `".[tensorflow-examples]"` and
-download about 10 MB of images; see
+Examples 01–05 use the synthetic data in `examples/data/`. Examples 06–11
+need `pip install ".[pytorch-examples]"` or `".[tensorflow-examples]"`.
+06–09 download about 10 MB of full-disk images; the active-region patches
+of 10–11 are in the repository. See
 [examples/real_data/README.md](examples/real_data/README.md).
 
 ## Tests

@@ -1,6 +1,6 @@
 """
-Helpers shared by the real-image examples (06, 07 with PyTorch; 08, 09
-with TensorFlow): turning the download manifest into an image index,
+Helpers shared by the real-image examples (06, 07, 10 with PyTorch; 08,
+09, 11 with TensorFlow): turning the download manifests into image indexes,
 checking catalog coverage, saving sequence tables with list-valued columns,
 and an independent label check that does not use flare_indexer.
 """
@@ -18,13 +18,19 @@ MANIFEST = REAL_DATA / "image_manifest.csv"
 CATALOG = REAL_DATA / "flare_catalog.csv"
 CATALOG_PROVENANCE = REAL_DATA / "catalog_provenance.json"
 FETCH_COMMAND = "python examples/real_data/fetch_real_data.py"
+SHARP_MANIFEST = REAL_DATA / "sharp_manifest.csv"
+SHARP_FETCH_COMMAND = "python examples/real_data/fetch_sharp_patches.py --email you@example.com"
 
 
 FRAMEWORKS = {"torch": "torch", "tensorflow": "tensorflow"}  # import name -> pip name
 
 
-def require_optional_dependencies(framework: str = "torch"):
-    """Exit with a clear message if the framework or Pillow (with JPEG 2000) is missing."""
+def require_optional_dependencies(framework: str = "torch", images: str = "jp2"):
+    """
+    Exit with a clear message if the framework or the image reader is
+    missing: Pillow with JPEG 2000 for the full-disk images (images="jp2"),
+    astropy and Pillow for the SHARP patches (images="fits").
+    """
     missing = []
     try:
         __import__(framework)
@@ -32,13 +38,19 @@ def require_optional_dependencies(framework: str = "torch"):
         missing.append(FRAMEWORKS[framework])
     try:
         from PIL import features
-        if not features.check("jpg_2000"):
+        if images == "jp2" and not features.check("jpg_2000"):
             missing.append("Pillow built with OpenJPEG (JPEG 2000 support)")
     except ImportError:
         missing.append("pillow")
+    if images == "fits":
+        try:
+            import astropy  # noqa: F401
+        except ImportError:
+            missing.append("astropy")
     if missing:
+        extra = " astropy" if images == "fits" else ""
         sys.exit(f"This example needs optional dependencies: {', '.join(missing)}. "
-                 f"Install them with:  pip install {FRAMEWORKS[framework]} pillow")
+                 f"Install them with:  pip install {FRAMEWORKS[framework]} pillow{extra}")
 
 
 def build_image_index(output_path: Path) -> pd.DataFrame:
@@ -70,6 +82,32 @@ def build_image_index(output_path: Path) -> pd.DataFrame:
         "timestamp": timestamps,
         "image_path": available["image_path"],
     }).sort_values("timestamp")
+    index.to_csv(output_path, index=False)
+    return index
+
+
+def build_patch_index(output_path: Path) -> pd.DataFrame:
+    """
+    Write the active-region image index: one row per SHARP patch, with
+    timestamp = DATE-OBS (UTC) from the patch's header, active_region = the
+    NOAA number from the header, image_path relative to examples/real_data.
+    Exits if a patch is absent or no longer matches its recorded SHA-256.
+    """
+    if not SHARP_MANIFEST.exists():
+        sys.exit(f"{SHARP_MANIFEST} not found. Download the patches first:  {SHARP_FETCH_COMMAND}")
+    manifest = pd.read_csv(SHARP_MANIFEST)
+    for path, sha256 in zip(manifest["image_path"], manifest["sha256"]):
+        file = REAL_DATA / path
+        if not file.exists():
+            sys.exit(f"{file} not found. Download the patches first:  {SHARP_FETCH_COMMAND}")
+        if hashlib.sha256(file.read_bytes()).hexdigest() != sha256:
+            sys.exit(f"{file} does not match the SHA-256 in {SHARP_MANIFEST.name}; run {SHARP_FETCH_COMMAND}")
+
+    index = pd.DataFrame({
+        "timestamp": pd.to_datetime(manifest["timestamp"]),
+        "active_region": manifest["noaa_ar"],
+        "image_path": manifest["image_path"],
+    }).sort_values(["timestamp", "active_region"])
     index.to_csv(output_path, index=False)
     return index
 
@@ -113,9 +151,15 @@ def _at_least_m1(goes_class: str) -> bool:
     return multiplier.scaleb(_EXPONENT[text[0]]) >= Decimal("1e-5")
 
 
-def independent_m_label(catalog: pd.DataFrame, t: pd.Timestamp, prediction_window) -> tuple[int, pd.DataFrame]:
-    """1 if any flare of M1.0 or stronger starts in [t, t + prediction_window), else 0."""
+def independent_m_label(catalog: pd.DataFrame, t: pd.Timestamp, prediction_window,
+                        region=None) -> tuple[int, pd.DataFrame]:
+    """
+    1 if any flare of M1.0 or stronger starts in [t, t + prediction_window),
+    else 0. With region, only that NOAA region's flares count.
+    """
     flares = flares_in_window(catalog, t, prediction_window)
+    if region is not None:
+        flares = flares[flares["active_region"].astype("string") == str(region)]
     strong = flares[flares["class"].map(_at_least_m1)]
     return int(not strong.empty), strong
 

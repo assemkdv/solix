@@ -227,3 +227,88 @@ def test_pytorch_example_runs(script, expected, tmp_path):
     assert completed.returncode == 0, completed.stderr
     for line in expected:
         assert line in completed.stdout
+
+
+# ── Active-region patches (examples 10 and 11) ───────────────────────────
+
+# Recorded from the executed example: HARP 7115 = NOAA 12673 gets the M1.2
+# that starts 2017-09-04 05:36 in its window from 05:58:42.5 on; HARP 7120 =
+# NOAA 12675 has no flares.
+EXPECTED_PATCH_LABELS = {
+    (pd.Timestamp("2017-09-03 05:58:42.500"), "12673"): 1, (pd.Timestamp("2017-09-03 08:58:42.400"), "12673"): 1,
+}
+
+
+def _patches_available():
+    manifest = pd.read_csv(real.SHARP_MANIFEST)
+    return all(
+        (REAL_DATA / p).exists() and hashlib.sha256((REAL_DATA / p).read_bytes()).hexdigest() == sha
+        for p, sha in zip(manifest["image_path"], manifest["sha256"])
+    )
+
+
+needs_patches = pytest.mark.skipif(not REAL_DATA.is_dir() or not _patches_available(),
+                                   reason="SHARP patches not present (python examples/real_data/fetch_sharp_patches.py)")
+
+
+def test_patch_manifest_lists_two_regions_at_the_same_times():
+    manifest = pd.read_csv(real.SHARP_MANIFEST)
+    assert len(manifest) == 16
+    assert dict(zip(manifest["harpnum"], manifest["noaa_ar"])) == {7115: 12673, 7120: 12675}
+    times = manifest.groupby("harpnum")["timestamp"].apply(list)
+    assert times[7115] == times[7120]
+    # T_REC is the TAI record time; the timestamp is DATE-OBS in UTC, before it.
+    assert all(pd.Timestamp(ts) < pd.Timestamp(t.replace("_TAI", "").replace(".", "-", 2).replace("_", " "))
+               for ts, t in zip(manifest["timestamp"], manifest["t_rec"]))
+
+
+def test_patch_labels_count_only_each_regions_own_flares(tmp_path):
+    index_path = tmp_path / "patch_index.csv"
+    index = real.build_patch_index(index_path) if _patches_available() else None
+    if index is None:
+        manifest = pd.read_csv(real.SHARP_MANIFEST)
+        pd.DataFrame({"timestamp": manifest["timestamp"], "active_region": manifest["noaa_ar"],
+                      "image_path": manifest["image_path"]}).to_csv(index_path, index=False)
+    labels = fidx.ActiveRegionSingleImage("24h", fidx.BinaryThresholdStrategy("M")).build(index_path, real.CATALOG)
+    got = {(t, r): label for t, r, label in zip(labels["timestamp"], labels["active_region"], labels["label"])}
+    assert {key: value for key, value in got.items() if value} == EXPECTED_PATCH_LABELS
+    assert len(got) == 16
+    catalog = real.load_catalog()
+    for (t, region), label in got.items():
+        assert real.independent_m_label(catalog, t, "24h", region)[0] == label
+
+
+@needs_patches
+def test_decoded_patches_are_real_and_match_header_times():
+    pytest.importorskip("astropy")
+    pytest.importorskip("PIL")
+    import sharp_fits
+
+    manifest = pd.read_csv(real.SHARP_MANIFEST)
+    arrays = []
+    for path, timestamp, harp, noaa in zip(manifest["image_path"], manifest["timestamp"],
+                                           manifest["harpnum"], manifest["noaa_ar"]):
+        header, field = sharp_fits.read_patch(REAL_DATA / path)
+        assert (header["HARPNUM"], header["NOAA_AR"]) == (harp, noaa)
+        assert sharp_fits.observation_time(header) == pd.Timestamp(timestamp)
+        patch = sharp_fits.load_patch(REAL_DATA / path, timestamp)
+        assert patch.shape == (1, 128, 128) and str(patch.dtype) == "float32"
+        assert 0.0 <= patch.min() and patch.max() <= 1.0 and patch.std() > 0.01
+        arrays.append(patch)
+    assert all((a != b).any() for a, b in zip(arrays, arrays[1:]))
+    with pytest.raises(ValueError, match="header time"):
+        sharp_fits.load_patch(REAL_DATA / manifest["image_path"][0], "2017-09-03 00:00:00")
+
+
+@needs_patches
+def test_pytorch_active_region_example_runs(tmp_path):
+    pytest.importorskip("torch")
+    pytest.importorskip("astropy")
+    completed = subprocess.run(
+        [sys.executable, str(EXAMPLES / "10_pytorch_active_region.py"), "--output", str(tmp_path)],
+        capture_output=True, text=True, timeout=300,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert "batch 3: patches [4, 1, 128, 128] torch.float32  regions ['12673', '12675', '12673', '12675']  " \
+           "labels [1, 0, 1, 0]" in completed.stdout
+    assert "16 patches: 2 positive, 14 negative; all checks passed" in completed.stdout

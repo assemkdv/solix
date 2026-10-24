@@ -125,9 +125,11 @@ jobs:
           if [ "${{ matrix.framework }}" = pytorch ]; then
             python examples/06_pytorch_images.py
             python examples/07_pytorch_sequences.py
+            python examples/10_pytorch_active_region.py
           else
             python examples/08_tensorflow_images.py
             python examples/09_tensorflow_sequences.py
+            python examples/11_tensorflow_active_region.py
           fi
 
       - name: Run the real-image tests and fail on unexpected skips

@@ -1,7 +1,9 @@
-# Real-image PyTorch and TensorFlow examples (06-09)
+# Real-image PyTorch and TensorFlow examples (06-11)
 
 Four examples label the same real SDO/HMI full-disk images with
-`flare_indexer` and load them with a deep-learning framework:
+`flare_indexer` and load them with a deep-learning framework (06-09); two
+more do the same with active-region patches (10-11, see
+[Active-region patches](#active-region-patches-examples-10-and-11)):
 
 | Example | Dataset class | Sample | Batch shape |
 |---|---|---|---|
@@ -21,6 +23,41 @@ and 09 convert each image explicitly to TensorFlow's channel-last
 `[H, W, C]` (`hmi_jp2.to_channels_last`) before batching. A Keras
 `PyDataset` returns whole batches, so it takes `batch_size` itself and can
 be passed straight to `model.fit`.
+
+## Active-region patches (examples 10 and 11)
+
+| Example | Dataset class | Sample | Batch shape |
+|---|---|---|---|
+| [`10_pytorch_active_region.py`](../10_pytorch_active_region.py) | `FlareDataset` (PyTorch `Dataset`) | one patch, labeled from its region's own flares | `[B, C, H, W]` = `[B, 1, 128, 128]` |
+| [`11_tensorflow_active_region.py`](../11_tensorflow_active_region.py) | `FlareDataset` (`keras.utils.PyDataset`) | as 10 | `[B, H, W, C]` = `[B, 128, 128, 1]` |
+
+**Data.** 16 SDO/HMI SHARP magnetograms (`hmi.sharp_cea_720s`, segment
+`magnetogram`) of two regions observed at the same times, hourly on
+2017-09-03 (JSOC has no records at 07:00 and 08:00):
+
+| HARP | NOAA region | Flares |
+|---|---|---|
+| 7115 | 12673 | M1.2 starting 2017-09-04 05:36, then M- and X-class flares |
+| 7120 | 12675 | none in 2017-09-01 .. 06 |
+
+The patches are in `sharp_patches/` (3.6 MB) and listed in
+`sharp_manifest.csv` with HARP and NOAA numbers from each file's header,
+the record time `T_REC` (TAI), the observation time `DATE-OBS` (UTC, used
+as the image timestamp) and the SHA-256. They were exported from
+[JSOC](http://jsoc.stanford.edu) with `fetch_sharp_patches.py`, which needs
+an email address registered at JSOC (`--email`) and `pip install drms
+astropy`. The flare catalog is the same as for examples 06-09.
+
+**Preprocessing** (`sharp_fits.py`): missing pixels are set to 0 G, the
+field is clipped to [-256, 255] G (the clip used in arpatch-sfp) and scaled
+to [0, 1], and each patch is resized (bilinear) to 128 x 128 so patches of
+different sizes can be batched. Reading the files needs `astropy`.
+
+**Result.** Region 12673's patches from 05:58:42.5 UTC on are labeled 1:
+the M1.2 that starts 2017-09-04 05:36 is inside their window. Region 12675's
+patches at the same times are all 0. 16 patches: 2 positive, 14 negative;
+every label matches a recomputation from the catalog rows of the patch's
+own region.
 
 ## Labeling settings
 

@@ -104,13 +104,27 @@ def test_observation_window_not_divisible_by_cadence_raises():
     assert "observation_window" in str(excinfo.value)
 
 
-def test_sliding_window_not_divisible_by_cadence_raises():
-    with pytest.raises(ValueError) as excinfo:
-        DatasetBuilder(
-            prediction_window=24, strategy=BinaryThresholdStrategy(),
-            cadence="1h", observation_window="6h", sliding_window="90min",
-        )
-    assert "sliding_window" in str(excinfo.value)
+def test_sliding_window_smaller_than_cadence(tmp_path):
+    # 12-minute images, hourly sequences of 3 images, a new one every 12 minutes.
+    timestamps = list(pd.date_range("2024-03-01", periods=16, freq="12min"))
+    builder = DatasetBuilder(
+        prediction_window=24, strategy=BinaryThresholdStrategy(),
+        cadence="1h", observation_window="3h", sliding_window="12min",
+    )
+    result = builder.build(_write_index(tmp_path, timestamps), _empty_catalog(tmp_path))
+    assert result["sequence_start"].tolist() == timestamps[:6]
+    assert result["timestamps"].iloc[1] == [timestamps[1], timestamps[6], timestamps[11]]
+
+
+@pytest.mark.parametrize("target", ["full_disk", "active_region"])
+def test_sliding_window_between_images_raises(tmp_path, target):
+    index = _write_index(tmp_path, _hourly("2024-03-01", 12), active_regions=[13600] * 12)
+    builder = DatasetBuilder(
+        prediction_window=24, strategy=BinaryThresholdStrategy(), target=target,
+        cadence="2h", observation_window="4h", sliding_window="90min",
+    )
+    with pytest.raises(ValueError, match="sliding_window 0 days 01:30:00 is not an exact multiple"):
+        builder.build(index, _empty_catalog(tmp_path))
 
 
 def test_invalid_start_value_raises():

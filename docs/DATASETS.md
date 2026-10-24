@@ -122,8 +122,10 @@ sequences = builder.build("image_index.csv", "flare_catalog.csv")
 - A sequence with a missing image is skipped; no nearby image is used in its
   place.
 - `cadence` may be coarser than the images (hourly sequences from 12-minute
-  images), not finer. `observation_window` and `sliding_window` must be
-  multiples of `cadence`.
+  images), not finer. `observation_window` must be a multiple of `cadence`.
+- `sliding_window` may be smaller than `cadence`: from 12-minute images,
+  `cadence="1h"` and `sliding_window="12min"` start a new hourly sequence
+  every 12 minutes. It must be a multiple of the images' own spacing.
 - `build(..., return_report=True)` also returns a `SequenceBuildReport`: how
   many sequences were made and skipped, and which image times were missing.
 

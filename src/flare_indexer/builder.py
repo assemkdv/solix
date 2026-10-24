@@ -137,6 +137,15 @@ def _infer_source_cadence(timestamps: pd.Series) -> pd.Timedelta:
     return diffs.mode().iloc[0]
 
 
+def _validate_sliding_window(sliding_window: pd.Timedelta, inferred: pd.Timedelta) -> None:
+    """The step between sequence starts may be smaller than cadence, but must land on image times."""
+    if sliding_window % inferred != pd.Timedelta(0):
+        raise ValueError(
+            f"sliding_window {sliding_window} is not an exact multiple of the inferred source cadence "
+            f"{inferred}, so sequences would start between images."
+        )
+
+
 def _validate_requested_cadence(requested: pd.Timedelta, inferred: pd.Timedelta) -> None:
     if requested < inferred:
         raise ValueError(
@@ -173,8 +182,9 @@ class DatasetBuilder:
         observation_window and sliding_window are required; each sequence
         holds observation_window / cadence images. cadence (and start)
         alone keep only the single images at start, start + cadence, ....
-        cadence must be a multiple of the index's own cadence (the most
-        common gap between its timestamps), and start must be an image time.
+        cadence and sliding_window must be multiples of the index's own
+        cadence (the most common gap between its timestamps); sliding_window
+        may be smaller than cadence. start must be an image time.
         Active-region sequences are built per region.
     """
 
@@ -265,10 +275,6 @@ class DatasetBuilder:
                 raise ValueError(
                     f"observation_window ({observation_window}) must be an exact multiple "
                     f"of cadence ({cadence})."
-                )
-            if self.sliding_window % self.cadence != pd.Timedelta(0):
-                raise ValueError(
-                    f"sliding_window ({sliding_window}) must be an exact multiple of cadence ({cadence})."
                 )
 
             self.number_of_images = round(self.observation_window / self.cadence)
@@ -706,6 +712,7 @@ class DatasetBuilder:
 
         inferred_cadence = _infer_source_cadence(timestamps)
         _validate_requested_cadence(self.cadence, inferred_cadence)
+        _validate_sliding_window(self.sliding_window, inferred_cadence)
 
         effective_start = self._validated_start(timestamps, path)
         ts_to_position = {ts: i for i, ts in enumerate(timestamps)}
@@ -776,6 +783,7 @@ class DatasetBuilder:
 
         inferred_cadence = _infer_source_cadence(index_df["timestamp"])
         _validate_requested_cadence(self.cadence, inferred_cadence)
+        _validate_sliding_window(self.sliding_window, inferred_cadence)
         effective_start = self._validated_start(index_df["timestamp"], path)
 
         records = []

@@ -3,7 +3,7 @@ import numbers
 from collections.abc import Mapping
 from typing import Protocol
 
-from .classifier import FluxConverter
+from .goes_class import FluxConverter
 
 _flux_converter = FluxConverter()
 
@@ -157,7 +157,7 @@ class MulticlassLabeler:
                 f"{_flux_converter.FLUX_MAP['A']!r} W/m^2. The GOES scale has no class for it, and it is not "
                 "'NF' (no flare). Check the catalog for classes below A1.0 (e.g. 'A0.5')."
             )
-        return _flux_converter.to_class(flux)   # the boundary rule lives in classifier.py
+        return _flux_converter.to_class(flux)   # the boundary rule lives in goes_class.py
 
 
 class ClassCountLabeler:

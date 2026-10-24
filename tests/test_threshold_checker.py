@@ -1,35 +1,35 @@
 import pandas as pd
 import pytest
-from flare_indexer.classifier import FlareClassifier
+from flare_indexer.goes_class import ThresholdChecker
 from flare_indexer.events import EventMatcher, FlareEvent
 
-# ── FlareClassifier tests ──────────────────────────────────────────────
+# ── ThresholdChecker tests ──────────────────────────────────────────────
 
 
 def test_is_strong():
-    classifier = FlareClassifier()
-    assert classifier.is_strong("M2.3") == True
-    assert classifier.is_strong("X1.0") == True
-    assert classifier.is_strong("C4.0") == False
-    assert classifier.is_strong("B1.0") == False
+    checker = ThresholdChecker()
+    assert checker.is_strong("M2.3") == True
+    assert checker.is_strong("X1.0") == True
+    assert checker.is_strong("C4.0") == False
+    assert checker.is_strong("B1.0") == False
 
 
 def test_is_strong_custom_threshold():
-    classifier = FlareClassifier()
-    assert classifier.is_strong("C5.0", threshold="C") == True
-    assert classifier.is_strong("B9.9", threshold="C") == False
+    checker = ThresholdChecker()
+    assert checker.is_strong("C5.0", threshold="C") == True
+    assert checker.is_strong("B9.9", threshold="C") == False
 
 
 def test_is_strong_invalid_goes_class_letter_raises():
-    classifier = FlareClassifier()
+    checker = ThresholdChecker()
     with pytest.raises(KeyError):
-        classifier.is_strong("Z5.0")
+        checker.is_strong("Z5.0")
 
 
 def test_is_strong_invalid_threshold_letter_raises():
-    classifier = FlareClassifier()
+    checker = ThresholdChecker()
     with pytest.raises(KeyError):
-        classifier.is_strong("M2.3", threshold="Z")
+        checker.is_strong("M2.3", threshold="Z")
 
 
 # ── EventMatcher tests ─────────────────────────────────────────────────

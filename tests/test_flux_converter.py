@@ -1,6 +1,6 @@
 import math
 import pytest
-from flare_indexer.classifier import FluxConverter
+from flare_indexer.goes_class import FluxConverter
 
 # ── FluxConverter tests ────────────────────────────────────────────────
 
@@ -56,13 +56,13 @@ def test_equivalent_class_text_gives_identical_flux(text, equivalent):
 def test_binary_m_threshold_at_c10_and_adjacent_floats():
     import math
 
-    from flare_indexer import BinaryThresholdLabeler, FlareClassifier
+    from flare_indexer import BinaryThresholdLabeler, ThresholdChecker
 
     converter = FluxConverter()
     labeler = BinaryThresholdLabeler("M")
     assert converter.to_flux("C10.0") == 1e-05
     assert labeler.assign(converter.to_flux("C10.0")) == 1
-    assert FlareClassifier().is_strong("C10.0", "M")
+    assert ThresholdChecker().is_strong("C10.0", "M")
     # The threshold comparison itself stays exact, with no tolerance.
     assert labeler.assign(math.nextafter(1e-05, 0.0)) == 0
     assert labeler.assign(math.nextafter(1e-05, math.inf)) == 1

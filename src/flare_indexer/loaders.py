@@ -8,7 +8,7 @@ import warnings
 import numpy as np
 import pandas as pd
 
-from .classifier import FluxConverter, validate_goes_class_column
+from .goes_class import FluxConverter, validate_goes_class_column
 from .events import _normalize_active_region, _parse_full_timestamp_column
 
 # Matches filenames like "HMI.m2010.12.21_21.00.00.jpg", regardless of how

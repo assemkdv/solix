@@ -3,7 +3,7 @@ import flare_indexer as fidx
 
 def test_public_names_are_accessible():
     expected = {
-        "FlareClassifier",
+        "ThresholdChecker",
         "FluxConverter",
         "InvalidGOESClassError",
         "FlareEvent",

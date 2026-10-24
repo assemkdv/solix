@@ -1,7 +1,7 @@
 from decimal import Decimal
 from typing import Protocol
 
-from .classifier import FluxConverter, _parse_goes_class_decimal
+from .goes_class import FluxConverter, _parse_goes_class_decimal
 from .events import FlareEvent
 
 _flux_converter = FluxConverter()

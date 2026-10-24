@@ -4,7 +4,7 @@ import pytest
 from flare_indexer import (
     BinaryThresholdStrategy, DatasetBuilder, EventMatcher, FluxConverter, InvalidGOESClassError, adapt_goes_catalog,
 )
-from flare_indexer.classifier import parse_goes_class
+from flare_indexer.goes_class import parse_goes_class
 
 
 @pytest.mark.parametrize("value, expected", [

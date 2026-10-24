@@ -168,10 +168,10 @@ class FluxConverter:
                          f"boundary {self.FLUX_MAP['A']!r} W/m^2; the GOES scale has no class for it.")
 
 
-class FlareClassifier:
+class ThresholdChecker:
     """
-    Classification-style checks on GOES flare class strings, built on top of
-    FluxConverter for the letter-to-flux conversion.
+    Checks whether a flare reaches a threshold GOES class, by comparing
+    fluxes (FluxConverter), not class text.
     """
 
     def __init__(self):

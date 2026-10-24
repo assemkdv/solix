@@ -7,7 +7,7 @@ import pandas as pd
 from pathlib import Path
 from dataclasses import dataclass
 
-from .classifier import validate_goes_class_column
+from .goes_class import validate_goes_class_column
 
 # A bare number written as text ("24", "1.5", "2.4e1"): pandas would read
 # it as nanoseconds, so such a duration string is rejected and a unit asked for.

@@ -1,13 +1,13 @@
 """
 The package is layered; this test keeps it that way.
 
-    classifier                 (GOES class <-> flux; no package imports)
-    events, labelers           (only classifier)
-    reducers                   (classifier, events)
+    goes_class                 (GOES class <-> flux; no package imports)
+    events, labelers           (only goes_class)
+    reducers                   (goes_class, events)
     strategies                 (events, reducers, labelers)
     pipeline                   (events only; reducer and labeler are passed in as objects)
     builder                    (events only; strategies are passed in as objects)
-    loaders                    (classifier, events; input adapters, outside the core)
+    loaders                    (goes_class, events; input adapters, outside the core)
 
 A module may import only from layers below it. The allowed sets below are
 exact: adding a new internal import means updating this table.
@@ -21,14 +21,14 @@ import pytest
 PACKAGE = Path(__file__).resolve().parent.parent / "src" / "flare_indexer"
 
 ALLOWED = {
-    "classifier": set(),
-    "events": {"classifier"},
-    "labelers": {"classifier"},
-    "reducers": {"classifier", "events"},
+    "goes_class": set(),
+    "events": {"goes_class"},
+    "labelers": {"goes_class"},
+    "reducers": {"goes_class", "events"},
     "strategies": {"events", "labelers", "reducers"},
     "pipeline": {"events"},
     "builder": {"events"},
-    "loaders": {"classifier", "events"},
+    "loaders": {"goes_class", "events"},
 }
 
 
@@ -68,4 +68,4 @@ def test_no_import_cycles():
 
     for module in ALLOWED:
         depth(module)
-    assert seen["classifier"] == 1 and seen["builder"] > seen["events"] > seen["classifier"]
+    assert seen["goes_class"] == 1 and seen["builder"] > seen["events"] > seen["goes_class"]

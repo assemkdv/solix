@@ -1,4 +1,4 @@
-from .classifier import FlareClassifier, FluxConverter, InvalidGOESClassError
+from .goes_class import ThresholdChecker, FluxConverter, InvalidGOESClassError
 from .events import EventMatcher, FlareEvent
 from .reducers import EventReducer, MaxFluxReducer, MinFluxReducer, MeanFluxReducer, ClassCountReducer, CumulativeClassIndexReducer
 from .reducers import MaxRelativeFluxReducer, SumRelativeFluxReducer
@@ -10,7 +10,7 @@ from .builder import DatasetBuilder, SequenceBuildReport
 from .loaders import build_image_index_from_filenames, adapt_goes_catalog, add_relative_flux, ImageIndexReport
 
 __all__ = [
-    "FlareClassifier",
+    "ThresholdChecker",
     "FluxConverter",
     "InvalidGOESClassError",
     "FlareEvent",

@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 import flare_indexer as fidx
-from flare_indexer.classifier import FluxConverter
+from flare_indexer.goes_class import FluxConverter
 from flare_indexer.events import FlareEvent
 
 flux = FluxConverter().to_flux
@@ -101,7 +101,7 @@ def test_binary_m_threshold_agrees_with_multiclass(value):
 def test_binary_and_multiclass_agree_on_c10_through_the_pipeline():
     events = [_event("C10.0")]
     assert fidx.BinaryThresholdStrategy("M").label(events) == 1
-    assert fidx.FlareClassifier().is_strong("C10.0", "M")
+    assert fidx.ThresholdChecker().is_strong("C10.0", "M")
     assert _multiclass_pipeline().label(events) == "M"
     assert fidx.MaxFlareStrategy().label(events) == fidx.MaxFlareStrategy().label([_event("M1.0")]) == 1e-5
 

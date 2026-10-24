@@ -70,7 +70,7 @@ NODES = {
     "lab_cum": ("pkg", "index  →  label",
                 ["NumericThresholdLabeler(number) → 0 / 1",
                  "RegressionLabeler → raw index"], 90, 14.3, 25, 6.4),
-    "classifier": ("pkg", "classifier",
+    "classifier": ("pkg", "goes_class",
                    ["FluxConverter: GOES class ↔ flux (decimal)", "GOES class validation"], 40, 7.5, 18, 6.5),
     "output": ("data", "Output table  (pandas DataFrame)",
                ["single image:  timestamp [active_region] label [image_path, ids]",

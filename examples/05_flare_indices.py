@@ -34,11 +34,11 @@ def events(classes):
 
 
 def main():
-    # The worked example of Hong et al., 2015-09-20T04:55 to 2015-09-21T04:55.
-    paper_classes = ["M1.5", "C2.6", "C1.4", "M2.1", "C2.8", "C4.2", "C1.5"]
+    # One prediction window with seven flares: (1.5 + 2.1) * 10 + (2.6 + 1.4 + 2.8 + 4.2 + 1.5) = 48.5.
+    classes = ["M1.5", "C2.6", "C1.4", "M2.1", "C2.8", "C4.2", "C1.5"]
     reducer = fidx.CumulativeClassIndexReducer()
-    index = reducer.reduce(events(paper_classes))
-    print("worked example:", ", ".join(paper_classes))
+    index = reducer.reduce(events(classes))
+    print("window:", ", ".join(classes))
     print("cumulative index:", index)
     for threshold in (10, 20, 50):
         print(f"label (index >= {threshold}): {fidx.NumericThresholdLabeler(threshold).assign(index)}")

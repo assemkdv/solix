@@ -9,7 +9,9 @@ import numpy as np
 import pandas as pd
 
 from .goes_class import FluxConverter, validate_goes_class_column
-from .events import _normalize_active_region, _parse_full_timestamp_column
+from .events import (
+    _normalize_active_region, _parse_full_timestamp_column, _rename_columns, CATALOG_COLUMNS, XRAY_FLUX_COLUMNS,
+)
 
 # Matches filenames like "HMI.m2010.12.21_21.00.00.jpg", regardless of how
 # deep the surrounding directory path is -- only the basename is checked.
@@ -314,6 +316,9 @@ def add_relative_flux(
     xray_flux_path: Union[str, Path],
     output_path: Union[str, Path, None] = None,
     verbose: bool = False,
+    *,
+    catalog_columns=None,
+    xray_columns=None,
 ) -> pd.DataFrame:
     """
     Add each flare's background X-ray flux and relative X-ray flux
@@ -342,6 +347,11 @@ def add_relative_flux(
     in its original row order; writes it to output_path if given.
     verbose=True prints a short summary (flares, flux minutes, how many
     flares got an rxfi); the result is the same either way.
+
+    catalog_columns and xray_columns let the files use their own column
+    names: {your column name: package column name}, e.g.
+    xray_columns={"time_tag": "time", "xrsb_flux": "flux"}. The returned
+    catalog uses the package's names, so it can go straight to build().
     """
     if not isinstance(verbose, bool):
         raise ValueError(f"verbose must be True or False, got {verbose!r}")
@@ -349,6 +359,7 @@ def add_relative_flux(
     xray_flux_path = Path(xray_flux_path)
 
     catalog = _read_csv(catalog_path, "Flare catalog")
+    catalog = _rename_columns(catalog, catalog_columns, CATALOG_COLUMNS, catalog_path, "Flare catalog", "catalog_columns")
     missing = {"start_time", "end_time", "class"} - set(catalog.columns)
     if missing:
         raise ValueError(
@@ -364,7 +375,7 @@ def add_relative_flux(
     starts = _parse_full_timestamp_column(catalog, "start_time", catalog_path)
     ends = _parse_full_timestamp_column(catalog, "end_time", catalog_path)
 
-    times, raw = _read_xray_flux(xray_flux_path)
+    times, raw = _read_xray_flux(xray_flux_path, xray_columns)
     if verbose:
         print(f"Flare catalog: {len(catalog):,} flares ({catalog_path})")
         span = f", {pd.Timestamp(times[0]):%Y-%m-%d} to {pd.Timestamp(times[-1]):%Y-%m-%d}" if len(times) else ""
@@ -424,9 +435,10 @@ def _read_csv(path: Path, what: str) -> pd.DataFrame:
         raise ValueError(f"{what} at {path} is empty: no header row / columns found.") from None
 
 
-def _read_xray_flux(path: Path) -> tuple[np.ndarray, np.ndarray]:
+def _read_xray_flux(path: Path, columns=None) -> tuple[np.ndarray, np.ndarray]:
     """Times (sorted) and flux values of an X-ray flux CSV with columns time, flux."""
     df = _read_csv(path, "X-ray flux file")
+    df = _rename_columns(df, columns, XRAY_FLUX_COLUMNS, path, "X-ray flux file", "xray_columns")
     missing = {"time", "flux"} - set(df.columns)
     if missing:
         raise ValueError(f"X-ray flux file at {path} is missing required column(s): {', '.join(sorted(missing))}")

@@ -1,6 +1,7 @@
 import datetime
 import numbers
 import re
+from collections.abc import Mapping
 
 import numpy as np
 import pandas as pd
@@ -218,6 +219,51 @@ def _parse_full_timestamp_column(df: pd.DataFrame, column: str, path, what: str 
     return _parse_time_text_column(df[column], column, what, path)
 
 
+# Column names a user may map their own columns to, per input file.
+IMAGE_INDEX_COLUMNS = ("timestamp", "active_region")
+CATALOG_COLUMNS = ("start_time", "peak_time", "end_time", "class", "active_region", "rxfi")
+XRAY_FLUX_COLUMNS = ("time", "flux")
+
+
+def _rename_columns(df: pd.DataFrame, columns, allowed: tuple, path, what: str, setting: str) -> pd.DataFrame:
+    """
+    Rename a file's own column names to the package's, from a
+    {their name: package name} mapping given as `setting`. Nothing is
+    guessed: every name must exist in the file, every target must be one
+    of `allowed`, two columns cannot get the same name, and an existing
+    column is never overwritten.
+    """
+    if columns is None:
+        return df
+    if not isinstance(columns, Mapping):
+        raise TypeError(f"{setting} must be a dict {{your column name: package column name}}, got {columns!r}")
+    for theirs, ours in columns.items():
+        if not isinstance(theirs, str) or not isinstance(ours, str):
+            raise TypeError(f"{setting} must map column names (text) to column names, got {theirs!r}: {ours!r}")
+        if theirs not in df.columns:
+            raise ValueError(
+                f"{setting} names column {theirs!r}, but {what} at {path} has no such column. "
+                f"Its columns: {', '.join(map(str, df.columns))}"
+            )
+        if ours not in allowed:
+            raise ValueError(
+                f"{setting} maps {theirs!r} to {ours!r}, which is not a column name the package uses here. "
+                f"Allowed: {', '.join(allowed)}"
+            )
+    targets = list(columns.values())
+    repeated = sorted({ours for ours in targets if targets.count(ours) > 1})
+    if repeated:
+        raise ValueError(f"{setting} maps more than one column to {', '.join(map(repr, repeated))}.")
+    renamed_away = {theirs for theirs, ours in columns.items() if theirs != ours}
+    for theirs, ours in columns.items():
+        if theirs != ours and ours in df.columns and ours not in renamed_away:
+            raise ValueError(
+                f"{setting} maps {theirs!r} to {ours!r}, but {what} at {path} already has a column {ours!r}; "
+                "remove or rename it first so it is not overwritten."
+            )
+    return df.rename(columns=dict(columns))
+
+
 def _validate_rxfi_column(df: pd.DataFrame, path) -> None:
     """
     The optional rxfi column (relative X-ray flux increase: peak flux /
@@ -273,15 +319,16 @@ class EventMatcher:
 
     REQUIRED_CATALOG_COLUMNS = {"start_time", "peak_time", "end_time", "class", "active_region"}
 
-    def __init__(self, catalog_path: str | Path):
+    def __init__(self, catalog_path: str | Path, columns=None):
         # Load the catalog once when the object is created
-        # so we don't re-read the file every time we query
-        self._catalog = self._load_catalog(catalog_path)
+        # so we don't re-read the file every time we query.
+        # columns: optional {your column name: package column name}.
+        self._catalog = self._load_catalog(catalog_path, columns)
         # Lazily built, cached {event_time: (sorted_values, original_positions)}
         # views used by query()'s searchsorted fast path -- see _sorted_view().
         self._sorted_view_cache: dict[str, tuple[np.ndarray, np.ndarray]] = {}
 
-    def _load_catalog(self, path: str | Path) -> pd.DataFrame:
+    def _load_catalog(self, path: str | Path, columns=None) -> pd.DataFrame:
         """
         Load and validate the flare catalog CSV.
 
@@ -296,6 +343,7 @@ class EventMatcher:
             raise ValueError(
                 f"Flare catalog at {path} is empty: no header row / columns found."
             ) from None
+        df = _rename_columns(df, columns, CATALOG_COLUMNS, path, "Flare catalog", "catalog_columns")
 
         missing = self.REQUIRED_CATALOG_COLUMNS - set(df.columns)
         if missing:

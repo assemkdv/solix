@@ -91,6 +91,10 @@ fidx.add_relative_flux("flare_catalog.csv", "xray_flux.csv",
                        output_path="flare_catalog_rxfi.csv")
 ```
 
+If the files use other column names, add `catalog_columns=` and
+`xray_columns=`, e.g. `xray_columns={"time_tag": "time", "xrsb_flux": "flux"}`
+(see [DATASETS.md](DATASETS.md#your-own-column-names)).
+
 It adds two columns, `background_flux` and `rxfi`. For each flare, the
 background is the mean of the flux values in the 24 hours before its start
 that are

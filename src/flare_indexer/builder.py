@@ -7,8 +7,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from .events import (
     EventMatcher, _normalize_active_region, _parse_prediction_window, _parse_time_text_column,
-    _reject_unitless_duration_text, _to_naive_utc,
-    VALID_EVENT_TIMES,
+    _reject_unitless_duration_text, _rename_columns, _to_naive_utc,
+    IMAGE_INDEX_COLUMNS, VALID_EVENT_TIMES,
 )
 
 
@@ -377,6 +377,7 @@ class DatasetBuilder:
 
     def build(
         self, image_index_path: str | Path, event_catalog_path: str | Path, return_report: bool = False,
+        *, index_columns=None, catalog_columns=None,
     ) -> pd.DataFrame:
         """
         Build a labeled dataset.
@@ -406,6 +407,15 @@ class DatasetBuilder:
 
         A completely empty image index (no header) raises ValueError, as
         does an image index missing the required timestamp column.
+
+        index_columns and catalog_columns let the files use their own
+        column names: {your column name: package column name}, e.g.
+        index_columns={"obs_time": "timestamp"} or
+        catalog_columns={"goes_class": "class"}. The columns are renamed
+        right after each file is read, so the output uses the package's
+        names. A name missing from the file, a target the package does not
+        use, two columns mapped to one name, or a target that already
+        exists raises ValueError.
         """
         if return_report and not self.time_based:
             raise ValueError(
@@ -421,6 +431,9 @@ class DatasetBuilder:
             raise ValueError(
                 f"Image index at {image_index_path} is empty: no header row / columns found."
             ) from None
+        index_df = _rename_columns(
+            index_df, index_columns, IMAGE_INDEX_COLUMNS, image_index_path, "Image index", "index_columns",
+        )
 
         if "timestamp" not in index_df.columns:
             raise ValueError(
@@ -436,7 +449,7 @@ class DatasetBuilder:
         index_df = index_df.reset_index(drop=True)
         index_df["timestamp"] = _parse_image_timestamps(index_df["timestamp"], image_index_path)
 
-        matcher = EventMatcher(event_catalog_path)
+        matcher = EventMatcher(event_catalog_path, columns=catalog_columns)
         self._check_required_catalog_column(matcher, event_catalog_path)
         self._warn_catalog_missing_event_time(matcher, event_catalog_path)
         if self.target == "active_region":

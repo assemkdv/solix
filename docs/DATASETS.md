@@ -24,6 +24,25 @@
 [Preparing real data](#preparing-real-data) shows how to make both files from
 HMI file names and a GOES catalog.
 
+### Your own column names
+
+If your files use other names, tell `build` which column is which, as
+`{your name: package name}`:
+
+```python
+labels = builder.build(
+    "my_images.csv", "my_flares.csv",
+    index_columns={"obs_time": "timestamp", "noaa_ar": "active_region"},
+    catalog_columns={"goes_class": "class", "begin": "start_time"},
+)
+```
+
+The result uses the package's names (`timestamp`, `active_region`, ...);
+other columns keep their own. Nothing is guessed: a column that is not in
+the file, a name the package does not use, two columns given the same
+name, or a name that already exists in the file stops the build with an
+error.
+
 ## The prediction window
 
 Each image at time `t` is labeled from the flares in `[t, t + w)`: a flare

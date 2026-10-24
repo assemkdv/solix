@@ -45,6 +45,35 @@ class MinFluxReducer:
         return min((_flux_converter.to_flux(e.goes_class) for e in events), default=0.0)
 
 
+class MaxRelativeFluxReducer:
+    """Largest relative X-ray flux increase (rxfi) among the events.
+
+    rxfi = peak X-ray flux / background X-ray flux, read from the catalog's
+    rxfi column (Hong, Ji, Pandey, Aydin, DaWaK 2023). Events without a
+    value are skipped; 0.0 if no event has one. Single images only.
+    """
+
+    requires_catalog_column = "rxfi"
+    single_image_only = True
+
+    def reduce(self, events: list[FlareEvent]) -> float:
+        return max((e.rxfi for e in events if e.rxfi is not None), default=0.0)
+
+
+class SumRelativeFluxReducer:
+    """Sum of the relative X-ray flux increase (rxfi) of all events.
+
+    Same rxfi values as MaxRelativeFluxReducer. Events without a value are
+    skipped; 0.0 if no event has one. Single images only.
+    """
+
+    requires_catalog_column = "rxfi"
+    single_image_only = True
+
+    def reduce(self, events: list[FlareEvent]) -> float:
+        return float(sum(e.rxfi for e in events if e.rxfi is not None))
+
+
 class ClassCountReducer:
     """Count every matched event by numeric GOES class, in A/B/C/M/X order.
 

@@ -27,6 +27,8 @@ GOES_CATALOG_REQUIRED_COLUMNS = {
     "noaa_active_region",
 }
 GOES_CATALOG_OPTIONAL_COLUMNS = ("fl_lon", "fl_lat")
+# Source column name -> catalog column name for the relative X-ray flux increase.
+GOES_CATALOG_RXFI_COLUMN = ("relative_X-ray_flux_increase", "rxfi")
 
 VALID_DUPLICATE_POLICIES = {"error", "first", "last"}
 
@@ -205,11 +207,12 @@ def adapt_goes_catalog(
     """
     Adapt a lab GOES flare catalog (goes_flares_integrated.csv-shaped) into
     the full-timestamp `start_time, peak_time, end_time, class,
-    active_region[, fl_lon, fl_lat]` schema EventMatcher accepts directly.
+    active_region[, fl_lon, fl_lat, rxfi]` schema EventMatcher accepts directly.
 
     Source columns used: `start_time`, `peak_time`, `end_time` (full
     datetime strings), `goes_class`, `noaa_active_region` (nullable float),
-    and, if present, `fl_lon`/`fl_lat`. All other source columns are
+    and, if present, `fl_lon`/`fl_lat` and `relative_X-ray_flux_increase`
+    (written as `rxfi`). All other source columns are
     ignored. `noaa_active_region` is normalized to the same string-or-None
     convention as `events._normalize_active_region`.
 
@@ -248,6 +251,9 @@ def adapt_goes_catalog(
     for optional_column in GOES_CATALOG_OPTIONAL_COLUMNS:
         if optional_column in df.columns:
             adapted[optional_column] = df[optional_column]
+    source_rxfi, rxfi = GOES_CATALOG_RXFI_COLUMN
+    if source_rxfi in df.columns:
+        adapted[rxfi] = df[source_rxfi]
 
     if output_path is not None:
         adapted.to_csv(output_path, index=False)

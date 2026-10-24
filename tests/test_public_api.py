@@ -13,6 +13,8 @@ def test_public_names_are_accessible():
         "MinFluxReducer",
         "ClassCountReducer",
         "CumulativeClassIndexReducer",
+        "MaxRelativeFluxReducer",
+        "SumRelativeFluxReducer",
         "ClassCountLabeler",
         "ClassPresenceLabeler",
         "LabelAssigner",

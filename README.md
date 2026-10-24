@@ -25,7 +25,7 @@ Two CSV files:
 | File | Columns |
 |---|---|
 | Image index | `timestamp`, plus `active_region` for active-region labels, plus any columns you want to keep (e.g. `image_path`) |
-| Flare catalog | `start_time, peak_time, end_time, class, active_region` (full date and time in every time cell) |
+| Flare catalog | `start_time, peak_time, end_time, class, active_region` (full date and time in every time cell), plus `rxfi` for the relative X-ray flux labels |
 
 ## Quick start
 
@@ -57,6 +57,13 @@ time instead.
 | Number of flares per class | `DatasetBuildingPipeline(ClassCountReducer(), ClassCountLabeler())` |
 | Cumulative index ΣC + 10ΣM + 100ΣX | `DatasetBuildingPipeline(CumulativeClassIndexReducer(), RegressionLabeler())` |
 | Cumulative index ≥ a number, as 0/1 | `DatasetBuildingPipeline(CumulativeClassIndexReducer(), NumericThresholdLabeler(10))` |
+| Largest relative X-ray flux increase (RXF) | `DatasetBuildingPipeline(MaxRelativeFluxReducer(), RegressionLabeler())` |
+| Sum of RXF values | `DatasetBuildingPipeline(SumRelativeFluxReducer(), RegressionLabeler())` |
+
+RXF is a flare's peak X-ray flux divided by the background X-ray flux of the
+24 hours before it starts, read from the catalog's `rxfi` column. Add
+`NumericThresholdLabeler(10)` for a 0/1 label. The RXF labels are for single
+images only.
 
 A pipeline is a reducer (flares → one value) and a labeler (value → label).
 Any object with a `label(events)` method can be passed as `strategy`.

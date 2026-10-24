@@ -33,6 +33,7 @@ class FlareEvent:
     end_time: pd.Timestamp | None = None   # when the flare ended (not all catalogs carry this)
     fl_lon: float | None = None            # heliographic longitude, when the source catalog has it
     fl_lat: float | None = None            # heliographic latitude, when the source catalog has it
+    rxfi: float | None = None              # relative X-ray flux increase, when the catalog has it
 
 
 VALID_EVENT_TIMES = {"start", "peak"}
@@ -217,6 +218,23 @@ def _parse_full_timestamp_column(df: pd.DataFrame, column: str, path, what: str 
     return _parse_time_text_column(df[column], column, what, path)
 
 
+def _validate_rxfi_column(df: pd.DataFrame, path) -> None:
+    """
+    The optional rxfi column (relative X-ray flux increase: peak flux /
+    background flux) must hold positive finite numbers; a blank cell means
+    the value is unknown for that flare.
+    """
+    values = pd.to_numeric(df["rxfi"], errors="coerce")
+    bad = (df["rxfi"].notna() & values.isna()) | ~(values.isna() | (np.isfinite(values) & (values > 0)))
+    if bad.any():
+        position = int(np.flatnonzero(bad.to_numpy())[0])
+        raise ValueError(
+            f"Flare catalog at {path}, column 'rxfi', data row {position + 1}: expected a positive "
+            f"number or a blank cell, got {df['rxfi'].iloc[position]!r}."
+        )
+    df["rxfi"] = values
+
+
 def _validate_time_order(df: pd.DataFrame, path) -> None:
     """
     Reject rows whose available times violate start <= peak <= end.
@@ -246,7 +264,7 @@ class EventMatcher:
     within a certain number of hours after that image was taken.
 
     The catalog is a CSV with the columns start_time, peak_time, end_time,
-    class, active_region (optionally fl_lon, fl_lat). Every time cell is a
+    class, active_region (optionally fl_lon, fl_lat, rxfi). Every time cell is a
     complete date-time string, so a flare whose start, peak and end fall on
     different calendar dates is written as it happened. This is the schema
     `flare_indexer.loaders.adapt_goes_catalog` produces from an integrated
@@ -297,6 +315,8 @@ class EventMatcher:
         df["end_time"] = _parse_full_timestamp_column(df, "end_time", path)
         _validate_time_order(df, path)
         validate_goes_class_column(df["goes_class"], path)
+        if "rxfi" in df.columns:
+            _validate_rxfi_column(df, path)
 
         return df.sort_values("peak_time").reset_index(drop=True)
 
@@ -407,6 +427,7 @@ class EventMatcher:
                 end_time=row.get("end_time"),
                 fl_lon=row.get("fl_lon"),
                 fl_lat=row.get("fl_lat"),
+                rxfi=None if pd.isna(row.get("rxfi")) else float(row["rxfi"]),
             )
             for _, row in candidates.iterrows()
         ]

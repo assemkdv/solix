@@ -355,6 +355,15 @@ class DatasetBuilder:
                 "(start/cadence/observation_window/sliding_window), not both."
             )
 
+        reducer = getattr(strategy, "reducer", None)
+        if getattr(reducer, "single_image_only", False) and (
+            time_based_given or (sequence_length is not None and sequence_length != 1)
+        ):
+            raise ValueError(
+                f"{type(reducer).__name__} labels single images only; "
+                "it cannot be used with sequence parameters."
+            )
+
         self.prediction_window = prediction_window
         self._window = parsed_prediction_window
         self.strategy = strategy
@@ -478,6 +487,7 @@ class DatasetBuilder:
         index_df["timestamp"] = _parse_image_timestamps(index_df["timestamp"], image_index_path)
 
         matcher = EventMatcher(event_catalog_path)
+        self._check_required_catalog_column(matcher, event_catalog_path)
         self._warn_catalog_missing_event_time(matcher, event_catalog_path)
         if self.target == "active_region":
             self._warn_catalog_missing_active_region(matcher, event_catalog_path)
@@ -581,6 +591,31 @@ class DatasetBuilder:
                 "to stop.",
                 UserWarning,
                 stacklevel=4,
+            )
+
+    def _check_required_catalog_column(self, matcher: EventMatcher, path) -> None:
+        """
+        A reducer that reads an optional catalog column (e.g. rxfi) names it
+        in requires_catalog_column. Without that column every window would
+        silently reduce to 0, so the build stops instead; blank cells are
+        counted in a warning.
+        """
+        column = getattr(getattr(self.strategy, "reducer", None), "requires_catalog_column", None)
+        if column is None:
+            return
+        catalog = matcher._catalog
+        if column not in catalog.columns:
+            raise ValueError(
+                f"Flare catalog at {path} has no '{column}' column, which "
+                f"{type(self.strategy.reducer).__name__} needs."
+            )
+        missing = int(catalog[column].isna().sum())
+        if missing:
+            warnings.warn(
+                f"{missing} of {len(catalog)} flare(s) in the catalog at {path} have no {column}; "
+                "they are skipped when the label is computed.",
+                UserWarning,
+                stacklevel=3,
             )
 
     def _warn_catalog_missing_event_time(self, matcher: EventMatcher, path) -> None:

@@ -1,0 +1,109 @@
+"""
+The four kinds of labeled dataset, one class each:
+
+    FullDiskSingleImage       one full-disk image   -> one label
+    FullDiskSequence          a sequence of full-disk images -> one label
+    ActiveRegionSingleImage   one active-region patch -> one label
+    ActiveRegionSequence      a sequence of patches of one region -> one label
+
+Each class takes only the settings that apply to its case and runs the
+shared DatasetBuilder engine. All four are used the same way:
+
+    labels = FullDiskSingleImage("24h", BinaryThresholdStrategy("M")).build(
+        "image_index.csv", "flare_catalog.csv")
+
+Sequences are built on a time grid (Dr. Pandey's terms): `cadence` is the
+time between images, `observation_window` the time a sequence covers,
+`sliding_window` the step between sequence starts, and `start` the
+optional first sequence start. Each sequence is labeled from its last
+image.
+"""
+
+from .builder import DatasetBuilder
+
+
+class FullDiskSingleImage(DatasetBuilder):
+    """One label per full-disk image, from all flares in its window."""
+
+    def __init__(
+        self,
+        prediction_window,
+        strategy,
+        *,
+        event_time="start",
+        include_metadata=False,
+        include_flares=False,
+        verbose=False,
+    ):
+        super().__init__(
+            prediction_window, strategy, target="full_disk", event_time=event_time,
+            include_metadata=include_metadata, include_flares=include_flares, verbose=verbose,
+        )
+
+
+class FullDiskSequence(DatasetBuilder):
+    """One label per sequence of full-disk images, from the window after its last image."""
+
+    def __init__(
+        self,
+        prediction_window,
+        strategy,
+        *,
+        cadence,
+        observation_window,
+        sliding_window,
+        start=None,
+        event_time="start",
+        include_flares=False,
+        verbose=False,
+    ):
+        super().__init__(
+            prediction_window, strategy, target="full_disk", event_time=event_time,
+            cadence=cadence, observation_window=observation_window, sliding_window=sliding_window, start=start,
+            include_flares=include_flares, verbose=verbose,
+        )
+
+
+class ActiveRegionSingleImage(DatasetBuilder):
+    """One label per active-region patch, from that region's flares only."""
+
+    def __init__(
+        self,
+        prediction_window,
+        strategy,
+        *,
+        event_time="start",
+        missing_active_region="negative",
+        include_metadata=False,
+        include_flares=False,
+        verbose=False,
+    ):
+        super().__init__(
+            prediction_window, strategy, target="active_region", event_time=event_time,
+            missing_active_region=missing_active_region, include_metadata=include_metadata,
+            include_flares=include_flares, verbose=verbose,
+        )
+
+
+class ActiveRegionSequence(DatasetBuilder):
+    """One label per sequence of patches of one region, from that region's flares after its last image."""
+
+    def __init__(
+        self,
+        prediction_window,
+        strategy,
+        *,
+        cadence,
+        observation_window,
+        sliding_window,
+        start=None,
+        event_time="start",
+        missing_active_region="negative",
+        include_flares=False,
+        verbose=False,
+    ):
+        super().__init__(
+            prediction_window, strategy, target="active_region", event_time=event_time,
+            cadence=cadence, observation_window=observation_window, sliding_window=sliding_window, start=start,
+            missing_active_region=missing_active_region, include_flares=include_flares, verbose=verbose,
+        )

@@ -7,6 +7,7 @@ The package is layered; this test keeps it that way.
     strategies                 (events, reducers, labelers)
     pipeline                   (events only; reducer and labeler are passed in as objects)
     builder                    (events only; strategies are passed in as objects)
+    datasets                   (builder; the four dataset classes)
     loaders                    (goes_class, events; input adapters, outside the core)
 
 A module may import only from layers below it. The allowed sets below are
@@ -28,6 +29,7 @@ ALLOWED = {
     "strategies": {"events", "labelers", "reducers"},
     "pipeline": {"events"},
     "builder": {"events"},
+    "datasets": {"builder"},
     "loaders": {"goes_class", "events"},
 }
 

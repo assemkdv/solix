@@ -16,7 +16,7 @@
 
 | Column | Needed |
 |---|---|
-| `start_time`, `peak_time`, `end_time` | full date and time in every cell |
+| `start_time`, `peak_time`, `end_time` | full date and time, e.g. `2024-03-01 04:00:00` (a blank cell is allowed: that flare cannot match on that time, and the build warns) |
 | `class` | GOES class, e.g. `M1.4` |
 | `active_region` | the flare's NOAA region (blank if unknown) |
 | `rxfi` | only for the RXF labels ([LABELS.md](LABELS.md)) |
@@ -50,12 +50,13 @@ counts if it starts at `t` or later and before `t + w`. `w` is
 `prediction_window`, e.g. `"24h"`, `"12h"` or a number of hours (`24`).
 
 In `examples/data/`, the image at 04:00 counts the C3.2 flare that starts at
-exactly 04:00:
+exactly 04:00 (here with `MaxFlareStrategy()`, whose label is the strongest
+flare's peak flux, and `include_flares=True`):
 
 ```text
-          timestamp     label             flares
-2024-03-01 00:00:00  2.70e-05 [C3.2, M1.4, M2.7]
-2024-03-01 04:00:00  2.70e-05 [C3.2, M1.4, M2.7]
+          timestamp    label             flares
+2024-03-01 00:00:00 0.000027 [C3.2, M1.4, M2.7]
+2024-03-01 04:00:00 0.000027 [C3.2, M1.4, M2.7]
 ```
 
 `event_time="peak"` matches the flare's peak time instead of its start.
@@ -76,7 +77,7 @@ settings by name:
 |---|---|---|---|
 | `event_time` | ✓ | ✓ | `"start"` |
 | `cadence` | optional | required | none |
-| `start` | optional | optional | the first image |
+| `start` | optional, with `cadence` | optional | the first image |
 | `observation_window`, `sliding_window` | | required | |
 | `include_metadata` | ✓ | (always on) | `False` |
 | `include_flares` | ✓ | ✓ | `False` |
@@ -185,9 +186,12 @@ catalog = fidx.adapt_goes_catalog(
     "goes_flares.csv", output_path="flare_catalog.csv")
 ```
 
-- `build_image_index_from_filenames` reads HMI or SHARP file names (a list
-  or a text file with one per line) and writes the image index. The
-  timestamp comes from the file name.
+- `build_image_index_from_filenames` reads HMI full-disk file names such as
+  `HMI.m2010.12.21_21.00.00.jpg` (a list or a text file with one per line)
+  and writes the image index. The timestamp comes from the file name. Other
+  names, including SHARP patch names, stop it with an error (or are left
+  out with `strict=False`); for patches, write the index yourself with
+  `timestamp` and `active_region`.
 - `adapt_goes_catalog` converts an integrated GOES flare catalog into the
   catalog format above. NOAA region numbers passed 9999 on 2002-06-14, and
   many flare lists kept only four digits, so for flares from that day on

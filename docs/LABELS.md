@@ -65,8 +65,9 @@ most common pipelines.
 
 Any object with a `label(flares)` method can be passed as `strategy`. It
 receives the window's flares as a list of `FlareEvent` objects
-(`goes_class`, `start_time`, `peak_time`, `active_region`, `rxfi`) and
-returns the label:
+(`goes_class`, `start_time`, `peak_time`, `end_time`, `active_region`,
+`fl_lon`, `fl_lat`, `rxfi`; the last three are `None` if the catalog has no
+such column) and returns the label:
 
 ```python
 class StrongFlareCount:
@@ -107,7 +108,9 @@ that are
 
 X-ray files have gaps where no value was recorded.
 Missing minutes are skipped, not filled in: the background is the mean of
-the minutes that exist. If none of the 24 hours remain, the flare gets no
-RXF and a warning says how many flares were left without one. To fill gaps
+the minutes that exist. The one minute that must exist is the flare's start
+minute, because the background is compared with the flux at that minute.
+If it is missing, or none of the 24 hours remain, the flare gets no RXF and
+a warning says how many flares were left without one. To fill gaps
 (for example from another GOES satellite), fill them in the X-ray file
 before calling `add_relative_flux`.

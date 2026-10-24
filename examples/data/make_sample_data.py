@@ -19,9 +19,9 @@ from flare_indexer import FluxConverter, adapt_goes_catalog
 
 DATA_DIR = Path(__file__).parent
 
-# GOES-catalog-shaped flares (same column names as an integrated
-# GOES catalog, goes_flares_integrated.csv; `ssw_flare_id` is an extra column that
-# adapt_goes_catalog ignores).
+# GOES-catalog-shaped flares (same column names as an integrated GOES
+# flare catalog; `ssw_flare_id` is an extra column that adapt_goes_catalog
+# ignores).
 FLARES = [
     # start,              peak,                 end,                  class, NOAA AR, lon,  lat
     ("2024-03-01 04:00:00", "2024-03-01 04:12:00", "2024-03-01 04:30:00", "C3.2", 13600, -20.0, 12.0),
@@ -85,10 +85,10 @@ def main():
         DATA_DIR / "full_disk_image_index.csv", index=False,
     )
 
-    # Headerless HMI path list, like totalfiles_jpg_512.csv: mostly images,
+    # Headerless list of HMI file paths: mostly images,
     # plus one non-image path that a directory walk would also pick up.
     listing = [f"/data/hmi_jpgs_512/{_hmi_path(t)[4:]}" for t in hours[:6]]
-    listing.insert(3, "/data/hmi_jpgs_512/labels_store/Fold1_train.csv")
+    listing.insert(3, "/data/notes/README.csv")
     (DATA_DIR / "hmi_image_list.txt").write_text("\n".join(listing) + "\n")
 
     # Active-region patches every 6 hours for two regions observed at the

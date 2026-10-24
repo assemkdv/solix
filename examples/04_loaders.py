@@ -3,12 +3,12 @@ Example 4 -- preparing real-world inputs.
 
 Real inputs rarely arrive in the package's schema. Two helpers convert them:
 
-- build_image_index_from_filenames(): a headerless list of HMI image paths
-  (like totalfiles_jpg_512.csv) -> (timestamp, image_path) image index.
+- build_image_index_from_filenames(): a headerless list of HMI file paths
+  -> (timestamp, image_path) image index.
   Non-image paths are excluded and reported, not silently dropped.
 - adapt_goes_catalog(): a GOES catalog with start_time, peak_time,
-  end_time, goes_class, noaa_active_region (like goes_flares_integrated.csv)
-  -> the catalog schema the dataset classes read.
+  end_time, goes_class, noaa_active_region (an integrated GOES flare
+  catalog) -> the catalog schema the dataset classes read.
 
 Run:  python examples/04_loaders.py
 """

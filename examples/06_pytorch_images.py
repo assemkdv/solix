@@ -11,9 +11,9 @@ Steps
 3. Loading: FlareDataset, a torch Dataset that gives one (image, label)
    per row of the label table, and a DataLoader that yields image batches
    shaped [B, C, H, W] = [B, 1, 256, 256].
-4. Checks: header time vs. index time for every loaded image, and one
-   positive and one negative label recomputed from the catalog without
-   flare_indexer.
+4. Checks: header time vs. index time for every loaded image, and every
+   label recomputed from the catalog without flare_indexer (one positive
+   and one negative are printed with their flares).
 
 Data: 10 SDO/HMI magnetograms requested hourly on 2017-09-03 (9 available)
 and the HEK/SWPC GOES flare list for 2017-09-01 .. 2017-09-06. See

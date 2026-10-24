@@ -18,7 +18,7 @@ package and its tests need none of them.
 All examples label with a 24 h prediction window and
 `BinaryThresholdStrategy("M")`: a sample is 1 if an M- or X-class flare
 starts in `[t, t + 24h)`. The settings are written out in each script.
-The TensorFlow examples use the same data, decoder and checks as the
+The TensorFlow examples use the same data, decoder and label checks as the
 PyTorch ones and move the channel axis last before batching.
 
 Results:
@@ -44,7 +44,7 @@ Active regions (10-11): 16 SHARP magnetograms (`hmi.sharp_cea_720s`) of
 two regions, exported from [JSOC](http://jsoc.stanford.edu) with
 [`fetch_sharp_patches.py`](fetch_sharp_patches.py) and kept in
 `sharp_patches/` (listed in [`sharp_manifest.csv`](sharp_manifest.csv)).
-JSOC has no records at 07:00 and 08:00.
+JSOC has no records at 07:00 and 08:00 TAI.
 
 | HARP | NOAA region | Flares |
 |---|---|---|

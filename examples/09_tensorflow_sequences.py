@@ -2,7 +2,7 @@
 Example 9 -- real full-disk image sequences on a time grid, loaded with TensorFlow.
 
 The TensorFlow counterpart of example 7: same images, same catalog, same
-labeling and grid settings, same checks. Only the loader differs.
+labeling and grid settings, same label checks. Only the loader differs.
 
 Each sample is T = 3 images one hour apart (observation_window 3h,
 cadence 1h); a new sequence starts every hour (sliding_window 1h). A

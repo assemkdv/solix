@@ -2,7 +2,7 @@
 Example 8 -- real full-disk images, one label per image, loaded with TensorFlow.
 
 The TensorFlow counterpart of example 6: same images, same catalog, same
-labeling settings, same checks. Only the loader differs.
+labeling settings, same label checks. Only the loader differs.
 
 Question answered for every image: "Does an M-class or stronger flare start
 in [t, t + 24h), where t is the image's full-precision observation time

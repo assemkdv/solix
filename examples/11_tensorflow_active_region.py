@@ -2,7 +2,7 @@
 Example 11 -- real active-region patches, one label per patch, loaded with TensorFlow.
 
 The TensorFlow counterpart of example 10: same patches, same catalog, same
-labeling settings, same checks. Only the loader differs.
+labeling settings, same label checks. Only the loader differs.
 
 Steps
 1. Image index from examples/real_data/sharp_manifest.csv (timestamps are
@@ -96,6 +96,7 @@ def main(argv=None):
     builder = fidx.ActiveRegionSingleImage(
         prediction_window=PREDICTION_WINDOW,
         strategy=fidx.BinaryThresholdStrategy("M"),  # 1 if a flare >= M1.0 from this region starts in the window
+        event_time="start",
         include_metadata=True,                       # keep image_path
         include_flares=True,                         # show which flares made each label
     )

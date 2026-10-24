@@ -18,9 +18,10 @@ Steps
    recomputed from the catalog, region by region, without flare_indexer.
 
 Data: SDO/HMI SHARP magnetograms (hmi.sharp_cea_720s) of HARP 7115 =
-NOAA 12673 and HARP 7120 = NOAA 12675, hourly on 2017-09-03 (07:00 and
-08:00 have no records), and the HEK/SWPC GOES flare list for 2017-09-01 ..
-2017-09-06. The patches are in examples/real_data/sharp_patches/.
+NOAA 12673 and HARP 7120 = NOAA 12675, recorded hourly from 00:00 to 09:00
+TAI on 2017-09-03 (no records at 07:00 and 08:00 TAI; the timestamps used
+are each file's DATE-OBS in UTC, about 78 s earlier), and the HEK/SWPC GOES
+flare list for 2017-09-01 .. 2017-09-06. The patches are in examples/real_data/sharp_patches/.
 
 Setup:  pip install ".[pytorch-examples]"           # torch, pillow, astropy
 Run:    python examples/10_pytorch_active_region.py
@@ -90,6 +91,7 @@ def main(argv=None):
     builder = fidx.ActiveRegionSingleImage(
         prediction_window=PREDICTION_WINDOW,
         strategy=fidx.BinaryThresholdStrategy("M"),  # 1 if a flare >= M1.0 from this region starts in the window
+        event_time="start",
         include_metadata=True,                       # keep image_path
         include_flares=True,                         # show which flares made each label
     )

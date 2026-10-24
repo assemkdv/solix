@@ -2,6 +2,7 @@ import pandas as pd
 import pytest
 
 from flare_indexer.loaders import ImageIndexReport, adapt_goes_catalog, build_image_index_from_filenames
+from flare_indexer.builder import DatasetBuilder
 
 # ── build_image_index_from_filenames ────────────────────────────────────
 

@@ -26,12 +26,15 @@ All four examples set every labeling choice explicitly; the package defaults
 are not used and not changed.
 
 ```python
-fidx.DatasetBuilder(
+fidx.FullDiskSingleImage(                        # examples 06 and 08
     prediction_window="24h",
     strategy=fidx.BinaryThresholdStrategy("M"),  # 1 if any flare >= M1.0
-    target="full_disk",
     event_time="start",
-    # examples 07 and 09 only:
+)
+fidx.FullDiskSequence(                           # examples 07 and 09
+    prediction_window="24h",
+    strategy=fidx.BinaryThresholdStrategy("M"),
+    event_time="start",
     cadence="1h", observation_window="3h", sliding_window="1h",
 )
 ```

@@ -3,7 +3,8 @@ import warnings
 import pandas as pd
 import pytest
 
-from flare_indexer import BinaryThresholdStrategy, DatasetBuilder, EventMatcher, MaxFlareStrategy
+from flare_indexer import BinaryThresholdStrategy, EventMatcher, MaxFlareStrategy
+from flare_indexer.builder import DatasetBuilder
 
 
 def _write(path, text):

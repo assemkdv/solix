@@ -16,7 +16,7 @@ why: images 0.1 s off the grid, a missing hour, and an image at
 
 Steps
 1. Image index from the manifest (same as examples 6, 7 and 8).
-2. Sequences and labels: DatasetBuilder in time-based mode.
+2. Sequences and labels: flare_indexer.FullDiskSequence on a time grid.
 3. CSV round trip of the list-valued columns (timestamps, image_path).
 4. Loading: a tf.data.Dataset that decodes the T images of each sequence,
    oldest first, converts each from [C, H, W] to [H, W, C], stacks them
@@ -120,10 +120,9 @@ def main(argv=None):
           f"{provenance['query_end']}; covers every [t, t+{PREDICTION_WINDOW}) window")
 
     # 2. Sequences and labels.
-    builder = fidx.DatasetBuilder(
+    builder = fidx.FullDiskSequence(
         prediction_window=PREDICTION_WINDOW,
         strategy=fidx.BinaryThresholdStrategy("M"),  # 1 if any flare >= M1.0 in the window
-        target="full_disk",
         event_time="start",
         cadence=CADENCE,
         observation_window=OBSERVATION_WINDOW,

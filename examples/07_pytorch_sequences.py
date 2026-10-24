@@ -24,7 +24,7 @@ that result depended on the rounding.)
 
 Steps
 1. Image index from the manifest (same as example 7).
-2. Sequences and labels: DatasetBuilder in time-based mode.
+2. Sequences and labels: flare_indexer.FullDiskSequence on a time grid.
 3. CSV round trip: the list-valued columns (timestamps, image_path) are
    written as JSON lists and parsed back, and the reloaded table must equal
    the original.
@@ -128,10 +128,9 @@ def main(argv=None):
           f"{provenance['query_end']}; covers every [t, t+{PREDICTION_WINDOW}) window")
 
     # 2. Sequences and labels.
-    builder = fidx.DatasetBuilder(
+    builder = fidx.FullDiskSequence(
         prediction_window=PREDICTION_WINDOW,
         strategy=fidx.BinaryThresholdStrategy("M"),  # 1 if any flare >= M1.0 in the window
-        target="full_disk",
         event_time="start",
         cadence=CADENCE,
         observation_window=OBSERVATION_WINDOW,

@@ -11,7 +11,7 @@ in [t, t + 24h), where t is the image's full-precision observation time
 Steps
 1. Image index from examples/real_data/image_manifest.csv (timestamps are
    the full-precision DATE_OBS read from each file's header).
-2. Labels: flare_indexer.DatasetBuilder with every labeling choice explicit.
+2. Labels: flare_indexer.FullDiskSingleImage with every labeling choice explicit.
 3. Loading: a tf.data.Dataset that decodes each JPEG 2000 file with the
    shared decoder (channel-first [C, H, W]), converts it explicitly to
    TensorFlow's channel-last layout [H, W, C], and yields batches
@@ -99,10 +99,9 @@ def main(argv=None):
           f"{provenance['query_end']}; covers every [t, t+{PREDICTION_WINDOW}) window")
 
     # 2. Labels.
-    builder = fidx.DatasetBuilder(
+    builder = fidx.FullDiskSingleImage(
         prediction_window=PREDICTION_WINDOW,
         strategy=fidx.BinaryThresholdStrategy("M"),  # 1 if any flare >= M1.0 in the window
-        target="full_disk",
         event_time="start",
         include_metadata=True,                       # keep image_path
     )

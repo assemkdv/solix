@@ -19,6 +19,7 @@ import pandas as pd
 import pytest
 
 import flare_indexer as fidx
+from flare_indexer.builder import DatasetBuilder
 
 REPO = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO / "examples"
@@ -49,7 +50,7 @@ def _load_example(name):
 
 
 def _builder(**sequence):
-    return fidx.DatasetBuilder(
+    return DatasetBuilder(
         prediction_window="24h", strategy=fidx.BinaryThresholdStrategy("M"), target="full_disk",
         event_time="start", include_metadata=not sequence, **sequence,
     )

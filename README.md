@@ -27,12 +27,21 @@ Two CSV files:
 | Image index | `timestamp`, plus `active_region` for active-region labels, plus any columns you want to keep (e.g. `image_path`) |
 | Flare catalog | `start_time, peak_time, end_time, class, active_region` (full date and time in every time cell), plus `rxfi` for the relative X-ray flux labels |
 
+## Four kinds of dataset
+
+| Class | Each row is labeled from |
+|---|---|
+| `FullDiskSingleImage` | one full-disk image |
+| `FullDiskSequence` | a sequence of full-disk images |
+| `ActiveRegionSingleImage` | one active-region patch (only that region's flares count) |
+| `ActiveRegionSequence` | a sequence of patches of one region |
+
 ## Quick start
 
 ```python
 import flare_indexer as fidx
 
-builder = fidx.DatasetBuilder(
+builder = fidx.FullDiskSingleImage(
     prediction_window="24h",                     # window [t, t + 24h)
     strategy=fidx.BinaryThresholdStrategy("M"),  # 1 if a flare >= M1.0 starts in it
 )
@@ -41,7 +50,7 @@ labels = builder.build("examples/data/full_disk_image_index.csv",
 ```
 
 The result is a pandas DataFrame with one row per image and a `label`
-column.
+column. The other three classes are used the same way.
 
 The window is `[t, t + w)`: a flare counts if it starts at the image time `t`
 or later, and before `t + w`. Use `event_time="peak"` to match the peak
@@ -78,7 +87,7 @@ The background is the mean of the flux values in the 24 hours before the
 flare's start that are above 1e-9 W/m², outside every catalog flare, and below
 the flux at the flare's start.
 
-Add `include_flares=True` to `DatasetBuilder` to get a `flares` column next to
+Add `include_flares=True` to any of the four classes to get a `flares` column next to
 the label, listing the classes of the flares in each window
 (e.g. `["C2.0", "M1.0"]`), so any label can be checked by eye.
 
@@ -98,32 +107,36 @@ Any object with a `label(events)` method can be passed as `strategy`.
 ## Sequences
 
 ```python
-builder = fidx.DatasetBuilder(
+builder = fidx.FullDiskSequence(
     prediction_window="24h",
     strategy=fidx.BinaryThresholdStrategy("M"),
-    cadence="1h", observation_window="3h", sliding_window="1h",  # 3 images, 1 h apart
+    cadence="1h",              # time between images
+    observation_window="3h",   # time one sequence covers: 3 images
+    sliding_window="1h",       # a new sequence starts every hour
 )
 sequences = builder.build("examples/data/full_disk_image_index.csv",
                           "examples/data/flare_catalog.csv")
 ```
 
 Each sequence is labeled from the time of its last image. Sequences with a
-missing image are skipped.
+missing image are skipped. `cadence` may be coarser than the images (e.g.
+hourly sequences from 12-minute images), not finer.
 
 ## Active regions
 
 ```python
-builder = fidx.DatasetBuilder(
+builder = fidx.ActiveRegionSingleImage(
     prediction_window="24h",
     strategy=fidx.BinaryThresholdStrategy("M"),
-    target="active_region",
 )
 labels = builder.build("examples/data/active_region_image_index.csv",
                        "examples/data/flare_catalog.csv")
 ```
 
-Only flares from the image's own region count. Sequences are built
-separately for each region.
+The image index needs an `active_region` column. Only flares from the
+image's own region count. `ActiveRegionSequence` takes the same sequence
+settings as `FullDiskSequence` and builds each region's sequences from that
+region's images only.
 
 ## Preparing real data
 

@@ -2,6 +2,7 @@ import pandas as pd
 import pytest
 
 import flare_indexer as f
+from flare_indexer.builder import DatasetBuilder
 
 
 def events(classes):
@@ -31,7 +32,7 @@ def test_mean_flux_in_builder(tmp_path):
     )
     index = tmp_path / "index.csv"
     index.write_text("timestamp\n2024-01-01 00:00:00\n2024-01-01 03:00:00\n2024-01-02 06:00:00\n")
-    result = f.DatasetBuilder(
+    result = DatasetBuilder(
         "24h", f.DatasetBuildingPipeline(f.MeanFluxReducer(), f.RegressionLabeler())
     ).build(index, catalog)
     assert result["label"].tolist() == pytest.approx([(1e-6 + 2e-5) / 2, 2e-5, 0.0])
@@ -80,7 +81,7 @@ def test_builder_all_modes(tmp_path, target, mode, labeler):
                   'class': ['B2', 'C2', 'X1'], 'active_region': [100, 100, 200]}).to_csv(catalog, index=False)
     options = {} if mode == 'single' else {'cadence': '1h', 'observation_window': '2h', 'sliding_window': '1h'}
     pipeline = f.DatasetBuildingPipeline(f.ClassCountReducer(), labeler())
-    result = f.DatasetBuilder('1h', pipeline, target=target, event_time='start', **options).build(index, catalog)
+    result = DatasetBuilder('1h', pipeline, target=target, event_time='start', **options).build(index, catalog)
     assert len(result) == (2 if mode == 'single' else 1)
     assert result.iloc[-1].label == {'A': 0, 'B': 0, 'C': 1, 'M': 0, 'X': int(target == 'full_disk')}
     if mode == 'single':
@@ -94,4 +95,4 @@ def test_minimum_pipeline_builder(tmp_path):
                   'peak_time': ['2024-01-01 01:05'] * 2, 'end_time': ['2024-01-01 01:10'] * 2,
                   'class': ['C2', 'X1'], 'active_region': [100, 100]}).to_csv(catalog, index=False)
     pipeline = f.DatasetBuildingPipeline(f.MinFluxReducer(), f.RegressionLabeler())
-    assert f.DatasetBuilder(24, pipeline).build(index, catalog).iloc[0].label == 2e-6
+    assert DatasetBuilder(24, pipeline).build(index, catalog).iloc[0].label == 2e-6

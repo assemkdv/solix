@@ -17,6 +17,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+from flare_indexer.builder import DatasetBuilder
 
 REPO = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO / "examples"
@@ -142,8 +143,8 @@ def test_tensorflow_and_pytorch_loaders_yield_the_same_samples(tmp_path):
     real.build_image_index(index_path)
     options = dict(prediction_window="24h", strategy=fidx.BinaryThresholdStrategy("M"), target="full_disk",
                    event_time="start")
-    labels = fidx.DatasetBuilder(include_metadata=True, **options).build(index_path, real.CATALOG)
-    sequences = fidx.DatasetBuilder(cadence="1h", observation_window="3h", sliding_window="1h", **options) \
+    labels = DatasetBuilder(include_metadata=True, **options).build(index_path, real.CATALOG)
+    sequences = DatasetBuilder(cadence="1h", observation_window="3h", sliding_window="1h", **options) \
         .build(index_path, real.CATALOG)
 
     torch_dataset = torch_images.make_dataset_class()(labels, real.REAL_DATA)

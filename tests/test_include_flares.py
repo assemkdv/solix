@@ -6,7 +6,8 @@ classes of the flares in each window, in order of event time.
 import pandas as pd
 import pytest
 
-from flare_indexer import BinaryThresholdStrategy, DatasetBuilder, MaxFlareStrategy
+from flare_indexer import BinaryThresholdStrategy, MaxFlareStrategy
+from flare_indexer.builder import DatasetBuilder
 
 CATALOG = (
     "start_time,peak_time,end_time,class,active_region\n"

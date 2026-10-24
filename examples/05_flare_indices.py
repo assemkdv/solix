@@ -58,7 +58,7 @@ def main():
 
     table = None
     for name, index_reducer in INDICES.items():
-        labels = f.DatasetBuilder(
+        labels = f.FullDiskSingleImage(
             prediction_window="24h",
             strategy=f.DatasetBuildingPipeline(index_reducer, f.RegressionLabeler()),
         ).build(DATA / "full_disk_image_index.csv", OUTPUT / "05_flare_catalog_rxfi.csv")

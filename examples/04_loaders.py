@@ -8,7 +8,7 @@ Real inputs rarely arrive in the package's schema. Two helpers convert them:
   Non-image paths are excluded and reported, not silently dropped.
 - adapt_goes_catalog(): a GOES catalog with start_time, peak_time,
   end_time, goes_class, noaa_active_region (like goes_flares_integrated.csv)
-  -> the catalog schema DatasetBuilder reads.
+  -> the catalog schema the dataset classes read.
 
 Run:  python examples/04_loaders.py
 """
@@ -40,7 +40,7 @@ def main():
     print("\nGOES catalog -> flare catalog (extra columns such as ssw_flare_id are dropped)")
     print(catalog.to_string(index=False))
 
-    labels = fidx.DatasetBuilder(
+    labels = fidx.FullDiskSingleImage(
         prediction_window=24, strategy=fidx.BinaryThresholdStrategy("M"),
         event_time="start", include_metadata=True,
     ).build(OUTPUT / "04_image_index.csv", OUTPUT / "04_flare_catalog.csv")

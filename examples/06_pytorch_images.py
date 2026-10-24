@@ -7,7 +7,7 @@ in [t, t + 24h), where t is the image's own observation time?"
 Steps
 1. Image index: built from examples/real_data/image_manifest.csv, which
    fetch_real_data.py wrote from each downloaded file's header (DATE_OBS).
-2. Labels: flare_indexer.DatasetBuilder with every labeling choice explicit.
+2. Labels: flare_indexer.FullDiskSingleImage with every labeling choice explicit.
 3. Loading: a torch Dataset that decodes each JPEG 2000 file and a
    DataLoader that yields image batches shaped [B, C, H, W] = [B, 1, 256, 256].
 4. Checks: header time vs. index time for every loaded image, and one
@@ -88,10 +88,9 @@ def main(argv=None):
           f"{provenance['query_end']}; covers every [t, t+{PREDICTION_WINDOW}) window")
 
     # 2. Labels.
-    builder = fidx.DatasetBuilder(
+    builder = fidx.FullDiskSingleImage(
         prediction_window=PREDICTION_WINDOW,
         strategy=fidx.BinaryThresholdStrategy("M"),  # 1 if any flare >= M1.0 in the window
-        target="full_disk",
         event_time="start",
         include_metadata=True,                       # keep image_path
     )

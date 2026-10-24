@@ -6,7 +6,7 @@ from .labelers import LabelAssigner, BinaryThresholdLabeler, RegressionLabeler, 
 from .labelers import ClassCountLabeler, ClassPresenceLabeler, NumericThresholdLabeler
 from .strategies import BinaryThresholdStrategy, MaxFlareStrategy
 from .pipeline import PipelineResult, DatasetBuildingPipeline
-from .builder import DatasetBuilder, SequenceBuildReport
+from .builder import SequenceBuildReport
 from .datasets import FullDiskSingleImage, FullDiskSequence, ActiveRegionSingleImage, ActiveRegionSequence
 from .loaders import build_image_index_from_filenames, adapt_goes_catalog, add_relative_flux, ImageIndexReport
 
@@ -35,7 +35,6 @@ __all__ = [
     "MaxFlareStrategy",
     "PipelineResult",
     "DatasetBuildingPipeline",
-    "DatasetBuilder",
     "FullDiskSingleImage",
     "FullDiskSequence",
     "ActiveRegionSingleImage",

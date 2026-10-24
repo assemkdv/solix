@@ -27,7 +27,6 @@ def test_public_names_are_accessible():
         "MaxFlareStrategy",
         "PipelineResult",
         "DatasetBuildingPipeline",
-        "DatasetBuilder",
         "FullDiskSingleImage",
         "FullDiskSequence",
         "ActiveRegionSingleImage",
@@ -44,9 +43,13 @@ def test_public_names_are_accessible():
         assert hasattr(fidx, name)
 
 
+def test_engine_is_not_public():
+    assert not hasattr(fidx, "DatasetBuilder")
+
+
 def test_top_level_classes_are_usable():
     strategy = fidx.BinaryThresholdStrategy()
     assert strategy.threshold == "M"
 
-    builder = fidx.DatasetBuilder(prediction_window=24, strategy=fidx.BinaryThresholdStrategy())
+    builder = fidx.FullDiskSingleImage(prediction_window=24, strategy=fidx.BinaryThresholdStrategy())
     assert builder.prediction_window == 24

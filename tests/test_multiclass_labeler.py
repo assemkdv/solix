@@ -8,6 +8,7 @@ import pytest
 import flare_indexer as fidx
 from flare_indexer.goes_class import FluxConverter
 from flare_indexer.events import FlareEvent
+from flare_indexer.builder import DatasetBuilder
 
 flux = FluxConverter().to_flux
 labeler = fidx.MulticlassLabeler()
@@ -167,7 +168,7 @@ def catalog(tmp_path):
 
 
 def _builder(strategy, **kwargs):
-    return fidx.DatasetBuilder(prediction_window="12h", strategy=strategy,
+    return DatasetBuilder(prediction_window="12h", strategy=strategy,
                                event_time="start", **kwargs)
 
 

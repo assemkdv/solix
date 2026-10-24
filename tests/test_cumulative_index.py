@@ -16,7 +16,6 @@ import pytest
 
 from flare_indexer import (
     CumulativeClassIndexReducer,
-    DatasetBuilder,
     DatasetBuildingPipeline,
     EventMatcher,
     FlareEvent,
@@ -24,6 +23,7 @@ from flare_indexer import (
     NumericThresholdLabeler,
     RegressionLabeler,
 )
+from flare_indexer.builder import DatasetBuilder
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 

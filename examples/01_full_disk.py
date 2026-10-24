@@ -20,17 +20,16 @@ OUTPUT = Path(__file__).parent / "output"
 def main():
     OUTPUT.mkdir(exist_ok=True)
 
-    builder = fidx.DatasetBuilder(
+    builder = fidx.FullDiskSingleImage(
         prediction_window=24,                       # hours (or a duration such as "24h")
         strategy=fidx.BinaryThresholdStrategy("M"),  # 1 if any flare >= M1.0, else 0
-        target="full_disk",                          # any flare on the Sun counts
         event_time="start",                          # compare the flare's start_time ...
         include_metadata=True,                       # keep image_path in the output
     )
     labels = builder.build(DATA / "full_disk_image_index.csv", DATA / "flare_catalog.csv")
 
     # A second builder gives the strongest flare's flux instead of 0/1.
-    flux = fidx.DatasetBuilder(
+    flux = fidx.FullDiskSingleImage(
         prediction_window=24, strategy=fidx.MaxFlareStrategy(),
         event_time="start",
     ).build(DATA / "full_disk_image_index.csv", DATA / "flare_catalog.csv")

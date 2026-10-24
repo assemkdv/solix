@@ -8,7 +8,6 @@ import pandas as pd
 import pytest
 
 from flare_indexer import (
-    DatasetBuilder,
     DatasetBuildingPipeline,
     EventMatcher,
     FlareEvent,
@@ -18,6 +17,7 @@ from flare_indexer import (
     SumRelativeFluxReducer,
     adapt_goes_catalog,
 )
+from flare_indexer.builder import DatasetBuilder
 
 CATALOG = (
     "start_time,peak_time,end_time,class,active_region,rxfi\n"

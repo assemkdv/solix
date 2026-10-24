@@ -24,11 +24,11 @@ import pytest
 from flare_indexer import (
     BinaryThresholdLabeler,
     BinaryThresholdStrategy,
-    DatasetBuilder,
     EventMatcher,
     adapt_goes_catalog,
 )
 from flare_indexer.events import _normalize_active_region, _parse_prediction_window
+from flare_indexer.builder import DatasetBuilder
 
 CATALOG_HEADER = "start_time,peak_time,end_time,class,active_region\n"
 FLARE_ROW = "2024-01-01 10:00:00,2024-01-01 10:10:00,2024-01-01 10:30:00,M1.0,100\n"

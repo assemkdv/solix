@@ -9,6 +9,7 @@ import pandas as pd
 import pytest
 
 import flare_indexer as f
+from flare_indexer.builder import DatasetBuilder
 
 DATA = Path(__file__).resolve().parent.parent / "examples" / "data"
 FULL_DISK = DATA / "full_disk_image_index.csv"
@@ -34,15 +35,15 @@ SETTINGS = {
 @pytest.mark.parametrize("name", SETTINGS)
 def test_result_is_identical_and_default_is_silent(name, capsys):
     index, kwargs = SETTINGS[name]
-    quiet = f.DatasetBuilder("24h", **kwargs).build(index, CATALOG)
+    quiet = DatasetBuilder("24h", **kwargs).build(index, CATALOG)
     assert capsys.readouterr().out == ""
-    loud = f.DatasetBuilder("24h", verbose=True, **kwargs).build(index, CATALOG)
+    loud = DatasetBuilder("24h", verbose=True, **kwargs).build(index, CATALOG)
     assert capsys.readouterr().out.startswith("Image index: ")
     pd.testing.assert_frame_equal(quiet, loud)
 
 
 def test_single_image_summary(capsys):
-    f.DatasetBuilder("24h", f.BinaryThresholdStrategy("M"), verbose=True).build(FULL_DISK, CATALOG)
+    DatasetBuilder("24h", f.BinaryThresholdStrategy("M"), verbose=True).build(FULL_DISK, CATALOG)
     assert capsys.readouterr().out.splitlines() == [
         f"Image index: 118 images ({FULL_DISK})",
         f"Flare catalog: 8 flares ({CATALOG})",
@@ -53,7 +54,7 @@ def test_single_image_summary(capsys):
 
 def test_active_region_time_sequence_summary(capsys):
     index, kwargs = SETTINGS["active region time sequences"]
-    f.DatasetBuilder("24h", verbose=True, **kwargs).build(index, CATALOG)
+    DatasetBuilder("24h", verbose=True, **kwargs).build(index, CATALOG)
     lines = capsys.readouterr().out.splitlines()
     assert lines[0] == f"Image index: 41 images, 2 regions ({ACTIVE_REGION})"
     assert lines[2] == ("Settings: window [t, t + 24h) on start_time, active region, "
@@ -63,7 +64,7 @@ def test_active_region_time_sequence_summary(capsys):
 
 def test_skipped_sequences_and_class_labels(capsys):
     pipeline = f.DatasetBuildingPipeline(f.MaxFluxReducer(), f.MulticlassLabeler())
-    f.DatasetBuilder("23h59min59s", pipeline, cadence="1h", observation_window="3h", sliding_window="1h",
+    DatasetBuilder("23h59min59s", pipeline, cadence="1h", observation_window="3h", sliding_window="1h",
                      verbose=True).build(FULL_DISK, CATALOG)
     lines = capsys.readouterr().out.splitlines()
     assert "window [t, t + 23h59min59s) on start_time" in lines[2]
@@ -72,7 +73,7 @@ def test_skipped_sequences_and_class_labels(capsys):
 
 
 def test_return_report_still_works(capsys):
-    result, report = f.DatasetBuilder("24h", f.BinaryThresholdStrategy("M"), cadence="1h", observation_window="3h",
+    result, report = DatasetBuilder("24h", f.BinaryThresholdStrategy("M"), cadence="1h", observation_window="3h",
                                       sliding_window="1h", verbose=True).build(FULL_DISK, CATALOG, return_report=True)
     assert len(result) == report.emitted_sequences
     assert f"Result: {len(result)} sequences ({report.skipped_sequences} skipped: missing images)" in capsys.readouterr().out
@@ -93,6 +94,6 @@ def test_add_relative_flux(capsys):
 @pytest.mark.parametrize("value", ["yes", 1, None])
 def test_verbose_must_be_a_bool(value):
     with pytest.raises(ValueError, match="verbose"):
-        f.DatasetBuilder("24h", f.BinaryThresholdStrategy("M"), verbose=value)
+        DatasetBuilder("24h", f.BinaryThresholdStrategy("M"), verbose=value)
     with pytest.raises(ValueError, match="verbose"):
         f.add_relative_flux(CATALOG, XRAY, verbose=value)

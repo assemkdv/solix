@@ -24,10 +24,9 @@ OUTPUT = Path(__file__).parent / "output"
 
 
 def build(**kwargs):
-    return fidx.DatasetBuilder(
+    return fidx.ActiveRegionSingleImage(
         prediction_window=24, strategy=fidx.BinaryThresholdStrategy("M"),
-        target="active_region", event_time="start",
-        include_metadata=True, **kwargs,
+        event_time="start", include_metadata=True, **kwargs,
     ).build(INDEX, CATALOG)
 
 
@@ -62,10 +61,9 @@ def main():
     print("   unknown patch never joins a region's sequence (it is dropped here).")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        sequences, report = fidx.DatasetBuilder(
+        sequences, report = fidx.ActiveRegionSequence(
             prediction_window=24, strategy=fidx.BinaryThresholdStrategy("M"),
-            target="active_region", event_time="start",
-            missing_active_region="drop",
+            event_time="start", missing_active_region="drop",
             cadence="6h", observation_window="12h", sliding_window="6h",
         ).build(INDEX, CATALOG, return_report=True)
     print(sequences[["sequence_start", "sequence_end", "active_region", "label"]].head(8).to_string(index=False))

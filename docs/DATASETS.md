@@ -1,0 +1,173 @@
+# Datasets
+
+## Inputs
+
+`build(image_index, flare_catalog)` reads two CSV files.
+
+**Image index**: one row per image.
+
+| Column | Needed |
+|---|---|
+| `timestamp` | always: the image's observation time |
+| `active_region` | for the two active-region classes: the NOAA region of the patch |
+| anything else, e.g. `image_path` | optional; kept in the output (see below) |
+
+**Flare catalog**: one row per flare.
+
+| Column | Needed |
+|---|---|
+| `start_time`, `peak_time`, `end_time` | full date and time in every cell |
+| `class` | GOES class, e.g. `M1.4` |
+| `active_region` | the flare's NOAA region (blank if unknown) |
+| `rxfi` | only for the RXF labels ([LABELS.md](LABELS.md)) |
+
+[Preparing real data](#preparing-real-data) shows how to make both files from
+HMI file names and a GOES catalog.
+
+## The prediction window
+
+Each image at time `t` is labeled from the flares in `[t, t + w)`: a flare
+counts if it starts at `t` or later and before `t + w`. `w` is
+`prediction_window`, e.g. `"24h"`, `"12h"` or a number of hours (`24`).
+
+In `examples/data/`, the image at 04:00 counts the C3.2 flare that starts at
+exactly 04:00:
+
+```text
+          timestamp     label             flares
+2024-03-01 00:00:00  2.70e-05 [C3.2, M1.4, M2.7]
+2024-03-01 04:00:00  2.70e-05 [C3.2, M1.4, M2.7]
+```
+
+`event_time="peak"` matches the flare's peak time instead of its start.
+
+## The four classes
+
+| Class | One row per | Flares counted |
+|---|---|---|
+| `FullDiskSingleImage` | image | all |
+| `FullDiskSequence` | sequence of images | all |
+| `ActiveRegionSingleImage` | patch | the patch's own region only |
+| `ActiveRegionSequence` | sequence of patches of one region | that region only |
+
+Every class takes `prediction_window` and `strategy` first, then its own
+settings by name:
+
+| Setting | Single image | Sequence | Default |
+|---|---|---|---|
+| `event_time` | ✓ | ✓ | `"start"` |
+| `cadence` | optional | required | none |
+| `start` | optional | optional | the first image |
+| `observation_window`, `sliding_window` | | required | |
+| `include_metadata` | ✓ | (always on) | `False` |
+| `include_flares` | ✓ | ✓ | `False` |
+| `verbose` | ✓ | ✓ | `False` |
+| `missing_active_region` | active region only | active region only | `"negative"` |
+
+## Single images
+
+```python
+builder = fidx.FullDiskSingleImage("24h", fidx.BinaryThresholdStrategy("M"))
+labels = builder.build("image_index.csv", "flare_catalog.csv")
+```
+
+The result has the columns `timestamp, label`.
+
+`cadence` keeps only some of the images: `cadence="6h"` keeps the images at
+the first image's time, +6 h, +12 h, and so on (or from `start=`, which
+must be an image time). The cadence must be a multiple of the time between
+the images.
+
+## Sequences
+
+```python
+builder = fidx.FullDiskSequence(
+    "24h", fidx.BinaryThresholdStrategy("M"),
+    cadence="1h",              # time between images in a sequence
+    observation_window="3h",   # time one sequence covers: 3 images
+    sliding_window="1h",       # a new sequence starts every hour
+)
+sequences = builder.build("image_index.csv", "flare_catalog.csv")
+```
+
+```text
+     sequence_start        sequence_end                                                      timestamps  n_images  label
+2024-03-01 00:00:00 2024-03-01 02:00:00 [2024-03-01 00:00:00, 2024-03-01 01:00:00, 2024-03-01 02:00:00]         3      1
+2024-03-01 01:00:00 2024-03-01 03:00:00 [2024-03-01 01:00:00, 2024-03-01 02:00:00, 2024-03-01 03:00:00]         3      1
+```
+
+- Each sequence is labeled from its last image: the window is
+  `[sequence_end, sequence_end + w)`.
+- Other image-index columns, such as `image_path`, come as lists in the
+  same order as `timestamps`.
+- A sequence with a missing image is skipped; no nearby image is used in its
+  place.
+- `cadence` may be coarser than the images (hourly sequences from 12-minute
+  images), not finer. `observation_window` and `sliding_window` must be
+  multiples of `cadence`.
+- `build(..., return_report=True)` also returns a `SequenceBuildReport`: how
+  many sequences were made and skipped, and which image times were missing.
+
+## Active regions
+
+```python
+builder = fidx.ActiveRegionSingleImage("24h", fidx.BinaryThresholdStrategy("M"),
+                                       include_metadata=True)
+labels = builder.build("active_region_image_index.csv", "flare_catalog.csv")
+```
+
+```text
+          timestamp active_region  label  image_path
+2024-03-01 00:00:00         13600      1  patches/13600/patch_13600_20240301_0000.jpg
+2024-03-01 00:00:00         13601      1  patches/13601/patch_13601_20240301_0000.jpg
+```
+
+- Only the flares of a patch's own region count.
+- Several regions can share a timestamp. Use `include_metadata=True` to
+  keep the `active_region` column, so the rows can be told apart.
+- `ActiveRegionSequence` takes the same settings as `FullDiskSequence` and
+  builds each region's sequences from that region's patches only.
+- A catalog flare with no region can never match a patch, and a warning
+  says how many there are.
+
+`missing_active_region` decides what happens to a patch with no region in
+the image index:
+
+| Value | Patch with no region |
+|---|---|
+| `"negative"` | labeled as if no flare occurred, with a warning |
+| `"drop"` | left out |
+| `"error"` | stops the build with an error |
+
+## Extra columns
+
+- `include_metadata=True` (single images) keeps every other image-index
+  column, e.g. `image_path`.
+- `include_flares=True` adds a `flares` column next to the label: the
+  classes of the flares in each window, e.g. `["C3.2", "M1.4"]`, so any
+  label can be checked by eye.
+- `verbose=True` prints a short summary of each build:
+
+```text
+Image index: 118 images (examples/data/full_disk_image_index.csv)
+Flare catalog: 8 flares (examples/data/flare_catalog.csv)
+Settings: window [t, t + 24h) on start_time, full disk, single images
+Result: 118 rows; label 0: 41, label 1: 77
+```
+
+## Preparing real data
+
+```python
+index = fidx.build_image_index_from_filenames(
+    "hmi_image_list.txt", output_path="image_index.csv",
+    strict=False)  # skip lines that are not HMI images
+catalog = fidx.adapt_goes_catalog(
+    "goes_flares.csv", output_path="flare_catalog.csv")
+```
+
+- `build_image_index_from_filenames` reads HMI or SHARP file names (a list
+  or a text file with one per line) and writes the image index. The
+  timestamp comes from the file name.
+- `adapt_goes_catalog` converts an integrated GOES flare catalog into the
+  catalog format above.
+- `add_relative_flux` adds the `rxfi` column ([LABELS.md](LABELS.md#relative-x-ray-flux-rxf)).

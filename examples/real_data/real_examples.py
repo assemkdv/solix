@@ -22,20 +22,14 @@ SHARP_MANIFEST = REAL_DATA / "sharp_manifest.csv"
 SHARP_FETCH_COMMAND = "python examples/real_data/fetch_sharp_patches.py --email you@example.com"
 
 
-FRAMEWORKS = {"torch": "torch", "tensorflow": "tensorflow"}  # import name -> pip name
-
-
-def require_optional_dependencies(framework: str = "torch", images: str = "jp2"):
+def require_optional_dependencies(images: str = "jp2"):
     """
-    Exit with a clear message if the framework or the image reader is
-    missing: Pillow with JPEG 2000 for the full-disk images (images="jp2"),
-    astropy and Pillow for the SHARP patches (images="fits").
+    Exit with a clear message if the image reader is missing: Pillow with
+    JPEG 2000 for the full-disk images (images="jp2"), astropy and Pillow
+    for the SHARP patches (images="fits"). The framework itself (torch or
+    tensorflow) is imported at the top of each example.
     """
     missing = []
-    try:
-        __import__(framework)
-    except ImportError:
-        missing.append(FRAMEWORKS[framework])
     try:
         from PIL import features
         if images == "jp2" and not features.check("jpg_2000"):
@@ -50,7 +44,7 @@ def require_optional_dependencies(framework: str = "torch", images: str = "jp2")
     if missing:
         extra = " astropy" if images == "fits" else ""
         sys.exit(f"This example needs optional dependencies: {', '.join(missing)}. "
-                 f"Install them with:  pip install {FRAMEWORKS[framework]} pillow{extra}")
+                 f"Install them with:  pip install pillow{extra}")
 
 
 def build_image_index(output_path: Path) -> pd.DataFrame:
@@ -126,7 +120,8 @@ def check_catalog_coverage(reference_times, prediction_window) -> dict:
     if first < query_start or last > query_end:
         raise SystemExit(
             f"Catalog queried for {query_start} .. {query_end} does not cover the prediction "
-            f"windows {first} .. {last}. Re-run {FETCH_COMMAND} --refresh-catalog with a wider interval."
+            f"windows {first} .. {last}. Widen CATALOG_START / CATALOG_END in fetch_real_data.py, then run "
+            f"{FETCH_COMMAND} --refresh-catalog."
         )
     return provenance
 
@@ -159,7 +154,8 @@ def independent_m_label(catalog: pd.DataFrame, t: pd.Timestamp, prediction_windo
     """
     flares = flares_in_window(catalog, t, prediction_window)
     if region is not None:
-        flares = flares[flares["active_region"].astype("string") == str(region)]
+        # As numbers: a column with a blank region is read as floats (12673.0).
+        flares = flares[pd.to_numeric(flares["active_region"]).astype("Int64") == int(region)]
     strong = flares[flares["class"].map(_at_least_m1)]
     return int(not strong.empty), strong
 

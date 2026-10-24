@@ -77,7 +77,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, default=EXAMPLES / "output")
     args = parser.parse_args(argv)
-    real.require_optional_dependencies("tensorflow", images="fits")
+    real.require_optional_dependencies(images="fits")
 
     args.output.mkdir(parents=True, exist_ok=True)
     index_path = args.output / "11_patch_index.csv"

@@ -113,7 +113,7 @@ def _download_verified(url: str, path: Path, expected_sha256: str) -> None:
     partial.replace(path)
 
 
-def _header_fields(path: Path, requested: pd.Timestamp) -> dict:
+def _header_fields(path: Path, requested: pd.Timestamp) -> tuple[dict, dict]:
     header = read_jp2_header(path)
     observed = observation_time(header)
     fields = {
@@ -233,8 +233,6 @@ def replay(root: Path = HERE) -> pd.DataFrame:
     """
     manifest_path = root / MANIFEST_NAME
     manifest = pd.read_csv(manifest_path, dtype=str, keep_default_na=False)
-    if "duplicate_of" not in manifest.columns:
-        manifest.insert(manifest.columns.get_loc("status") + 1, "duplicate_of", "")
     (root / "images").mkdir(exist_ok=True)
 
     for i, row in manifest.iterrows():
@@ -316,6 +314,8 @@ def fetch_catalog() -> pd.DataFrame:
 
 
 def main(argv=None, root: Path = HERE):
+    # root holds the images and the manifest; the flare catalog files always
+    # stay next to this script.
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--refresh", action="store_true",
                         help="discover the closest images again with getClosestImage and rewrite the manifest")

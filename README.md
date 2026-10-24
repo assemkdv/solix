@@ -11,7 +11,7 @@ data are both supported.
 
 ## Installation
 
-Python 3.10 or newer. The only dependencies are pandas and numpy.
+Python 3.10 or newer. The only dependencies are pandas (2.0 or newer) and numpy.
 
 ```bash
 git clone https://github.com/assemkdv/flare-indexer.git

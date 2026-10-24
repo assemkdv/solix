@@ -33,15 +33,20 @@ def _run(script: Path, cwd: Path) -> str:
     return completed.stdout
 
 
-@pytest.mark.parametrize("script", EXAMPLE_SCRIPTS, ids=lambda p: p.name)
-def test_example_runs(script, tmp_path):
+def _copy_examples(tmp_path: Path) -> Path:
+    """A copy of examples/, so the scripts write their output there and not into the repository."""
     copy = tmp_path / "examples"
     shutil.copytree(EXAMPLES_DIR, copy, ignore=shutil.ignore_patterns("output", "__pycache__"))
-    assert _run(copy / script.name, tmp_path)
+    return copy
 
 
-def test_flare_indices_example_shows_paper_value_and_labels(tmp_path):
-    output = _run(EXAMPLES_DIR / "05_flare_indices.py", tmp_path)
+@pytest.mark.parametrize("script", EXAMPLE_SCRIPTS, ids=lambda p: p.name)
+def test_example_runs(script, tmp_path):
+    assert _run(_copy_examples(tmp_path) / script.name, tmp_path)
+
+
+def test_flare_indices_example_shows_index_values_and_labels(tmp_path):
+    output = _run(_copy_examples(tmp_path) / "05_flare_indices.py", tmp_path)
     assert "cumulative index: 48.5" in output
     assert "label (index >= 10): 1" in output
     assert "label (index >= 20): 1" in output

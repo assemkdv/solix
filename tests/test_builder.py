@@ -280,17 +280,10 @@ def test_active_region_sequence_requires_active_region_column(tmp_path):
     assert "active_region" in message
     assert str(index_path) in message
 
-# ── event_time configuration and window boundaries ─────────────────────────────
+# ── Flares are matched by their start time ─────────────────────────────────────
 
 
-def test_event_time_invalid_value_raises():
-    with pytest.raises(ValueError) as excinfo:
-        DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy(), event_time="middle")
-
-    assert "event_time" in str(excinfo.value)
-
-
-def test_event_time_start_vs_peak_produce_different_labels(tmp_path):
+def test_a_flare_counts_by_its_start_time(tmp_path):
     # A flare that starts inside the window but peaks just after it closes.
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
@@ -300,13 +293,8 @@ def test_event_time_start_vs_peak_produce_different_labels(tmp_path):
     index_path = tmp_path / "index.csv"
     index_path.write_text("timestamp\n2024-01-01T08:00:00\n")
 
-    peak_builder = DatasetBuilder(prediction_window=1, strategy=BinaryThresholdStrategy(), event_time="peak")
-    start_builder = DatasetBuilder(prediction_window=1, strategy=BinaryThresholdStrategy(), event_time="start")
+    result = DatasetBuilder(prediction_window=1, strategy=BinaryThresholdStrategy()).build(index_path, catalog_path)
 
-    peak_result = peak_builder.build(index_path, catalog_path)
-    start_result = start_builder.build(index_path, catalog_path)
-
-    # peak_time (09:01) falls outside [08:00, 09:00) -> 0.
-    # start_time (08:30) falls inside [08:00, 09:00) -> 1.
-    assert peak_result["label"].tolist() == [0]
-    assert start_result["label"].tolist() == [1]
+    # start_time (08:30) falls inside [08:00, 09:00), so it counts although
+    # peak_time (09:01) is after the window.
+    assert result["label"].tolist() == [1]

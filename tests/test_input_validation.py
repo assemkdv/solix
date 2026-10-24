@@ -276,12 +276,12 @@ def test_query_with_an_offset_aware_image_time(catalog):
     matcher = EventMatcher(catalog)
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        # 14:00+05:00 is 09:00 UTC: [09:00, 10:00) excludes the flare peaking at 10:10.
-        assert matcher.query(pd.Timestamp("2024-01-01 14:00+05:00"), 1, event_time="peak") == []
+        # 14:00+05:00 is 09:00 UTC: [09:00, 10:00) excludes the flare starting at 10:00.
+        assert matcher.query(pd.Timestamp("2024-01-01 14:00+05:00"), 1) == []
         # 14:30+05:00 is 09:30 UTC: [09:30, 10:30) includes it.
-        assert len(matcher.query(pd.Timestamp("2024-01-01 14:30+05:00"), 1, event_time="peak")) == 1
+        assert len(matcher.query(pd.Timestamp("2024-01-01 14:30+05:00"), 1)) == 1
         # The same instant written in UTC gives the same answer.
-        assert len(matcher.query(pd.Timestamp("2024-01-01 09:30Z"), 1, event_time="peak")) == 1
+        assert len(matcher.query(pd.Timestamp("2024-01-01 09:30Z"), 1)) == 1
 
 
 def test_time_based_start_with_an_offset_is_converted_to_utc(tmp_path, catalog):
@@ -340,8 +340,8 @@ def test_same_instant_in_z_zero_and_nonzero_offsets_parses_to_one_value(tmp_path
     assert matcher._catalog["start_time"].dt.tz is None
     assert matcher._catalog["start_time"].nunique() == 1
     assert matcher._catalog["start_time"].iloc[0] == pd.Timestamp("2024-01-01 10:00:00")
-    assert len(matcher.query(T0, 24, event_time="start")) == 4
-    assert matcher.query(pd.Timestamp("2024-01-01 10:00:01"), 24, event_time="start") == []
+    assert len(matcher.query(T0, 24)) == 4
+    assert matcher.query(pd.Timestamp("2024-01-01 10:00:01"), 24) == []
 
 
 def test_mixed_offsets_across_a_daylight_saving_change_convert_to_utc(tmp_path):
@@ -359,8 +359,8 @@ def test_mixed_offsets_across_a_daylight_saving_change_convert_to_utc(tmp_path):
     assert matcher._catalog["start_time"].dt.tz is None
     # The two flares are one hour apart in UTC, not two: [00:00, 02:00) holds both,
     # [00:00, 01:00) only the first.
-    assert len(matcher.query(pd.Timestamp("2024-03-31 00:00"), "2h", event_time="start")) == 2
-    assert len(matcher.query(pd.Timestamp("2024-03-31 00:00"), "1h", event_time="start")) == 1
+    assert len(matcher.query(pd.Timestamp("2024-03-31 00:00"), "2h")) == 2
+    assert len(matcher.query(pd.Timestamp("2024-03-31 00:00"), "1h")) == 1
 
 
 def test_offset_column_with_missing_cells_keeps_them_missing(tmp_path):
@@ -375,8 +375,8 @@ def test_offset_column_with_missing_cells_keeps_them_missing(tmp_path):
     for column in ("start_time", "peak_time", "end_time"):
         assert matcher._catalog[column].dt.tz is None
         assert int(matcher._catalog[column].isna().sum()) == 1
-    assert len(matcher.query(pd.Timestamp("2024-01-01 09:00"), 24, event_time="start")) == 1
-    assert len(matcher.query(pd.Timestamp("2024-01-02 09:00"), 24, event_time="peak")) == 0
+    assert len(matcher.query(pd.Timestamp("2024-01-01 09:00"), 24)) == 1
+    assert len(matcher.query(pd.Timestamp("2024-01-02 09:00"), 24)) == 1   # a blank peak_time does not matter
 
 
 def test_offset_normalization_is_not_a_time_scale_correction():
@@ -392,14 +392,14 @@ def test_offset_normalization_is_not_a_time_scale_correction():
 
 def test_prediction_window_number_means_hours_in_builder_and_query(tmp_path, catalog):
     index = _write(tmp_path, "index.csv", "timestamp\n2024-01-01 09:00:00\n")
-    # The flare peaks at 10:10: a 1-hour window [09:00, 10:00) misses it, a 2-hour one has it.
-    assert _labels(DatasetBuilder(1, BinaryThresholdStrategy(), event_time="peak"), index, catalog) == [0]
-    assert _labels(DatasetBuilder(2, BinaryThresholdStrategy(), event_time="peak"), index, catalog) == [1]
-    assert _labels(DatasetBuilder("2h", BinaryThresholdStrategy(), event_time="peak"), index, catalog) == [1]
+    # The flare starts at 10:00: a 1-hour window [09:00, 10:00) misses it, a 2-hour one has it.
+    assert _labels(DatasetBuilder(1, BinaryThresholdStrategy()), index, catalog) == [0]
+    assert _labels(DatasetBuilder(2, BinaryThresholdStrategy()), index, catalog) == [1]
+    assert _labels(DatasetBuilder("2h", BinaryThresholdStrategy()), index, catalog) == [1]
     matcher = EventMatcher(catalog)
-    assert matcher.query(T0, 1, event_time="peak") == []
-    assert len(matcher.query(T0, 2, event_time="peak")) == 1
-    assert len(matcher.query(T0, 1.5, event_time="peak")) == 1
+    assert matcher.query(T0, 1) == []
+    assert len(matcher.query(T0, 2)) == 1
+    assert len(matcher.query(T0, 1.5)) == 1
 
 
 @pytest.mark.parametrize("name", ["cadence", "observation_window", "sliding_window"])
@@ -439,7 +439,7 @@ def test_all_blank_image_timestamp_column_raises_in_every_mode(tmp_path, catalog
             builder.build(region_index, catalog)
 
 
-def test_catalog_flare_with_blank_selected_time_never_matches_and_build_warns(tmp_path):
+def test_catalog_flare_with_blank_start_time_never_matches_and_build_warns(tmp_path):
     path = _write(
         tmp_path, "catalog.csv",
         CATALOG_HEADER
@@ -448,17 +448,11 @@ def test_catalog_flare_with_blank_selected_time_never_matches_and_build_warns(tm
     )
     index = _write(tmp_path, "index.csv", "timestamp\n2024-01-01 09:00:00\n")
     matcher = EventMatcher(path)
-    assert matcher.query(T0, 24, event_time="start") == []
-    assert len(matcher.query(T0, 24, event_time="peak")) == 1
+    assert matcher.query(T0, 24) == []
 
     with pytest.warns(UserWarning, match="1 of 2 flare\\(s\\) in the catalog at .* have no start_time"):
-        out = DatasetBuilder(24, BinaryThresholdStrategy(), event_time="start").build(index, path)
+        out = DatasetBuilder(24, BinaryThresholdStrategy()).build(index, path)
     assert out["label"].tolist() == [0]
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")   # the blank start_time is irrelevant to peak matching
-        out = DatasetBuilder(24, BinaryThresholdStrategy(), event_time="peak").build(index, path)
-    assert out["label"].tolist() == [1]
 
 
 def test_blank_end_time_does_not_affect_matching_or_warn(tmp_path):
@@ -466,9 +460,8 @@ def test_blank_end_time_does_not_affect_matching_or_warn(tmp_path):
     index = _write(tmp_path, "index.csv", "timestamp\n2024-01-01 09:00:00\n")
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        for event_time in ("start", "peak"):
-            out = DatasetBuilder(24, BinaryThresholdStrategy(), event_time=event_time).build(index, path)
-            assert out["label"].tolist() == [1]
+        out = DatasetBuilder(24, BinaryThresholdStrategy()).build(index, path)
+    assert out["label"].tolist() == [1]
 
 
 # --- 6. conflicting class columns ------------------------------------------

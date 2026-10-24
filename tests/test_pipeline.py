@@ -97,7 +97,7 @@ def test_extract_events_delegates_to_event_matcher():
     assert events[0].goes_class == "M2.3"
 
 
-def test_extract_events_event_time_start():
+def test_extract_events_uses_start_time():
     matcher = _matcher_with_flares([
         {
             "peak_time": pd.Timestamp("2024-01-01 01:00"), "start_time": pd.Timestamp("2024-01-01 00:30"),
@@ -107,39 +107,24 @@ def test_extract_events_event_time_start():
     pipeline = _default_pipeline()
 
     events = pipeline.extract_events(
-        matcher, pd.Timestamp("2024-01-01 00:00"), prediction_window=0.75, event_time="start",
+        matcher, pd.Timestamp("2024-01-01 00:00"), prediction_window=0.75,
     )
     assert len(events) == 1  # start (00:30) is inside [00:00, 00:45)
-
-
-def test_extract_events_event_time_peak():
-    matcher = _matcher_with_flares([
-        {
-            "peak_time": pd.Timestamp("2024-01-01 01:00"), "start_time": pd.Timestamp("2024-01-01 00:30"),
-            "goes_class": "M2.3", "active_region": None,
-        },
-    ])
-    pipeline = _default_pipeline()
-
-    events = pipeline.extract_events(
-        matcher, pd.Timestamp("2024-01-01 00:00"), prediction_window=0.75, event_time="peak",
-    )
-    assert len(events) == 0  # peak (01:00) is outside [00:00, 00:45)
 
 
 def test_extract_events_excludes_window_end():
     matcher = _matcher_with_flares([
         {
-            "peak_time": pd.Timestamp("2024-01-01 01:00"), "start_time": pd.Timestamp("2024-01-01 00:50"),
+            "peak_time": pd.Timestamp("2024-01-01 01:10"), "start_time": pd.Timestamp("2024-01-01 01:00"),
             "goes_class": "X1.0", "active_region": None,
         },
     ])
     pipeline = _default_pipeline()
 
     events = pipeline.extract_events(
-        matcher, pd.Timestamp("2024-01-01 00:00"), prediction_window=1,         event_time="peak",
+        matcher, pd.Timestamp("2024-01-01 00:00"), prediction_window=1,
     )
-    assert events == []  # peak exactly at t+1h excluded by [t, t+1h)
+    assert events == []  # start exactly at t+1h excluded by [t, t+1h)
 
 
 def test_extract_events_active_region_forwarding():
@@ -367,7 +352,7 @@ def test_active_region_sequences_work_with_pipeline(tmp_path):
     index_path = tmp_path / "ar_sequence_index.csv"
     pd.DataFrame({
         "timestamp": pd.to_datetime([
-            "2024-02-01T10:59:00", "2024-02-01T11:29:00", "2024-02-01T11:59:00",
+            "2024-02-01T10:49:00", "2024-02-01T11:19:00", "2024-02-01T11:49:00",
             "2024-02-05T08:59:00", "2024-02-05T09:29:00", "2024-02-05T09:59:00",
         ]),
         "active_region": ["11111", "11111", "11111", "22222", "22222", "22222"],
@@ -377,7 +362,6 @@ def test_active_region_sequences_work_with_pipeline(tmp_path):
     builder = DatasetBuilder(
         prediction_window=1, strategy=pipeline, target="active_region",
         cadence="30min", observation_window="90min", sliding_window="90min",
-        event_time="peak",
     )
     result = builder.build(index_path, CATALOG_PATH)
 

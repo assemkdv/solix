@@ -163,7 +163,7 @@ def catalog(tmp_path):
 
 def _builder(strategy, **kwargs):
     return DatasetBuilder(prediction_window="12h", strategy=strategy,
-                               event_time="start", **kwargs)
+                               **kwargs)
 
 
 @pytest.fixture

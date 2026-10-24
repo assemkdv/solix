@@ -37,13 +37,12 @@ class FullDiskSingleImage(DatasetBuilder):
         *,
         cadence=None,
         start=None,
-        event_time="start",
         include_metadata=False,
         include_flares=False,
         verbose=False,
     ):
         super().__init__(
-            prediction_window, strategy, target="full_disk", event_time=event_time,
+            prediction_window, strategy, target="full_disk",
             cadence=cadence, start=start,
             include_metadata=include_metadata, include_flares=include_flares, verbose=verbose,
         )
@@ -61,12 +60,11 @@ class FullDiskSequence(DatasetBuilder):
         observation_window,
         sliding_window,
         start=None,
-        event_time="start",
         include_flares=False,
         verbose=False,
     ):
         super().__init__(
-            prediction_window, strategy, target="full_disk", event_time=event_time,
+            prediction_window, strategy, target="full_disk",
             cadence=cadence, observation_window=observation_window, sliding_window=sliding_window, start=start,
             include_flares=include_flares, verbose=verbose,
         )
@@ -86,14 +84,13 @@ class ActiveRegionSingleImage(DatasetBuilder):
         *,
         cadence=None,
         start=None,
-        event_time="start",
         missing_active_region="negative",
         include_metadata=False,
         include_flares=False,
         verbose=False,
     ):
         super().__init__(
-            prediction_window, strategy, target="active_region", event_time=event_time,
+            prediction_window, strategy, target="active_region",
             cadence=cadence, start=start,
             missing_active_region=missing_active_region, include_metadata=include_metadata,
             include_flares=include_flares, verbose=verbose,
@@ -112,13 +109,12 @@ class ActiveRegionSequence(DatasetBuilder):
         observation_window,
         sliding_window,
         start=None,
-        event_time="start",
         missing_active_region="negative",
         include_flares=False,
         verbose=False,
     ):
         super().__init__(
-            prediction_window, strategy, target="active_region", event_time=event_time,
+            prediction_window, strategy, target="active_region",
             cadence=cadence, observation_window=observation_window, sliding_window=sliding_window, start=start,
             missing_active_region=missing_active_region, include_flares=include_flares, verbose=verbose,
         )

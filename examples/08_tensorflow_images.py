@@ -99,7 +99,6 @@ def main(argv=None):
     builder = fidx.FullDiskSingleImage(
         prediction_window=PREDICTION_WINDOW,
         strategy=fidx.BinaryThresholdStrategy("M"),  # 1 if any flare >= M1.0 in the window
-        event_time="start",
         include_metadata=True,                       # keep image_path
     )
     labels = builder.build(index_path, real.CATALOG)

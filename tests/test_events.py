@@ -244,7 +244,7 @@ def test_load_catalog_preserves_dates_crossing_midnight(tmp_path):
     assert row["end_time"].date() == pd.Timestamp("2020-01-02").date()
 
     results = matcher.query(
-        pd.Timestamp("2020-01-01 23:00:00"), prediction_window=2, event_time="start"
+        pd.Timestamp("2020-01-01 23:00:00"), prediction_window=2
     )
     assert len(results) == 1
     assert results[0].start_time == pd.Timestamp("2020-01-01 23:58:00")
@@ -291,10 +291,10 @@ def test_load_catalog_full_timestamp_allows_equal_and_missing_times(tmp_path):
     assert catalog["start_time"].isna().tolist() == [False, False, True]
 
 
-# ── event_time (start vs. peak matching) ────────────────────────────────
+# ── flares are matched by start time ────────────────────────────────
 
 
-def test_event_time_defaults_to_start():
+def test_query_matches_flares_by_start_time():
     matcher = EventMatcher.__new__(EventMatcher)
     matcher._catalog = pd.DataFrame({
         "peak_time": pd.to_datetime(["2024-01-01 01:00"]),
@@ -303,43 +303,9 @@ def test_event_time_defaults_to_start():
         "active_region": [None],
     })
 
-    # Window [00:00, 00:45) catches the flare by start_time (00:30) but not
-    # by peak_time (01:00) -- the default (start) includes it.
+    # Window [00:00, 00:45) contains the start (00:30), not the peak (01:00).
     results = matcher.query(pd.Timestamp("2024-01-01 00:00"), prediction_window=0.75)
-    assert len(results) == 1
-
-
-def test_event_time_start_vs_peak_produce_different_results():
-    matcher = EventMatcher.__new__(EventMatcher)
-    matcher._catalog = pd.DataFrame({
-        "peak_time": pd.to_datetime(["2024-01-01 01:00"]),
-        "start_time": pd.to_datetime(["2024-01-01 00:30"]),
-        "goes_class": ["M2.3"],
-        "active_region": [None],
-    })
-    window_start = pd.Timestamp("2024-01-01 00:00")
-
-    peak_results = matcher.query(window_start, prediction_window=0.75, event_time="peak")
-    start_results = matcher.query(window_start, prediction_window=0.75, event_time="start")
-
-    assert peak_results == []
-    assert len(start_results) == 1
-    assert start_results[0].goes_class == "M2.3"
-
-
-def test_event_time_invalid_value_raises():
-    matcher = EventMatcher.__new__(EventMatcher)
-    matcher._catalog = pd.DataFrame({
-        "peak_time": pd.to_datetime(["2024-01-01 01:00"]),
-        "start_time": pd.to_datetime(["2024-01-01 00:30"]),
-        "goes_class": ["M2.3"],
-        "active_region": [None],
-    })
-
-    with pytest.raises(ValueError) as excinfo:
-        matcher.query(pd.Timestamp("2024-01-01 00:00"), prediction_window=1, event_time="end")
-
-    assert "event_time" in str(excinfo.value)
+    assert [flare.goes_class for flare in results] == ["M2.3"]
 
 
 # ── window boundaries: [t, t + w) ──────────────────────────
@@ -390,7 +356,7 @@ def test_query_returns_flares_within_window():
             "2024-01-01 01:30",
             "2024-01-01 00:59",
         ]),
-        "start_time": pd.to_datetime([  # matched by default (event_time="start")
+        "start_time": pd.to_datetime([  # what matching uses
             "2024-01-01 00:20",  # inside a 1-hour window starting at 00:00
             "2024-01-01 01:20",  # outside — too late
             "2024-01-01 00:50",  # inside

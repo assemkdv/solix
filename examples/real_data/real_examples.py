@@ -129,8 +129,7 @@ def check_catalog_coverage(reference_times, prediction_window) -> dict:
 def flares_in_window(catalog: pd.DataFrame, t: pd.Timestamp, prediction_window) -> pd.DataFrame:
     """
     Independent of flare_indexer: catalog rows whose start_time is in
-    [t, t + prediction_window), i.e. event_time="start" and the
-    package's window rule.
+    [t, t + prediction_window), the package's window rule.
     """
     end = t + pd.Timedelta(prediction_window)
     return catalog[(catalog["start_time"] >= t) & (catalog["start_time"] < end)]

@@ -26,8 +26,8 @@ pytestmark = [
 
 CASES = [
     (f.FullDiskSingleImage, {}, dict(target="full_disk"), FULL_DISK),
-    (f.FullDiskSingleImage, dict(include_metadata=True, event_time="peak"),
-     dict(target="full_disk", include_metadata=True, event_time="peak"), FULL_DISK),
+    (f.FullDiskSingleImage, dict(include_metadata=True),
+     dict(target="full_disk", include_metadata=True), FULL_DISK),
     (f.FullDiskSequence, GRID, dict(target="full_disk", **GRID), FULL_DISK),
     (f.FullDiskSequence, dict(GRID, start="2024-03-01 02:00:00"),
      dict(target="full_disk", start="2024-03-01 02:00:00", **GRID), FULL_DISK),

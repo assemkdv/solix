@@ -51,21 +51,20 @@ def test_prediction_window_accepts_hours_and_durations(tmp_path, boundary_catalo
     index_path = _write(tmp_path / "index.csv", "timestamp\n2024-01-01 00:00:00\n")
     builder = DatasetBuilder(
         prediction_window=window, strategy=BinaryThresholdStrategy(),
-        event_time="start",
     )
     # Every spelling means the same 24 h window; the M1.0 starts exactly at
     # t + 24h, so [t, t + 24h) excludes it.
     assert builder.build(index_path, boundary_catalog)["label"].tolist() == [0]
-    longer = DatasetBuilder(prediction_window="24h1min", strategy=BinaryThresholdStrategy(), event_time="start")
+    longer = DatasetBuilder(prediction_window="24h1min", strategy=BinaryThresholdStrategy())
     assert longer.build(index_path, boundary_catalog)["label"].tolist() == [1]
 
 
 def test_event_matcher_query_accepts_duration(boundary_catalog):
     matcher = EventMatcher(boundary_catalog)
     t = pd.Timestamp("2024-01-01 00:00:00")
-    assert len(matcher.query(t, "24h1min", event_time="start")) == 1
-    assert len(matcher.query(t, "24h", event_time="start")) == 0       # exactly t + 24h is excluded
-    assert len(matcher.query(t, "23h59min59s", event_time="start")) == 0
+    assert len(matcher.query(t, "24h1min")) == 1
+    assert len(matcher.query(t, "24h")) == 0       # exactly t + 24h is excluded
+    assert len(matcher.query(t, "23h59min59s")) == 0
 
 
 @pytest.mark.parametrize("window", [0, -1, "0h", "-2h", "soon", None, True, float("inf"), float("nan")])

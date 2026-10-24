@@ -113,7 +113,6 @@ def main(argv=None):
     builder = fidx.FullDiskSequence(
         prediction_window=PREDICTION_WINDOW,
         strategy=fidx.BinaryThresholdStrategy("M"),  # 1 if any flare >= M1.0 in the window
-        event_time="start",
         cadence=CADENCE,
         observation_window=OBSERVATION_WINDOW,
         sliding_window=SLIDING_WINDOW,

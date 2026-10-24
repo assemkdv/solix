@@ -43,13 +43,9 @@ class DatasetBuildingPipeline:
         reference_time,
         prediction_window,
         active_region=None,
-        event_time: str = "start",
     ) -> list[FlareEvent]:
         """Stage 1: query EventMatcher and return the matched FlareEvents."""
-        events = matcher.query(
-            reference_time, prediction_window, active_region=active_region,
-            event_time=event_time,
-        )
+        events = matcher.query(reference_time, prediction_window, active_region=active_region)
         return list(events)
 
     def reduce_events(self, events: list[FlareEvent]):
@@ -66,12 +62,11 @@ class DatasetBuildingPipeline:
         reference_time,
         prediction_window,
         active_region=None,
-        event_time: str = "start",
     ) -> PipelineResult:
         """Run all three stages for one reference time and return every intermediate value."""
         events = self.extract_events(
             matcher, reference_time, prediction_window,
-            active_region=active_region, event_time=event_time,
+            active_region=active_region,
         )
         reduced_value = self.reduce_events(events)
         label = self.assign_label(reduced_value)

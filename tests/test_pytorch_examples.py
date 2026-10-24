@@ -45,7 +45,7 @@ EXPECTED_SEQUENCE_ENDS = {"2017-09-03 02:59:49.900": 0, "2017-09-03 03:59:49.900
 def _builder(**sequence):
     return DatasetBuilder(
         prediction_window="24h", strategy=fidx.BinaryThresholdStrategy("M"), target="full_disk",
-        event_time="start", include_metadata=not sequence, **sequence,
+        include_metadata=not sequence, **sequence,
     )
 
 

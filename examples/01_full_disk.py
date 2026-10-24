@@ -22,8 +22,7 @@ def main():
 
     builder = fidx.FullDiskSingleImage(
         prediction_window="24h",                     # a number means hours: 24 is the same
-        strategy=fidx.BinaryThresholdStrategy("M"),  # 1 if any flare >= M1.0, else 0
-        event_time="start",                          # compare the flare's start_time ...
+        strategy=fidx.BinaryThresholdStrategy("M"),  # 1 if a flare >= M1.0 starts in the window, else 0
         include_metadata=True,                       # keep image_path in the output
     )
     labels = builder.build(DATA / "full_disk_image_index.csv", DATA / "flare_catalog.csv")
@@ -31,7 +30,6 @@ def main():
     # A second builder gives the strongest flare's flux instead of 0/1.
     flux = fidx.FullDiskSingleImage(
         prediction_window="24h", strategy=fidx.MaxFlareStrategy(),
-        event_time="start",
     ).build(DATA / "full_disk_image_index.csv", DATA / "flare_catalog.csv")
     labels["max_flux"] = flux["label"]
 

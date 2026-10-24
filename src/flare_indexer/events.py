@@ -37,9 +37,6 @@ class FlareEvent:
     rxfi: float | None = None        # relative X-ray flux increase, if the catalog has it
 
 
-VALID_EVENT_TIMES = {"start", "peak"}
-
-
 def _parse_prediction_window(value) -> pd.Timedelta:
     """
     Normalize a prediction window into a strictly positive pd.Timedelta.
@@ -314,9 +311,6 @@ class EventMatcher:
     def __init__(self, catalog_path: str | Path, columns=None):
         # columns: optional {your column name: package column name}.
         self._catalog = self._load_catalog(catalog_path, columns)
-        # Lazily built, cached {event_time: (sorted_values, original_positions)}
-        # views used by query()'s searchsorted fast path -- see _sorted_view().
-        self._sorted_view_cache: dict[str, tuple[np.ndarray, np.ndarray]] = {}
 
     def _load_catalog(self, path: str | Path, columns=None) -> pd.DataFrame:
         """
@@ -358,40 +352,29 @@ class EventMatcher:
 
         return df.sort_values("peak_time").reset_index(drop=True)
 
-    def _sorted_view(self, event_time: str) -> tuple[np.ndarray, np.ndarray]:
+    def _sorted_starts(self) -> tuple[np.ndarray, np.ndarray]:
         """
-        Cached, sorted (values, original_positions) for the given event-time
-        basis, built once per basis and reused across query() calls so a
-        DatasetBuilder run over tens of thousands of images doesn't re-sort
-        the catalog every time -- see query()'s searchsorted fast path.
+        The catalog's start times, sorted, and their row positions. Built
+        once and reused by every query(), so labeling tens of thousands of
+        images does not re-sort the catalog each time.
         """
-        # Tests (and any other caller) sometimes build an EventMatcher via
-        # __new__() and set _catalog directly, bypassing __init__ -- fall
-        # back to an empty cache rather than requiring that pattern to also
-        # know about this private cache attribute.
-        cache = self.__dict__.setdefault("_sorted_view_cache", {})
-        if event_time not in cache:
-            column = "start_time" if event_time == "start" else "peak_time"
-            values = self._catalog[column].to_numpy()
+        # getattr, not an attribute set in __init__: tests build an
+        # EventMatcher with __new__() and set _catalog directly.
+        if getattr(self, "_start_index", None) is None:
+            values = self._catalog["start_time"].to_numpy()
             order = np.argsort(values, kind="stable")
-            cache[event_time] = (values[order], order)
-        return cache[event_time]
+            self._start_index = (values[order], order)
+        return self._start_index
 
     def query(
         self,
         image_time: pd.Timestamp,
         prediction_window,
         active_region: str | None = None,
-        event_time: str = "start",
     ) -> list[FlareEvent]:
         """
-        Returns all flares whose event time falls inside the prediction
+        Returns all flares whose start time falls inside the prediction
         window.
-
-        event_time selects which of a flare's timestamps is checked against
-        the window:
-        - "start" (default): the flare's start_time.
-        - "peak": the flare's peak_time.
 
         The window is [image_time, image_time + prediction_window): it
         includes image_time itself and excludes the window end, so a 24 h
@@ -400,7 +383,7 @@ class EventMatcher:
         prediction_window is either a number of hours (e.g. 24) or a
         pandas-compatible duration (e.g. "23h59min59s", pd.Timedelta).
 
-        Example: image taken at 10:00, window = 24 hours, defaults
+        Example: image taken at 10:00, window = 24 hours
         → returns all flares with start_time in [10:00, 10:00 next day)
 
         If active_region is given, only flares attributed to that exact
@@ -416,8 +399,6 @@ class EventMatcher:
         a UTC offset is converted to UTC before matching; a naive one is
         assumed to be on the catalog's time scale.
         """
-        if event_time not in VALID_EVENT_TIMES:
-            raise ValueError(f"event_time must be one of {sorted(VALID_EVENT_TIMES)}, got {event_time!r}")
         if isinstance(image_time, (datetime.datetime, np.datetime64)) and not isinstance(image_time, pd.Timestamp):
             image_time = pd.Timestamp(image_time)
         if not isinstance(image_time, pd.Timestamp) or pd.isna(image_time):
@@ -437,7 +418,7 @@ class EventMatcher:
         image_time = _to_naive_utc(image_time)
         window_end = image_time + _parse_prediction_window(prediction_window)
 
-        sorted_values, sort_positions = self._sorted_view(event_time)
+        sorted_values, sort_positions = self._sorted_starts()
         image_time_np = np.datetime64(image_time)
         window_end_np = np.datetime64(window_end)
 

@@ -42,7 +42,7 @@ def main():
 
     labels = fidx.FullDiskSingleImage(
         prediction_window=24, strategy=fidx.BinaryThresholdStrategy("M"),
-        event_time="start", include_metadata=True,
+        include_metadata=True,
     ).build(OUTPUT / "04_image_index.csv", OUTPUT / "04_flare_catalog.csv")
     print("\nLabels for the converted inputs")
     print(labels.to_string(index=False))

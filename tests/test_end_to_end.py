@@ -11,7 +11,7 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 CATALOG_PATH = FIXTURES_DIR / "catalog.csv"
 IMAGE_INDEX_PATH = FIXTURES_DIR / "image_index.csv"
 
-# tests/fixtures/catalog.csv has four flares (start time, the default event_time):
+# tests/fixtures/catalog.csv has four flares (start times, which is what matching uses):
 #   C3.0 starts 2024-02-01T11:50:00  (flux=3e-6)
 #   X1.0 starts 2024-02-02T00:00:00  (flux=1e-4)  <- exactly on a 24h window end
 #   C1.0 starts 2024-02-05T05:50:00  (flux=1e-6)
@@ -60,10 +60,10 @@ def test_end_to_end_sequences_against_fixture_catalog(tmp_path):
     index_path = tmp_path / "sequence_index.csv"
     pd.DataFrame({
         "timestamp": pd.to_datetime([
-            "2024-02-01T08:59:00",
-            "2024-02-01T09:59:00",
-            "2024-02-01T10:59:00",
-            "2024-02-01T11:59:00",
+            "2024-02-01T08:49:00",
+            "2024-02-01T09:49:00",
+            "2024-02-01T10:49:00",
+            "2024-02-01T11:49:00",
         ]),
     }).to_csv(index_path, index=False)
 
@@ -71,18 +71,17 @@ def test_end_to_end_sequences_against_fixture_catalog(tmp_path):
         prediction_window=1,
         strategy=BinaryThresholdStrategy(),
         cadence="1h", observation_window="2h", sliding_window="1h",
-        event_time="peak",
     )
     result = builder.build(index_path, CATALOG_PATH)
 
     assert list(result.columns) == ["sequence_start", "sequence_end", "timestamps", "n_images", "label"]
     assert result["sequence_end"].tolist() == [
-        pd.Timestamp("2024-02-01T09:59:00"),
-        pd.Timestamp("2024-02-01T10:59:00"),
-        pd.Timestamp("2024-02-01T11:59:00"),
+        pd.Timestamp("2024-02-01T09:49:00"),
+        pd.Timestamp("2024-02-01T10:49:00"),
+        pd.Timestamp("2024-02-01T11:49:00"),
     ]
-    # Only the last sequence's 1-hour window [11:59, 12:59) catches a
-    # flare (C3.0, peak at 12:00) -- and it's C-class, so the
+    # Only the last sequence's 1-hour window [11:49, 12:49) catches a
+    # flare (C3.0, starting at 11:50) -- and it's C-class, so the
     # M-threshold binary label is still 0 for all three sequences.
     assert result["label"].tolist() == [0, 0, 0]
 
@@ -90,7 +89,6 @@ def test_end_to_end_sequences_against_fixture_catalog(tmp_path):
         prediction_window=1,
         strategy=MaxFlareStrategy(),
         cadence="1h", observation_window="2h", sliding_window="1h",
-        event_time="peak",
     ).build(index_path, CATALOG_PATH)
     assert max_result["label"].tolist() == [0.0, 0.0, 3e-6]
 
@@ -121,15 +119,15 @@ def test_end_to_end_active_region_against_fixture_catalog(tmp_path):
 
 
 def test_end_to_end_active_region_sequences_against_fixture_catalog(tmp_path):
-    # tests/fixtures/catalog.csv has region 11111 (C3.0 peak 2024-02-01T12:00,
-    # X1.0 peak 2024-02-02T00:00) and region 22222 (C1.0/M4.0 on 2024-02-05).
+    # tests/fixtures/catalog.csv has region 11111 (C3.0 starts 2024-02-01T11:50,
+    # X1.0 starts 2024-02-02T00:00) and region 22222 (C1.0/M4.0 on 2024-02-05).
     # Using threshold="C" so C-class flares count as qualifying.
     index_path = tmp_path / "ar_sequence_index.csv"
     pd.DataFrame({
         "timestamp": pd.to_datetime([
-            "2024-02-01T10:59:00",
-            "2024-02-01T11:29:00",
-            "2024-02-01T11:59:00",
+            "2024-02-01T10:49:00",
+            "2024-02-01T11:19:00",
+            "2024-02-01T11:49:00",
             "2024-02-05T08:59:00",
             "2024-02-05T09:29:00",
             "2024-02-05T09:59:00",
@@ -142,7 +140,6 @@ def test_end_to_end_active_region_sequences_against_fixture_catalog(tmp_path):
         strategy=BinaryThresholdStrategy(threshold="C"),
         target="active_region",
         cadence="30min", observation_window="90min", sliding_window="90min",
-        event_time="peak",
     )
     result = builder.build(index_path, CATALOG_PATH)
 
@@ -150,12 +147,12 @@ def test_end_to_end_active_region_sequences_against_fixture_catalog(tmp_path):
         "sequence_start", "sequence_end", "timestamps", "n_images", "active_region", "label"
     ]
     assert result["sequence_end"].tolist() == [
-        pd.Timestamp("2024-02-01T11:59:00"),
+        pd.Timestamp("2024-02-01T11:49:00"),
         pd.Timestamp("2024-02-05T09:59:00"),
     ]
-    # First sequence ends one minute before region 11111's C3.0 peak -> label 1.
+    # First sequence ends one minute before region 11111's C3.0 starts -> label 1.
     # Second sequence's 1-hour window from 09:59 catches no region-22222
-    # flare (C1.0 peaked at 06:00, M4.0 peaks later at 18:00) -> label 0.
+    # flare (C1.0 started at 05:50, M4.0 starts later at 17:50) -> label 0.
     assert result["label"].tolist() == [1, 0]
     assert result["active_region"].tolist() == ["11111", "22222"]
 
@@ -221,18 +218,15 @@ def test_end_to_end_midnight_crossing_event(tmp_path):
     index_path = _write_index(tmp_path / "index.csv",
                               ["2030-01-11T00:00:00", "2030-01-12T00:00:00", "2030-01-13T00:00:00"])
 
-    # Windows [t, t + 24h):
-    #   2030-01-11 00:00: start 01-11 23:50 inside; peak 01-12 00:05 outside
-    #   2030-01-12 00:00: start before t; peak 01-12 00:05 inside
-    #   2030-01-13 00:00: neither
-    labels = {}
-    for event_time in ("start", "peak"):
-        result = DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy("M"), event_time=event_time) \
-            .build(index_path, SYNTHETIC_FULL_TIMESTAMP_CATALOG_PATH)
-        assert result["timestamp"].tolist() == [
-            pd.Timestamp("2030-01-11T00:00:00"),
-            pd.Timestamp("2030-01-12T00:00:00"),
-            pd.Timestamp("2030-01-13T00:00:00"),
-        ]
-        labels[event_time] = result["label"].tolist()
-    assert labels == {"start": [1, 0, 0], "peak": [0, 1, 0]}
+    # Windows [t, t + 24h), matched by start time:
+    #   2030-01-11 00:00: starts 01-11 23:50, inside (although it peaks the next day)
+    #   2030-01-12 00:00: started before t
+    #   2030-01-13 00:00: nothing
+    result = DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy("M")) \
+        .build(index_path, SYNTHETIC_FULL_TIMESTAMP_CATALOG_PATH)
+    assert result["timestamp"].tolist() == [
+        pd.Timestamp("2030-01-11T00:00:00"),
+        pd.Timestamp("2030-01-12T00:00:00"),
+        pd.Timestamp("2030-01-13T00:00:00"),
+    ]
+    assert result["label"].tolist() == [1, 0, 0]

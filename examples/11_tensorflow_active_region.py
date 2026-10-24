@@ -96,7 +96,6 @@ def main(argv=None):
     builder = fidx.ActiveRegionSingleImage(
         prediction_window=PREDICTION_WINDOW,
         strategy=fidx.BinaryThresholdStrategy("M"),  # 1 if a flare >= M1.0 from this region starts in the window
-        event_time="start",
         include_metadata=True,                       # keep image_path
         include_flares=True,                         # show which flares made each label
     )

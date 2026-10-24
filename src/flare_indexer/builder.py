@@ -8,7 +8,7 @@ from pathlib import Path
 from .events import (
     EventMatcher, _none_for_missing, _normalize_active_region, _parse_prediction_window, _parse_time_text_column,
     _reject_unitless_duration_text, _rename_columns, _to_naive_utc,
-    IMAGE_INDEX_COLUMNS, VALID_EVENT_TIMES,
+    IMAGE_INDEX_COLUMNS,
 )
 
 
@@ -166,12 +166,11 @@ class DatasetBuilder:
     Parameters
     ----------
     prediction_window : hours (number) or a duration with a unit ("24h").
-        Flares in [t, t + prediction_window) count, where t is the image
-        time or, for a sequence, the time of its last image.
+        Flares that start in [t, t + prediction_window) count, where t is
+        the image time or, for a sequence, the time of its last image.
     strategy : any object with label(flares).
     target : "full_disk" (all flares count) or "active_region" (only the
         flares of the image's own region; the index needs active_region).
-    event_time : "start" or "peak", the flare time matched to the window.
     missing_active_region : "negative", "drop" or "error", for
         active-region images without a region.
     include_metadata : single images only; keep the other index columns.
@@ -195,7 +194,6 @@ class DatasetBuilder:
         prediction_window,
         strategy,
         target="full_disk",
-        event_time="start",
         start=None,
         cadence=None,
         observation_window=None,
@@ -219,8 +217,6 @@ class DatasetBuilder:
             )
         if target not in self.VALID_TARGETS:
             raise ValueError(f"target must be one of {sorted(self.VALID_TARGETS)}, got {target!r}")
-        if event_time not in VALID_EVENT_TIMES:
-            raise ValueError(f"event_time must be one of {sorted(VALID_EVENT_TIMES)}, got {event_time!r}")
 
         # observation_window or sliding_window makes sequences; cadence (and
         # start) alone thin out single images to a time grid.
@@ -237,7 +233,6 @@ class DatasetBuilder:
         self._window = parsed_prediction_window
         self.strategy = strategy
         self.target = target
-        self.event_time = event_time
         self.missing_active_region = missing_active_region
         if not isinstance(include_metadata, bool):
             raise ValueError(f"include_metadata must be True or False, got {include_metadata!r}")
@@ -363,7 +358,7 @@ class DatasetBuilder:
 
         matcher = EventMatcher(event_catalog_path, columns=catalog_columns)
         self._check_required_catalog_column(matcher, event_catalog_path)
-        self._warn_catalog_missing_event_time(matcher, event_catalog_path)
+        self._warn_catalog_missing_start_time(matcher, event_catalog_path)
         if self.target == "active_region":
             self._warn_catalog_missing_active_region(matcher, event_catalog_path)
 
@@ -406,7 +401,7 @@ class DatasetBuilder:
             mode = f"single images every {_format_duration(self.image_cadence)}"
         else:
             mode = "single images"
-        print(f"Settings: window [t, t + {_format_duration(self._window)}) on {self.event_time}_time, {target}, {mode}")
+        print(f"Settings: window [t, t + {_format_duration(self._window)}) on start_time, {target}, {mode}")
 
     def _print_result(self, result: pd.DataFrame, report) -> None:
         unit = "sequences" if self.time_based else "rows"
@@ -421,10 +416,7 @@ class DatasetBuilder:
             extra_columns = _extra_columns(index_df, ("timestamp",), tuple(self._label_columns()), path)
         records = []
         for ts in index_df["timestamp"]:
-            flares = matcher.query(
-                ts, self._window,
-                event_time=self.event_time,
-            )
+            flares = matcher.query(ts, self._window)
             records.append({"timestamp": ts, **self._label_fields(flares)})
 
         columns = ["timestamp"] + self._label_columns()
@@ -461,10 +453,7 @@ class DatasetBuilder:
                     continue
                 flares = []
             else:
-                flares = matcher.query(
-                    ts, self._window, active_region=active_region,
-                    event_time=self.event_time,
-                )
+                flares = matcher.query(ts, self._window, active_region=active_region)
             record = {"timestamp": ts, "active_region": active_region, **self._label_fields(flares)}
             for col in extra_columns:
                 record[col] = index_df[col].iloc[position]
@@ -534,21 +523,19 @@ class DatasetBuilder:
     def _sequence_reserved(self) -> tuple:
         return _SEQUENCE_OUTPUT_COLUMNS + (("flares",) if self.include_flares else ())
 
-    def _warn_catalog_missing_event_time(self, matcher: EventMatcher, path) -> None:
+    def _warn_catalog_missing_start_time(self, matcher: EventMatcher, path) -> None:
         """
-        A catalog row may have a blank start_time or peak_time (the
-        catalog still loads). Such a flare can never be matched through
-        the blank column, so when it is the selected event_time column
-        the build says how many flares are invisible to it.
+        A catalog row may have a blank start_time (the catalog still
+        loads). Such a flare can never be matched, so the build says how
+        many flares are invisible to it.
         """
         catalog = matcher._catalog
-        column = "start_time" if self.event_time == "start" else "peak_time"
-        missing = int(catalog[column].isna().sum())
+        missing = int(catalog["start_time"].isna().sum())
         if missing:
             warnings.warn(
-                f"{missing} of {len(catalog)} flare(s) in the catalog at {path} have no {column}. "
-                f"With event_time={self.event_time!r} they can never match any image, so a window "
-                "that contains one of them is labeled as if it were absent.",
+                f"{missing} of {len(catalog)} flare(s) in the catalog at {path} have no start_time. "
+                "They can never match any image, so a window that contains one of them is labeled "
+                "as if it were absent.",
                 UserWarning,
                 stacklevel=3,
             )
@@ -630,10 +617,7 @@ class DatasetBuilder:
         if region is None:
             # Never fall back to full-disk matching for an unknown region.
             return []
-        return matcher.query(
-            reference_time, self._window, active_region=region,
-            event_time=self.event_time,
-        )
+        return matcher.query(reference_time, self._window, active_region=region)
 
     # ── Time-based sequence mode ─────────────────────────────────────────
 
@@ -749,10 +733,7 @@ class DatasetBuilder:
         records = []
         for window_timestamps, positions in candidates:
             sequence_end = window_timestamps[-1]
-            flares = matcher.query(
-                sequence_end, self._window,
-                event_time=self.event_time,
-            )
+            flares = matcher.query(sequence_end, self._window)
             record = {
                 "sequence_start": window_timestamps[0],
                 "sequence_end": sequence_end,

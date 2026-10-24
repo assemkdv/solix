@@ -64,7 +64,7 @@ BOXES = {
     # Configuration layer.
     "classes": ("Dataset class", ["FullDiskSingleImage", "FullDiskSequence", "ActiveRegionSingleImage",
                                   "ActiveRegionSequence"], 33, 38.5, 26, 9, False),
-    "settings": ("Settings", ["prediction_window, event_time", "cadence, start",
+    "settings": ("Settings", ["prediction_window", "cadence, start",
                               "observation_window, sliding_window", "missing_active_region"], 62, 38.5, 27, 9, False),
     "strategy": ("Label (strategy)", ["reducer + labeler, or", "BinaryThresholdStrategy,",
                                       "MaxFlareStrategy, your own"], 92, 38.5, 23, 9, False),

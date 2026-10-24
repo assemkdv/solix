@@ -16,7 +16,7 @@
 
 | Column | Needed |
 |---|---|
-| `start_time`, `peak_time`, `end_time` | full date and time, e.g. `2024-03-01 04:00:00` (a blank cell is allowed: that flare cannot match on that time, and the build warns when it is the time it matches on, start or peak) |
+| `start_time`, `peak_time`, `end_time` | full date and time, e.g. `2024-03-01 04:00:00` (a blank cell is allowed; a flare with a blank `start_time` can never match, and the build warns) |
 | `class` | GOES class, e.g. `M1.4` |
 | `active_region` | the flare's NOAA region (blank if unknown) |
 | `rxfi` | only for the RXF labels ([LABELS.md](LABELS.md)) |
@@ -59,7 +59,8 @@ flare's peak flux, and `include_flares=True`):
 2024-03-01 04:00:00 0.000027 [C3.2, M1.4, M2.7]
 ```
 
-`event_time="peak"` matches the flare's peak time instead of its start.
+A flare counts by its start time: one that starts inside the window counts
+even if it peaks after the window ends.
 
 ## The four classes
 
@@ -75,7 +76,6 @@ settings by name:
 
 | Setting | Single image | Sequence | Default |
 |---|---|---|---|
-| `event_time` | ✓ | ✓ | `"start"` |
 | `cadence` | optional | required | none |
 | `start` | optional, with `cadence` | optional | the first image |
 | `observation_window`, `sliding_window` | | required | |

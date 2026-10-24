@@ -190,7 +190,6 @@ def test_pipeline_run_one_with_fixture_catalog():
     pipeline = DatasetBuildingPipeline(CumulativeClassIndexReducer(), NumericThresholdLabeler(10))
     result = pipeline.run_one(
         matcher, pd.Timestamp("2024-02-01 00:00"), "24h",
-        event_time="start",
     )
     assert [e.goes_class for e in result.events] == ["C3.0"]
     assert result.reduced_value == 3.0
@@ -199,7 +198,6 @@ def test_pipeline_run_one_with_fixture_catalog():
     # A window longer than 24 h includes the X1.0 starting exactly 24 h later: 3 + 100.
     wide = pipeline.run_one(
         matcher, pd.Timestamp("2024-02-01 00:00"), "24h1min",
-        event_time="start",
     )
     assert wide.reduced_value == 103.0
     assert wide.label == 1
@@ -207,19 +205,14 @@ def test_pipeline_run_one_with_fixture_catalog():
 
 def test_dataset_builder_single_images_raw_and_binary():
     raw = DatasetBuilder(
-        prediction_window="24h", event_time="start",
+        prediction_window="24h",
         strategy=DatasetBuildingPipeline(CumulativeClassIndexReducer(), RegressionLabeler()),
     ).build(FIXTURES_DIR / "image_index.csv", FIXTURES_DIR / "catalog.csv")
     binary = DatasetBuilder(
-        prediction_window="24h", event_time="start",
+        prediction_window="24h",
         strategy=DatasetBuildingPipeline(CumulativeClassIndexReducer(), NumericThresholdLabeler(10)),
     ).build(FIXTURES_DIR / "image_index.csv", FIXTURES_DIR / "catalog.csv")
     # 2024-02-01: C3.0 -> 3.0; 2024-02-05: C1.0 + M4.0 -> 41.0; 2024-02-10: empty -> 0.0
     assert raw["label"].tolist() == [3.0, 41.0, 0.0]
     assert binary["label"].tolist() == [0, 1, 0]
 
-
-def test_default_event_time_is_start():
-    builder = DatasetBuilder(prediction_window=24, strategy=DatasetBuildingPipeline(
-        CumulativeClassIndexReducer(), RegressionLabeler()))
-    assert builder.event_time == "start"

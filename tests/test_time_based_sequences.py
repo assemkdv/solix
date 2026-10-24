@@ -501,35 +501,20 @@ def test_default_is_single_image_mode(tmp_path):
     assert list(result.columns) == ["timestamp", "label"]
 
 
-# ── event_time / window boundary / MaxFlareStrategy compatibility ──────────
+# ── start-time matching / window boundary / MaxFlareStrategy ──────────────
 
 
-def test_time_based_event_time_start(tmp_path):
+def test_time_based_flare_counts_by_start_time(tmp_path):
     timestamps = _hourly("2024-01-01T00:00:00", 6)
     index_path = _write_index(tmp_path, timestamps)
     # Flare starts inside a short window measured from sequence_end but
-    # peaks just after it -- only event_time="start" should catch it.
+    # peaks just after it; its start time is what counts.
     catalog_path = _catalog_with_flare(tmp_path, "2024-01-01", "0505", "0510", "0515", "M1.0", "4456")
 
     builder = DatasetBuilder(
         prediction_window=0.1,  # 6 minutes: [05:00, 05:06) catches start=05:05, not peak=05:10
         strategy=BinaryThresholdStrategy(),
         cadence="1h", observation_window="6h", sliding_window="6h",
-        event_time="start",
-    )
-    result = builder.build(index_path, catalog_path)
-    assert result.iloc[0]["label"] == 1
-
-
-def test_time_based_event_time_peak(tmp_path):
-    timestamps = _hourly("2024-01-01T00:00:00", 6)
-    index_path = _write_index(tmp_path, timestamps)
-    catalog_path = _catalog_with_flare(tmp_path, "2024-01-01", "0459", "0501", "0502", "M1.0", "4456")
-
-    builder = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(),
-        cadence="1h", observation_window="6h", sliding_window="6h",
-        event_time="peak",
     )
     result = builder.build(index_path, catalog_path)
     assert result.iloc[0]["label"] == 1
@@ -538,7 +523,7 @@ def test_time_based_event_time_peak(tmp_path):
 def test_time_based_window_excludes_its_end(tmp_path):
     timestamps = _hourly("2024-01-01T00:00:00", 6)
     index_path = _write_index(tmp_path, timestamps)
-    # Flare peaks exactly at sequence_end + prediction_window -- excluded by [t, t+w).
+    # Flare starts exactly at sequence_end + prediction_window -- excluded by [t, t+w).
     catalog_path = _catalog_with_flare(tmp_path, "2024-01-01", "0600", "0600", "0605", "X1.0", "4456")
 
     builder = DatasetBuilder(

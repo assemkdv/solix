@@ -1,6 +1,6 @@
 """
 include_flares=True adds a "flares" column next to the label: the GOES
-classes of the flares in each window, in order of event time.
+classes of the flares in each window, in order of start time.
 """
 
 import pandas as pd
@@ -49,12 +49,6 @@ def test_window_edges_follow_the_label(tmp_path):
     result = DatasetBuilder("2h30min", MaxFlareStrategy(), include_flares=True).build(index, catalog)
     assert result["flares"].tolist() == [["C2.0"]]
     assert result["label"].tolist() == [2e-6]
-
-
-def test_peak_time_basis(tmp_path):
-    index, catalog = _files(tmp_path, ["2024-01-01 03:15:00"])
-    result = DatasetBuilder("6h", MaxFlareStrategy(), event_time="peak", include_flares=True).build(index, catalog)
-    assert result["flares"].tolist() == [["C2.0", "M1.0", "C5.0"]]
 
 
 def test_single_image_active_region_lists_only_that_region(tmp_path):

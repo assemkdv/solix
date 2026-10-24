@@ -81,7 +81,7 @@ def test_builder_all_modes(tmp_path, target, mode, labeler):
                   'class': ['B2', 'C2', 'X1'], 'active_region': [100, 100, 200]}).to_csv(catalog, index=False)
     options = {} if mode == 'single' else {'cadence': '1h', 'observation_window': '2h', 'sliding_window': '1h'}
     pipeline = f.DatasetBuildingPipeline(f.ClassCountReducer(), labeler())
-    result = DatasetBuilder('1h', pipeline, target=target, event_time='start', **options).build(index, catalog)
+    result = DatasetBuilder('1h', pipeline, target=target, **options).build(index, catalog)
     assert len(result) == (2 if mode == 'single' else 1)
     assert result.iloc[-1].label == {'A': 0, 'B': 0, 'C': 1, 'M': 0, 'X': int(target == 'full_disk')}
     if mode == 'single':

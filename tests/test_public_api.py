@@ -11,6 +11,7 @@ def test_public_names_are_accessible():
         "EventReducer",
         "MaxFluxReducer",
         "MinFluxReducer",
+        "MeanFluxReducer",
         "ClassCountReducer",
         "CumulativeClassIndexReducer",
         "MaxRelativeFluxReducer",

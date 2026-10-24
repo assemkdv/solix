@@ -74,6 +74,19 @@ class SumRelativeFluxReducer:
         return float(sum(e.rxfi for e in events if e.rxfi is not None))
 
 
+class MeanFluxReducer:
+    """Mean peak flux of all events in the window, in W/m²; 0.0 if empty.
+
+    Each event's GOES class is converted to flux and the values are
+    averaged, so C1.0, C3.0 and M2.0 give (1e-6 + 3e-6 + 2e-5) / 3.
+    """
+
+    def reduce(self, events: list[FlareEvent]) -> float:
+        if not events:
+            return 0.0
+        return sum(_flux_converter.to_flux(e.goes_class) for e in events) / len(events)
+
+
 class ClassCountReducer:
     """Count every matched event by numeric GOES class, in A/B/C/M/X order.
 

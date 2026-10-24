@@ -53,6 +53,7 @@ time instead.
 |---|---|
 | 0/1, strongest flare ≥ a GOES class | `BinaryThresholdStrategy("M")` |
 | Peak flux of the strongest flare (W/m²) | `MaxFlareStrategy()` |
+| Peak flux of the weakest flare / mean peak flux of all flares | `DatasetBuildingPipeline(MinFluxReducer(), RegressionLabeler())` / `DatasetBuildingPipeline(MeanFluxReducer(), RegressionLabeler())` |
 | Class of the strongest flare (NF, A, B, C, M, X) | `DatasetBuildingPipeline(MaxFluxReducer(), MulticlassLabeler())` |
 | Number of flares per class | `DatasetBuildingPipeline(ClassCountReducer(), ClassCountLabeler())` |
 | Cumulative index ΣC + 10ΣM + 100ΣX | `DatasetBuildingPipeline(CumulativeClassIndexReducer(), RegressionLabeler())` |

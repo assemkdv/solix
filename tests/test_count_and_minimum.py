@@ -15,6 +15,28 @@ def test_minimum_numeric_and_empty():
     assert f.MinFluxReducer().reduce(events(['C4'])) == 4e-6
 
 
+def test_mean_of_event_fluxes_and_empty():
+    assert f.MeanFluxReducer().reduce(events(['C1', 'C3', 'M2'])) == pytest.approx((1e-6 + 3e-6 + 2e-5) / 3)
+    assert f.MeanFluxReducer().reduce(events(['C10', 'M1'])) == pytest.approx(1e-5)
+    assert f.MeanFluxReducer().reduce(events(['X2.9'])) == pytest.approx(2.9e-4)
+    assert f.MeanFluxReducer().reduce([]) == 0.0
+
+
+def test_mean_flux_in_builder(tmp_path):
+    catalog = tmp_path / "catalog.csv"
+    catalog.write_text(
+        "start_time,peak_time,end_time,class,active_region\n"
+        "2024-01-01 02:00:00,2024-01-01 02:10:00,2024-01-01 02:20:00,C1.0,100\n"
+        "2024-01-01 05:00:00,2024-01-01 05:10:00,2024-01-01 05:20:00,M2.0,100\n"
+    )
+    index = tmp_path / "index.csv"
+    index.write_text("timestamp\n2024-01-01 00:00:00\n2024-01-01 03:00:00\n2024-01-02 06:00:00\n")
+    result = f.DatasetBuilder(
+        "24h", f.DatasetBuildingPipeline(f.MeanFluxReducer(), f.RegressionLabeler())
+    ).build(index, catalog)
+    assert result["label"].tolist() == pytest.approx([(1e-6 + 2e-5) / 2, 2e-5, 0.0])
+
+
 def test_counts_retain_every_event_and_normalize_class():
     assert f.ClassCountReducer().reduce(events(['C2'] * 10 + ['X1', 'C10', 'M10'])) == {
         'A': 0, 'B': 0, 'C': 10, 'M': 1, 'X': 2}

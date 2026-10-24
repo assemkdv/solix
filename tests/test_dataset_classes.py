@@ -67,7 +67,7 @@ def test_options_reach_the_engine():
     (f.FullDiskSingleImage, dict(missing_active_region="drop")),
     (f.FullDiskSequence, dict(GRID, target="active_region")),
     (f.FullDiskSequence, dict(GRID, include_metadata=True)),
-    (f.ActiveRegionSingleImage, dict(cadence="1h")),
+    (f.ActiveRegionSingleImage, dict(observation_window="3h")),
     (f.ActiveRegionSequence, dict(AR_GRID, target="full_disk")),
 ])
 def test_settings_of_another_case_are_refused(cls, kwargs):

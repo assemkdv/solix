@@ -23,13 +23,20 @@ from .builder import DatasetBuilder
 
 
 class FullDiskSingleImage(DatasetBuilder):
-    """One label per full-disk image, from all flares in its window."""
+    """One label per full-disk image, from all flares in its window.
+
+    cadence (optional) keeps only the images at start, start + cadence, ...
+    (e.g. one image per hour from a 12-minute image list); start defaults
+    to the earliest image.
+    """
 
     def __init__(
         self,
         prediction_window,
         strategy,
         *,
+        cadence=None,
+        start=None,
         event_time="start",
         include_metadata=False,
         include_flares=False,
@@ -37,6 +44,7 @@ class FullDiskSingleImage(DatasetBuilder):
     ):
         super().__init__(
             prediction_window, strategy, target="full_disk", event_time=event_time,
+            cadence=cadence, start=start,
             include_metadata=include_metadata, include_flares=include_flares, verbose=verbose,
         )
 
@@ -65,13 +73,19 @@ class FullDiskSequence(DatasetBuilder):
 
 
 class ActiveRegionSingleImage(DatasetBuilder):
-    """One label per active-region patch, from that region's flares only."""
+    """One label per active-region patch, from that region's flares only.
+
+    cadence (optional) keeps only the patches at start, start + cadence, ...;
+    all regions share this grid, and start defaults to the earliest patch.
+    """
 
     def __init__(
         self,
         prediction_window,
         strategy,
         *,
+        cadence=None,
+        start=None,
         event_time="start",
         missing_active_region="negative",
         include_metadata=False,
@@ -80,6 +94,7 @@ class ActiveRegionSingleImage(DatasetBuilder):
     ):
         super().__init__(
             prediction_window, strategy, target="active_region", event_time=event_time,
+            cadence=cadence, start=start,
             missing_active_region=missing_active_region, include_metadata=include_metadata,
             include_flares=include_flares, verbose=verbose,
         )

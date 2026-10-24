@@ -52,6 +52,11 @@ labels = builder.build("examples/data/full_disk_image_index.csv",
 The result is a pandas DataFrame with one row per image and a `label`
 column. The other three classes are used the same way.
 
+To use only some of the images, add `cadence`: `FullDiskSingleImage("24h",
+strategy, cadence="1h")` keeps one image per hour (from the first image, or
+from `start=`) and labels only those. The cadence must be a multiple of the
+time between your images.
+
 The window is `[t, t + w)`: a flare counts if it starts at the image time `t`
 or later, and before `t + w`. Use `event_time="peak"` to match the peak
 time instead.

@@ -11,7 +11,6 @@ from .events import (
     VALID_EVENT_TIMES,
 )
 
-_TIME_BASED_PARAM_NAMES = ("start", "cadence", "observation_window", "sliding_window")
 
 # Cap on how many skipped-sequence-starts / missing-timestamps a
 # SequenceBuildReport keeps verbatim, so a very long-running build doesn't
@@ -217,8 +216,9 @@ class DatasetBuilder:
         (row count and label counts or range). The returned table is the
         same either way.
 
-    Sequence parameters (giving any of them builds sequences instead of
-    single images)
+    Sequence parameters (observation_window or sliding_window builds
+    sequences; cadence and start alone thin out single images -- see
+    "Sequence mode selection")
     ----------------------------------------------------------------------
     start : pandas-compatible timestamp | None
         The first candidate sequence's starting timestamp. Inclusive: an
@@ -261,9 +261,12 @@ class DatasetBuilder:
 
     Sequence mode selection
     ----------------------------------------------------------------------
-    Supplying any of start/cadence/observation_window/sliding_window
-    builds sequences, in which cadence, observation_window, and
-    sliding_window are all required (start remains optional).
+    Supplying observation_window or sliding_window builds sequences, in
+    which cadence, observation_window, and sliding_window are all required
+    (start remains optional). cadence (and optionally start) without them
+    keeps single images, but only those at start, start + cadence,
+    start + 2 * cadence, ... (start defaults to the earliest image; for
+    target="active_region" all regions share this grid).
 
     Source cadence inference
     ----------------------------------------------------------------------
@@ -306,13 +309,12 @@ class DatasetBuilder:
         if event_time not in VALID_EVENT_TIMES:
             raise ValueError(f"event_time must be one of {sorted(VALID_EVENT_TIMES)}, got {event_time!r}")
 
-        time_based_given = [
-            name for name, value in zip(_TIME_BASED_PARAM_NAMES, (start, cadence, observation_window, sliding_window))
-            if value is not None
-        ]
+        # observation_window or sliding_window makes sequences; cadence (and
+        # start) alone thin out single images to a time grid.
+        sequence_given = observation_window is not None or sliding_window is not None
 
         reducer = getattr(strategy, "reducer", None)
-        if getattr(reducer, "single_image_only", False) and time_based_given:
+        if getattr(reducer, "single_image_only", False) and sequence_given:
             raise ValueError(
                 f"{type(reducer).__name__} labels single images only; "
                 "it cannot be used with sequence parameters."
@@ -331,7 +333,14 @@ class DatasetBuilder:
         if not isinstance(verbose, bool):
             raise ValueError(f"verbose must be True or False, got {verbose!r}")
         self.verbose = verbose
-        self.time_based = bool(time_based_given)
+        self.time_based = sequence_given
+        self.image_cadence = None
+
+        if not self.time_based and (cadence is not None or start is not None):
+            if cadence is None:
+                raise ValueError("start needs a cadence: it is the first point of the cadence grid.")
+            self.image_cadence = _parse_duration(cadence, "cadence")
+            self.start = _parse_timestamp_param(start, "start") if start is not None else None
 
         if self.time_based:
             missing_required = [
@@ -435,6 +444,9 @@ class DatasetBuilder:
         if self.verbose:
             self._print_inputs(index_df, image_index_path, matcher, event_catalog_path)
 
+        if self.image_cadence is not None:
+            index_df = self._images_on_cadence_grid(index_df, image_index_path)
+
         report = None
         if self.time_based:
             if self.target == "active_region":
@@ -464,6 +476,8 @@ class DatasetBuilder:
         if self.time_based:
             mode = (f"sequences of {self.number_of_images} images {_format_duration(self.cadence)} apart, "
                     f"new sequence every {_format_duration(self.sliding_window)}")
+        elif self.image_cadence is not None:
+            mode = f"single images every {_format_duration(self.image_cadence)}"
         else:
             mode = "single images"
         print(f"Settings: window [t, t + {_format_duration(self._window)}) on {self.event_time}_time, {target}, {mode}")
@@ -744,6 +758,20 @@ class DatasetBuilder:
             candidate_start = candidate_start + self.sliding_window
 
         return emitted, total_candidates, skipped_starts, missing_timestamps
+
+    def _images_on_cadence_grid(self, index_df: pd.DataFrame, path: Path) -> pd.DataFrame:
+        """
+        Single images with a cadence: keep only the images at start,
+        start + cadence, start + 2 * cadence, ... (start defaults to the
+        earliest image; all regions share one grid). The cadence must be a
+        multiple of the image index's own cadence, as for sequences.
+        """
+        timestamps = index_df["timestamp"]
+        _validate_requested_cadence(self.image_cadence, _infer_source_cadence(timestamps))
+        grid_start = self._validated_start(timestamps, path)
+        offset = timestamps - grid_start
+        on_grid = (offset >= pd.Timedelta(0)) & (offset % self.image_cadence == pd.Timedelta(0))
+        return index_df[on_grid].reset_index(drop=True)
 
     def _validated_start(self, timestamps: pd.Series, path: Path) -> pd.Timestamp:
         if self.start is None:

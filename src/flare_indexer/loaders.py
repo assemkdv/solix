@@ -61,19 +61,18 @@ class ImageIndexReport:
         involved in a duplicate timestamp, for inspection.
     final_row_count : row count of the returned DataFrame, after applying
         duplicate_policy.
-    duplicate_policy : the policy that was applied ("error" raises before a
-        report is ever produced, so this will only ever be "first" or
-        "last" on a report that was actually returned).
+    duplicate_policy : the duplicate_policy of the call. With "error" a
+        report is only returned when there were no duplicates.
     """
 
     total_input_rows: int
     valid_image_rows_before_dedup: int
     excluded_row_count: int
+    duplicate_policy: str
     excluded_rows: list = field(default_factory=list)
     duplicate_timestamp_count: int = 0
     duplicate_rows: list = field(default_factory=list)
     final_row_count: int = 0
-    duplicate_policy: str = "error"
 
 
 def _read_paths_file(path: Path) -> list[str]:

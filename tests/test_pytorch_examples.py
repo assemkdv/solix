@@ -221,6 +221,7 @@ def test_decoded_images_are_real_and_match_header_times():
 ])
 def test_pytorch_example_runs(script, expected, tmp_path):
     pytest.importorskip("torch")
+    pytest.importorskip("PIL")
     completed = subprocess.run(
         [sys.executable, str(EXAMPLES / script), "--output", str(tmp_path)],
         capture_output=True, text=True, timeout=300,

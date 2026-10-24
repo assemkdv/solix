@@ -35,6 +35,10 @@ GOES_CATALOG_RXFI_COLUMN = ("relative_X-ray_flux_increase", "rxfi")
 
 VALID_DUPLICATE_POLICIES = {"error", "first", "last"}
 
+# NOAA region numbers passed 9999 on this date (region 10000). Many flare
+# lists kept four digits, so a later region 13324 is written 3324.
+NOAA_FIVE_DIGIT_START = pd.Timestamp("2002-06-14")
+
 # Cap on how many excluded/duplicate rows a report keeps verbatim, so a
 # badly-formed multi-million-row file doesn't blow up memory just to report
 # on itself. Counts in the report are always exact regardless of this cap.
@@ -222,6 +226,13 @@ def adapt_goes_catalog(
     Each timestamp keeps its own complete date, so a flare that crosses
     midnight (start_time on one date, peak_time/end_time on the next) is
     written as it happened.
+
+    Four-digit region numbers of flares that start on or after 2002-06-14
+    get the leading 1 back (3324 -> 13324): NOAA's numbers passed 9999
+    that day, and many flare lists kept only four digits. If a row then
+    equals another row in start_time, peak_time, end_time, class and
+    active_region, it is the same flare listed twice and is dropped. A
+    warning gives both counts.
     """
     input_path = Path(input_path)
 
@@ -258,10 +269,39 @@ def adapt_goes_catalog(
     if source_rxfi in df.columns:
         adapted[rxfi] = df[source_rxfi]
 
+    adapted = _restore_five_digit_regions(adapted, input_path)
+
     if output_path is not None:
         adapted.to_csv(output_path, index=False)
 
     return adapted
+
+
+def _restore_five_digit_regions(catalog: pd.DataFrame, path: Path) -> pd.DataFrame:
+    """Add the leading 1 to four-digit regions after 2002-06-14 and drop the copies this creates."""
+    def is_four_digit(region):
+        return isinstance(region, str) and region.isdigit() and 1 <= int(region) <= 9999
+
+    fixed = catalog["active_region"].map(is_four_digit) & (catalog["start_time"] >= NOAA_FIVE_DIGIT_START)
+    if not fixed.any():
+        return catalog
+    catalog = catalog.copy()
+    catalog.loc[fixed, "active_region"] = catalog.loc[fixed, "active_region"].map(lambda r: str(int(r) + 10000))
+
+    # A fixed row that now equals an unfixed row (or an earlier fixed row)
+    # is the same flare listed twice; the other copy is kept.
+    keys = ["start_time", "peak_time", "end_time", "class", "active_region"]
+    order = fixed.astype(int).sort_values(kind="stable").index
+    copies = catalog.loc[order].duplicated(subset=keys, keep="first").reindex(catalog.index)
+    dropped = copies & fixed
+    warnings.warn(
+        f"{int(fixed.sum())} flare(s) in {path} starting on or after 2002-06-14 had a four-digit "
+        f"active_region and got the leading 1 back (e.g. 3324 -> 13324); {int(dropped.sum())} of them "
+        "then equaled another row (same start, peak, end, class and region) and were dropped as copies.",
+        UserWarning,
+        stacklevel=3,
+    )
+    return catalog[~dropped].reset_index(drop=True)
 
 
 # Flux values at or below this are treated as bad readings (rxfi_creator).

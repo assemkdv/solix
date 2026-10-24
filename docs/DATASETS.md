@@ -168,5 +168,9 @@ catalog = fidx.adapt_goes_catalog(
   or a text file with one per line) and writes the image index. The
   timestamp comes from the file name.
 - `adapt_goes_catalog` converts an integrated GOES flare catalog into the
-  catalog format above.
+  catalog format above. NOAA region numbers passed 9999 on 2002-06-14, and
+  many flare lists kept only four digits, so for flares from that day on
+  it adds the leading 1 back (3324 → 13324). A flare that is then listed
+  twice (same start, peak, end, class and region) is kept once. A warning
+  gives both counts.
 - `add_relative_flux` adds the `rxfi` column ([LABELS.md](LABELS.md#relative-x-ray-flux-rxf)).

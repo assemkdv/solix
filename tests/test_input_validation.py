@@ -265,7 +265,7 @@ def test_catalog_with_utc_offsets_is_converted_to_naive_utc(tmp_path):
 
 
 def test_adapted_goes_catalog_with_offsets_is_naive_utc_and_loadable(tmp_path):
-    goes = _write(tmp_path, "goes.csv", GOES_HEADER + "2024-01-01T10:00:00Z,2024-01-01T10:10:00Z,2024-01-01T10:30:00Z,M1.0,100\n")
+    goes = _write(tmp_path, "goes.csv", GOES_HEADER + "2024-01-01T10:00:00Z,2024-01-01T10:10:00Z,2024-01-01T10:30:00Z,M1.0,13100\n")
     output = tmp_path / "adapted.csv"
     adapted = adapt_goes_catalog(goes, output)
     assert adapted["start_time"].dt.tz is None

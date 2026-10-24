@@ -237,7 +237,7 @@ def test_adapt_goes_catalog_preserves_dates_crossing_midnight(tmp_path):
     source = _write_source_catalog(
         tmp_path,
         "start_time,peak_time,end_time,goes_class,noaa_active_region\n"
-        "2020-01-01 23:58:00,2020-01-02 00:04:00,2020-01-02 00:10:00,C1.0,4456.0\n",
+        "2020-01-01 23:58:00,2020-01-02 00:04:00,2020-01-02 00:10:00,C1.0,14456.0\n",
     )
 
     result = adapt_goes_catalog(source)
@@ -247,6 +247,55 @@ def test_adapt_goes_catalog_preserves_dates_crossing_midnight(tmp_path):
     assert row["peak_time"] == pd.Timestamp("2020-01-02 00:04:00")
     assert row["end_time"] == pd.Timestamp("2020-01-02 00:10:00")
     assert row["start_time"].date() != row["peak_time"].date()
+
+
+_REGION_HEADER = "start_time,peak_time,end_time,goes_class,noaa_active_region\n"
+
+
+def test_adapt_goes_catalog_adds_leading_one_after_june_2002(tmp_path):
+    source = _write_source_catalog(
+        tmp_path,
+        _REGION_HEADER
+        + "2001-04-02 21:32:00,2001-04-02 21:51:00,2001-04-02 22:03:00,X20,9393.0\n"   # real 4-digit region
+        + "2002-06-13 10:00:00,2002-06-13 10:10:00,2002-06-13 10:20:00,C1.0,9997.0\n"  # the day before
+        + "2002-06-14 00:00:00,2002-06-14 00:10:00,2002-06-14 00:20:00,C2.0,1.0\n"     # from that day on
+        + "2010-07-22 17:19:00,2010-07-22 17:23:00,2010-07-22 17:30:00,B3.8,1089.0\n"
+        + "2023-06-01 12:00:00,2023-06-01 12:10:00,2023-06-01 12:20:00,M1.0,13324.0\n"
+        + "2023-06-02 12:00:00,2023-06-02 12:10:00,2023-06-02 12:20:00,M2.0,\n",
+    )
+    with pytest.warns(UserWarning, match="2 flare\\(s\\) .* got the leading 1 back .* 0 of them"):
+        result = adapt_goes_catalog(source)
+    regions = result["active_region"].tolist()
+    assert regions[:5] == ["9393", "9997", "10001", "11089", "13324"] and pd.isna(regions[5])
+
+
+def test_adapt_goes_catalog_drops_the_copies_the_leading_one_creates(tmp_path):
+    source = _write_source_catalog(
+        tmp_path,
+        _REGION_HEADER
+        # The same flare twice, once with a four-digit number (rows 193/194 of the lab catalog).
+        + "2010-07-22 17:19:00,2010-07-22 17:23:00,2010-07-22 17:30:00,B3.8,1089.0\n"
+        + "2010-07-22 17:19:00,2010-07-22 17:23:00,2010-07-22 17:30:00,B3.8,11089.0\n"
+        # Same start and class, different peak: a different flare, kept.
+        + "2010-08-05 22:23:00,2010-08-05 22:27:00,2010-08-05 22:30:00,B5.7,1094.0\n"
+        + "2010-08-05 22:23:00,2010-08-05 22:29:00,2010-08-05 22:30:00,B5.7,11094.0\n"
+        # Same flare in two different regions: kept in both.
+        + "2010-12-12 18:43:00,2010-12-12 18:49:00,2010-12-12 18:54:00,B5.9,1133.0\n"
+        + "2010-12-12 18:43:00,2010-12-12 18:49:00,2010-12-12 18:54:00,B5.9,11135.0\n",
+    )
+    with pytest.warns(UserWarning, match="3 flare\\(s\\) .* 1 of them then equaled another row"):
+        result = adapt_goes_catalog(source)
+    assert result["active_region"].tolist() == ["11089", "11094", "11094", "11133", "11135"]
+    assert result["peak_time"].tolist()[1:3] == [pd.Timestamp("2010-08-05 22:27"), pd.Timestamp("2010-08-05 22:29")]
+
+
+def test_adapt_goes_catalog_without_four_digit_regions_does_not_warn(tmp_path, recwarn):
+    source = _write_source_catalog(
+        tmp_path,
+        _REGION_HEADER + "2010-05-01 01:39:00,2010-05-01 01:45:00,2010-05-01 01:51:00,C5.7,11067.0\n",
+    )
+    adapt_goes_catalog(source)
+    assert not [w for w in recwarn if "leading 1" in str(w.message)]
 
 
 def test_adapt_goes_catalog_includes_fl_lon_fl_lat_when_present(tmp_path):
@@ -293,7 +342,7 @@ def test_adapt_goes_catalog_single_digit_vs_multi_digit_active_region(tmp_path):
     source = _write_source_catalog(
         tmp_path,
         "start_time,peak_time,end_time,goes_class,noaa_active_region\n"
-        "2010-05-01 01:39:00,2010-05-01 01:45:00,2010-05-01 01:51:00,C5.7,7.0\n"
+        "2001-05-01 01:39:00,2001-05-01 01:45:00,2001-05-01 01:51:00,C5.7,7.0\n"
         "2010-05-02 01:39:00,2010-05-02 01:45:00,2010-05-02 01:51:00,M2.3,11067.0\n",
     )
 
@@ -342,7 +391,7 @@ def test_adapt_goes_catalog_output_is_directly_loadable_by_event_matcher(tmp_pat
     source = _write_source_catalog(
         tmp_path,
         "start_time,peak_time,end_time,goes_class,noaa_active_region\n"
-        "2020-01-01 23:58:00,2020-01-02 00:04:00,2020-01-02 00:10:00,M2.3,4456.0\n",
+        "2020-01-01 23:58:00,2020-01-02 00:04:00,2020-01-02 00:10:00,M2.3,14456.0\n",
     )
     catalog_path = tmp_path / "flare_catalog.csv"
     adapt_goes_catalog(source, output_path=catalog_path)

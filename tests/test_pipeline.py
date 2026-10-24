@@ -327,7 +327,7 @@ def test_full_disk_time_based_sequences_work_with_pipeline(tmp_path):
 def test_sequence_build_report_unaffected_by_strategy_vs_pipeline(tmp_path):
     # SequenceBuildReport is computed from candidate-timestamp generation
     # alone, independent of labeling -- confirm it's identical whether the
-    # strategy is the legacy BinaryThresholdStrategy or the equivalent pipeline.
+    # strategy is BinaryThresholdStrategy or the equivalent pipeline.
     index_path = tmp_path / "index.csv"
     pd.DataFrame({
         "timestamp": pd.date_range("2024-01-01T00:00:00", periods=10, freq="1h"),
@@ -335,7 +335,7 @@ def test_sequence_build_report_unaffected_by_strategy_vs_pipeline(tmp_path):
     empty_catalog = tmp_path / "catalog.csv"
     empty_catalog.write_text("start_time,peak_time,end_time,class,active_region\n")
 
-    _, legacy_report = DatasetBuilder(
+    _, strategy_report = DatasetBuilder(
         prediction_window=24, strategy=BinaryThresholdStrategy(),
         cadence="1h", observation_window="6h", sliding_window="3h",
     ).build(index_path, empty_catalog, return_report=True)
@@ -345,7 +345,7 @@ def test_sequence_build_report_unaffected_by_strategy_vs_pipeline(tmp_path):
         cadence="1h", observation_window="6h", sliding_window="3h",
     ).build(index_path, empty_catalog, return_report=True)
 
-    assert legacy_report == pipeline_report
+    assert strategy_report == pipeline_report
 
 
 def test_active_region_single_image_works_with_pipeline(tmp_path):
@@ -406,7 +406,7 @@ def test_extra_columns_preserved_with_pipeline(tmp_path):
 
 
 def test_binary_threshold_strategy_equivalent_to_pipeline():
-    legacy_result = DatasetBuilder(
+    strategy_result = DatasetBuilder(
         prediction_window=24, strategy=BinaryThresholdStrategy(threshold="M"),
     ).build(IMAGE_INDEX_PATH, CATALOG_PATH)
 
@@ -415,11 +415,11 @@ def test_binary_threshold_strategy_equivalent_to_pipeline():
         prediction_window=24, strategy=pipeline,
     ).build(IMAGE_INDEX_PATH, CATALOG_PATH)
 
-    pd.testing.assert_frame_equal(legacy_result, pipeline_result)
+    pd.testing.assert_frame_equal(strategy_result, pipeline_result)
 
 
 def test_max_flare_strategy_equivalent_to_pipeline():
-    legacy_result = DatasetBuilder(
+    strategy_result = DatasetBuilder(
         prediction_window=24, strategy=MaxFlareStrategy(),
     ).build(IMAGE_INDEX_PATH, CATALOG_PATH)
 
@@ -428,4 +428,4 @@ def test_max_flare_strategy_equivalent_to_pipeline():
         prediction_window=24, strategy=pipeline,
     ).build(IMAGE_INDEX_PATH, CATALOG_PATH)
 
-    pd.testing.assert_frame_equal(legacy_result, pipeline_result)
+    pd.testing.assert_frame_equal(strategy_result, pipeline_result)

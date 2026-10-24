@@ -15,8 +15,8 @@ def test_to_flux():
 
 def test_to_flux_numeric_ordering_not_lexical():
     # A lexical ("string") comparison of "M9.0" vs "M10.0" would incorrectly
-    # rank "M9.0" higher ('9' > '1' as characters) -- the legacy lab script
-    # has exactly this bug. FluxConverter must order them numerically:
+    # rank "M9.0" higher ('9' > '1' as characters). FluxConverter must
+    # order them numerically:
     # M10.0 (10x the M-class base) is stronger than M9.0 (9x), and in fact
     # exactly as strong as X1.0.
     converter = FluxConverter()

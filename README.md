@@ -78,6 +78,10 @@ The background is the mean of the flux values in the 24 hours before the
 flare's start that are above 1e-9 W/m², outside every catalog flare, and below
 the flux at the flare's start.
 
+Add `include_flares=True` to `DatasetBuilder` to get a `flares` column next to
+the label, listing the classes of the flares in each window
+(e.g. `["C2.0", "M1.0"]`), so any label can be checked by eye.
+
 A pipeline is a reducer (flares → one value) and a labeler (value → label).
 Any object with a `label(events)` method can be passed as `strategy`.
 

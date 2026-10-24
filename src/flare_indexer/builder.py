@@ -227,6 +227,11 @@ class DatasetBuilder:
         image-index column (e.g. image_path); for target="active_region"
         the normalized active_region is placed right before label, so
         several regions observed at the same timestamp stay distinguishable.
+    include_flares : bool
+        False (default) returns only the label. True adds a "flares" column
+        right after it: the GOES classes of the flares in each window, in
+        order of event time (e.g. ["C3.2", "M1.4"]; [] for an empty
+        window), so every label can be checked by eye. All modes.
 
     Row-based sequence parameters (mutually exclusive with the time-based
     ones below -- see "Sequence mode selection")
@@ -325,6 +330,7 @@ class DatasetBuilder:
         sliding_window=None,
         missing_active_region="negative",
         include_metadata=False,
+        include_flares=False,
     ):
         parsed_prediction_window = _parse_prediction_window(prediction_window)
         if missing_active_region not in VALID_MISSING_ACTIVE_REGION_POLICIES:
@@ -371,6 +377,9 @@ class DatasetBuilder:
         self.event_time = event_time
         self.missing_active_region = missing_active_region
         self.include_metadata = include_metadata
+        if not isinstance(include_flares, bool):
+            raise ValueError(f"include_flares must be True or False, got {include_flares!r}")
+        self.include_flares = include_flares
         self.time_based = bool(time_based_given)
 
         if self.time_based:
@@ -511,17 +520,16 @@ class DatasetBuilder:
 
     def _build_single_image(self, index_df: pd.DataFrame, matcher: EventMatcher, path: Path) -> pd.DataFrame:
         if self.include_metadata:
-            extra_columns = _extra_columns(index_df, ("timestamp",), ("label",), path)
+            extra_columns = _extra_columns(index_df, ("timestamp",), tuple(self._label_columns()), path)
         records = []
         for ts in index_df["timestamp"]:
             flares = matcher.query(
                 ts, self._window,
                 event_time=self.event_time,
             )
-            label = self.strategy.label(flares)
-            records.append({"timestamp": ts, "label": label})
+            records.append({"timestamp": ts, **self._label_fields(flares)})
 
-        columns = ["timestamp", "label"]
+        columns = ["timestamp"] + self._label_columns()
         if not records:
             result = pd.DataFrame(columns=columns)
         else:
@@ -535,13 +543,13 @@ class DatasetBuilder:
         self, index_df: pd.DataFrame, matcher: EventMatcher, path: Path,
     ) -> pd.DataFrame:
         if self.include_metadata:
-            extra_columns = _extra_columns(index_df, ("timestamp", "active_region"), ("label",), path)
+            extra_columns = _extra_columns(index_df, ("timestamp", "active_region"), tuple(self._label_columns()), path)
         else:
             extra_columns = []
         if self.include_metadata:
-            columns = ["timestamp", "active_region", "label"] + extra_columns
+            columns = ["timestamp", "active_region"] + self._label_columns() + extra_columns
         else:
-            columns = ["timestamp", "label"]
+            columns = ["timestamp"] + self._label_columns()
 
         records = []
         missing_rows = []
@@ -561,8 +569,7 @@ class DatasetBuilder:
                     ts, self._window, active_region=active_region,
                     event_time=self.event_time,
                 )
-            label = self.strategy.label(flares)
-            record = {"timestamp": ts, "active_region": active_region, "label": label}
+            record = {"timestamp": ts, "active_region": active_region, **self._label_fields(flares)}
             for col in extra_columns:
                 record[col] = index_df[col].iloc[position]
             records.append(record)
@@ -617,6 +624,19 @@ class DatasetBuilder:
                 UserWarning,
                 stacklevel=3,
             )
+
+    def _label_fields(self, flares: list) -> dict:
+        """The label of one window, plus its flare list when include_flares is on."""
+        fields = {"label": self.strategy.label(flares)}
+        if self.include_flares:
+            fields["flares"] = [flare.goes_class for flare in flares]
+        return fields
+
+    def _label_columns(self) -> list:
+        return ["label", "flares"] if self.include_flares else ["label"]
+
+    def _sequence_reserved(self) -> tuple:
+        return _SEQUENCE_OUTPUT_COLUMNS + (("flares",) if self.include_flares else ())
 
     def _warn_catalog_missing_event_time(self, matcher: EventMatcher, path) -> None:
         """
@@ -683,11 +703,11 @@ class DatasetBuilder:
 
     def _build_sequences(self, index_df: pd.DataFrame, matcher: EventMatcher, path: Path) -> pd.DataFrame:
         timestamps = index_df["timestamp"].tolist()
-        extra_columns = _extra_columns(index_df, ("timestamp",), _SEQUENCE_OUTPUT_COLUMNS, path)
+        extra_columns = _extra_columns(index_df, ("timestamp",), self._sequence_reserved(), path)
         n = len(timestamps)
         length = self.sequence_length
 
-        columns = ["sequence_start", "sequence_end", "timestamps", "n_images", "label"] + extra_columns
+        columns = ["sequence_start", "sequence_end", "timestamps", "n_images"] + self._label_columns() + extra_columns
 
         records = []
         start = 0
@@ -700,14 +720,12 @@ class DatasetBuilder:
                     sequence_end, self._window,
                     event_time=self.event_time,
                 )
-                label = self.strategy.label(flares)
-
                 record = {
                     "sequence_start": window[0],
                     "sequence_end": sequence_end,
                     "timestamps": list(window),
                     "n_images": len(window),
-                    "label": label,
+                    **self._label_fields(flares),
                 }
                 for col in extra_columns:
                     record[col] = index_df[col].iloc[start:start + length].tolist()
@@ -780,8 +798,8 @@ class DatasetBuilder:
         )
 
     def _build_sequences_active_region(self, index_df: pd.DataFrame, matcher: EventMatcher, path: Path) -> pd.DataFrame:
-        extra_columns = _extra_columns(index_df, ("timestamp", "active_region"), _SEQUENCE_OUTPUT_COLUMNS, path)
-        columns = ["sequence_start", "sequence_end", "timestamps", "n_images", "active_region", "label"] + extra_columns
+        extra_columns = _extra_columns(index_df, ("timestamp", "active_region"), self._sequence_reserved(), path)
+        columns = ["sequence_start", "sequence_end", "timestamps", "n_images", "active_region"] + self._label_columns() + extra_columns
         length = self.sequence_length
 
         records = []
@@ -802,7 +820,7 @@ class DatasetBuilder:
                         "timestamps": list(window),
                         "n_images": len(window),
                         "active_region": region,
-                        "label": self.strategy.label(flares),
+                        **self._label_fields(flares),
                     }
                     for col in extra_columns:
                         record[col] = rows[col].iloc[start:start + length].tolist()
@@ -903,9 +921,9 @@ class DatasetBuilder:
     def _build_time_based_sequences(
         self, index_df: pd.DataFrame, matcher: EventMatcher, path: Path,
     ) -> tuple[pd.DataFrame, SequenceBuildReport]:
-        extra_columns = _extra_columns(index_df, ("timestamp",), _SEQUENCE_OUTPUT_COLUMNS, path)
+        extra_columns = _extra_columns(index_df, ("timestamp",), self._sequence_reserved(), path)
         candidates, report = self._time_based_candidates(index_df, path)
-        columns = ["sequence_start", "sequence_end", "timestamps", "n_images", "label"] + extra_columns
+        columns = ["sequence_start", "sequence_end", "timestamps", "n_images"] + self._label_columns() + extra_columns
 
         records = []
         for window_timestamps, positions in candidates:
@@ -914,14 +932,12 @@ class DatasetBuilder:
                 sequence_end, self._window,
                 event_time=self.event_time,
             )
-            label = self.strategy.label(flares)
-
             record = {
                 "sequence_start": window_timestamps[0],
                 "sequence_end": sequence_end,
                 "timestamps": list(window_timestamps),
                 "n_images": len(window_timestamps),
-                "label": label,
+                **self._label_fields(flares),
             }
             for col in extra_columns:
                 record[col] = index_df[col].iloc[positions].tolist()
@@ -942,8 +958,8 @@ class DatasetBuilder:
         at the first grid point start + k * sliding_window (k >= 0) that is
         not before the region's first image, so all regions share one grid.
         """
-        extra_columns = _extra_columns(index_df, ("timestamp", "active_region"), _SEQUENCE_OUTPUT_COLUMNS, path)
-        columns = ["sequence_start", "sequence_end", "timestamps", "n_images", "active_region", "label"] + extra_columns
+        extra_columns = _extra_columns(index_df, ("timestamp", "active_region"), self._sequence_reserved(), path)
+        columns = ["sequence_start", "sequence_end", "timestamps", "n_images", "active_region"] + self._label_columns() + extra_columns
 
         groups = self._region_groups(index_df, path)
         for region, rows in groups:
@@ -982,7 +998,7 @@ class DatasetBuilder:
                     "timestamps": list(window_timestamps),
                     "n_images": len(window_timestamps),
                     "active_region": region,
-                    "label": self.strategy.label(flares),
+                    **self._label_fields(flares),
                 }
                 for col in extra_columns:
                     record[col] = index_df[col].iloc[positions].tolist()

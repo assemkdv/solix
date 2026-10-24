@@ -20,3 +20,4 @@ venv/
 # Example outputs and the images downloaded by examples/real_data/fetch_real_data.py
 examples/output/
 examples/real_data/images/
+docs/architecture/overview.png

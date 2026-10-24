@@ -16,7 +16,7 @@
 
 | Column | Needed |
 |---|---|
-| `start_time`, `peak_time`, `end_time` | full date and time, e.g. `2024-03-01 04:00:00` (a blank cell is allowed: that flare cannot match on that time, and the build warns) |
+| `start_time`, `peak_time`, `end_time` | full date and time, e.g. `2024-03-01 04:00:00` (a blank cell is allowed: that flare cannot match on that time, and the build warns when it is the time it matches on, start or peak) |
 | `class` | GOES class, e.g. `M1.4` |
 | `active_region` | the flare's NOAA region (blank if unknown) |
 | `rxfi` | only for the RXF labels ([LABELS.md](LABELS.md)) |
@@ -123,7 +123,8 @@ sequences = builder.build("image_index.csv", "flare_catalog.csv")
 - A sequence with a missing image is skipped; no nearby image is used in its
   place.
 - `cadence` may be coarser than the images (hourly sequences from 12-minute
-  images), not finer. `observation_window` must be a multiple of `cadence`.
+  images), not finer, and must be a multiple of the images' own spacing.
+  `observation_window` must be a multiple of `cadence`.
 - `sliding_window` may be smaller than `cadence`: from 12-minute images,
   `cadence="1h"` and `sliding_window="12min"` start a new hourly sequence
   every 12 minutes. It must be a multiple of the images' own spacing.

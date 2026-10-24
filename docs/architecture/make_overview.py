@@ -48,10 +48,10 @@ LAYERS = {
 BOXES = {
     # Raw data and hand-made CSVs, outside the package.
     "raw": ("Raw data (optional)",
-            ["HMI / SHARP file names", "GOES flare catalog", "GOES 1-min X-ray flux"], 2, 60.5, 24, 8, False),
+            ["HMI file names", "GOES flare catalog", "GOES 1-min X-ray flux"], 2, 60.5, 24, 8, False),
     "own": ("Or your own CSVs",
-            ["image index: timestamp,", "[active_region], [image_path]", "flare catalog: start, peak,",
-             "end, class, active_region"], 2, 38, 24, 10, False),
+            ["image index: timestamp,", "[active_region], [image_path]", "catalog: start_time, peak_time,",
+             "end_time, class, active_region"], 2, 38, 24, 10, False),
 
     # Input layer.
     "load_index": ("build_image_index_from_filenames", [], 33, 62.5, 26, 4, False),
@@ -83,7 +83,8 @@ BOXES = {
     "table": ("Labeled table (pandas DataFrame), one row per image or sequence",
               ["single images:  timestamp, [active_region], label     sequences:  sequence_start, sequence_end,"
                " timestamps, n_images, [active_region], label",
-               "optional:  flares (include_flares=True), image_path and other index columns (include_metadata=True)",
+               "optional:  flares (include_flares=True); image_path and other index columns (single images:"
+               " include_metadata=True; sequences: always)",
                "verbose=True prints a summary;  sequences can also return a SequenceBuildReport"],
               33, 4, 82, 7.8, False),
 }

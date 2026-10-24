@@ -6,4 +6,6 @@ prune src/flare_indexer.egg-info
 # partial downloads or byte code.
 prune examples/output
 prune examples/real_data/images
+# Local folders that are not part of the project.
+prune meetings
 global-exclude __pycache__ *.py[cod] *.part .DS_Store

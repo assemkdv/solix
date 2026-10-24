@@ -80,8 +80,9 @@ relative X-ray flux increase (RXF), or your own.
 
 Examples 01–05 use the synthetic data in `examples/data/`. Examples 06–11
 need `pip install ".[pytorch-examples]"` or `".[tensorflow-examples]"`.
-06–09 download about 10 MB of full-disk images; the active-region patches
-of 10–11 are in the repository. See
+06–09 need about 10 MB of full-disk images, downloaded once by
+`examples/real_data/fetch_real_data.py`; the active-region patches of
+10–11 are in the repository. See
 [examples/real_data/README.md](examples/real_data/README.md).
 
 ## Tests

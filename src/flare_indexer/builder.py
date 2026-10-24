@@ -223,6 +223,8 @@ class DatasetBuilder:
         self.target = target
         self.event_time = event_time
         self.missing_active_region = missing_active_region
+        if not isinstance(include_metadata, bool):
+            raise ValueError(f"include_metadata must be True or False, got {include_metadata!r}")
         self.include_metadata = include_metadata
         if not isinstance(include_flares, bool):
             raise ValueError(f"include_flares must be True or False, got {include_flares!r}")

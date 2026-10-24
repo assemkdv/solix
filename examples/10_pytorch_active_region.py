@@ -22,7 +22,7 @@ NOAA 12673 and HARP 7120 = NOAA 12675, hourly on 2017-09-03 (07:00 and
 08:00 have no records), and the HEK/SWPC GOES flare list for 2017-09-01 ..
 2017-09-06. The patches are in examples/real_data/sharp_patches/.
 
-Setup:  pip install torch pillow astropy
+Setup:  pip install ".[pytorch-examples]"           # torch, pillow, astropy
 Run:    python examples/10_pytorch_active_region.py
 """
 

@@ -21,8 +21,8 @@ Steps
    order of image paths, timestamps and labels against the label table, and
    every label recomputed from the catalog without flare_indexer.
 
-Setup:  pip install tensorflow pillow        # TensorFlow needs Python <= 3.13
-        python examples/real_data/fetch_real_data.py
+Setup:  pip install ".[tensorflow-examples]"        # TensorFlow needs Python <= 3.13
+        python examples/real_data/fetch_real_data.py     # downloads about 10 MB once
 Run:    python examples/08_tensorflow_images.py
 """
 

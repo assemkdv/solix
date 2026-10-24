@@ -8,16 +8,16 @@ from flare_indexer.events import EventMatcher
 
 def test_is_strong():
     checker = ThresholdChecker()
-    assert checker.is_strong("M2.3") == True
-    assert checker.is_strong("X1.0") == True
-    assert checker.is_strong("C4.0") == False
-    assert checker.is_strong("B1.0") == False
+    assert checker.is_strong("M2.3")
+    assert checker.is_strong("X1.0")
+    assert not checker.is_strong("C4.0")
+    assert not checker.is_strong("B1.0")
 
 
 def test_is_strong_custom_threshold():
     checker = ThresholdChecker()
-    assert checker.is_strong("C5.0", threshold="C") == True
-    assert checker.is_strong("B9.9", threshold="C") == False
+    assert checker.is_strong("C5.0", threshold="C")
+    assert not checker.is_strong("B9.9", threshold="C")
 
 
 def test_is_strong_invalid_goes_class_letter_raises():

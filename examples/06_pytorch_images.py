@@ -19,8 +19,8 @@ Data: 10 SDO/HMI magnetograms requested hourly on 2017-09-03 (9 available)
 and the HEK/SWPC GOES flare list for 2017-09-01 .. 2017-09-06. See
 examples/real_data/README.md.
 
-Setup:  pip install torch pillow
-        python examples/real_data/fetch_real_data.py     # downloads ~10 MB once
+Setup:  pip install ".[pytorch-examples]"           # torch, pillow, astropy
+        python examples/real_data/fetch_real_data.py     # downloads about 10 MB once
 Run:    python examples/06_pytorch_images.py
 """
 

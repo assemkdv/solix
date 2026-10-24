@@ -32,8 +32,8 @@ Steps
    image, and the label of every sequence recomputed from the catalog
    without flare_indexer.
 
-Setup:  pip install torch pillow
-        python examples/real_data/fetch_real_data.py     # downloads ~10 MB once
+Setup:  pip install ".[pytorch-examples]"           # torch, pillow, astropy
+        python examples/real_data/fetch_real_data.py     # downloads about 10 MB once
 Run:    python examples/07_pytorch_sequences.py
 """
 

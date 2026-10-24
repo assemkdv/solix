@@ -103,7 +103,9 @@ that are
 - outside every catalog flare, and
 - below the flux at the flare's start.
 
-**Missing minutes.** X-ray files have gaps where no value was recorded.
+### Missing minutes
+
+X-ray files have gaps where no value was recorded.
 Missing minutes are skipped, not filled in: the background is the mean of
 the minutes that exist. If none of the 24 hours remain, the flare gets no
 RXF and a warning says how many flares were left without one. To fill gaps

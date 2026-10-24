@@ -72,7 +72,7 @@ From the repository root:
 
 ```bash
 pip install -e ".[pytorch-examples]"           # torch, pillow, astropy
-python examples/real_data/fetch_real_data.py   # downloads the 9 images once (~9 MB)
+python examples/real_data/fetch_real_data.py   # downloads the 9 images once (about 10 MB)
 python examples/06_pytorch_images.py
 python examples/07_pytorch_sequences.py
 python examples/10_pytorch_active_region.py

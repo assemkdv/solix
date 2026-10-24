@@ -26,8 +26,8 @@ Steps
    image, batch shapes, order of paths and labels against the sequence
    table, and every label recomputed from the catalog without flare_indexer.
 
-Setup:  pip install tensorflow pillow        # TensorFlow needs Python <= 3.13
-        python examples/real_data/fetch_real_data.py
+Setup:  pip install ".[tensorflow-examples]"        # TensorFlow needs Python <= 3.13
+        python examples/real_data/fetch_real_data.py     # downloads about 10 MB once
 Run:    python examples/09_tensorflow_sequences.py
 """
 

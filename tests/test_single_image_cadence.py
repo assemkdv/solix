@@ -97,8 +97,9 @@ def test_start_must_be_an_image_time_and_needs_a_cadence(tmp_path):
 
 
 def test_relative_flux_labels_allow_cadence():
+    # cadence alone keeps single images, so the RXF labels stay allowed.
     pipeline = f.DatasetBuildingPipeline(f.MaxRelativeFluxReducer(), f.RegressionLabeler())
-    f.FullDiskSingleImage("24h", pipeline, cadence="1h")
+    assert not f.FullDiskSingleImage("24h", pipeline, cadence="1h").time_based
 
 
 def test_verbose_names_the_cadence(tmp_path, capsys):

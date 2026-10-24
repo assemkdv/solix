@@ -71,7 +71,7 @@ MAX_OFFSET = pd.Timedelta("60s")
 CATALOG_START = pd.Timestamp("2017-09-01 00:00:00")
 CATALOG_END = pd.Timestamp("2017-09-06 00:00:00")
 
-USER_AGENT = "flare-indexer-examples/0.2.1"
+USER_AGENT = "flare-indexer-examples"
 
 # Columns read from the image's own header; replay may rewrite these.
 HEADER_COLUMNS = (

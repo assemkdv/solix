@@ -88,3 +88,9 @@ def test_relative_flux_labels_stay_single_image_only(cls, grid):
         cls("24h", pipeline, **grid)
     f.FullDiskSingleImage("24h", pipeline)
     f.ActiveRegionSingleImage("24h", pipeline)
+
+
+@pytest.mark.parametrize("setting", ["include_metadata", "include_flares", "verbose"])
+def test_on_off_settings_must_be_true_or_false(setting):
+    with pytest.raises(ValueError, match=f"{setting} must be True or False"):
+        f.FullDiskSingleImage("24h", f.BinaryThresholdStrategy("M"), **{setting: "yes"})

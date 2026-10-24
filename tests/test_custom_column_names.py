@@ -18,6 +18,8 @@ ACTIVE_REGION = DATA / "active_region_image_index.csv"
 CATALOG = DATA / "flare_catalog.csv"
 XRAY = DATA / "xray_flux.csv"
 
+pytestmark = pytest.mark.skipif(not DATA.is_dir(), reason="examples/ not available (installed package)")
+
 INDEX_NAMES = {"timestamp": "obs_time", "active_region": "noaa_ar"}
 CATALOG_NAMES = {"start_time": "begin", "peak_time": "peak", "end_time": "end", "class": "goes_class",
                  "active_region": "noaa_ar"}

@@ -87,7 +87,7 @@ def main():
 
     # Headerless list of HMI file paths: mostly images,
     # plus one non-image path that a directory walk would also pick up.
-    listing = [f"/data/hmi_jpgs_512/{_hmi_path(t)[4:]}" for t in hours[:6]]
+    listing = [f"/data/hmi/{_hmi_path(t)[4:]}" for t in hours[:6]]
     listing.insert(3, "/data/notes/README.csv")
     (DATA_DIR / "hmi_image_list.txt").write_text("\n".join(listing) + "\n")
 

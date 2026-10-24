@@ -56,8 +56,6 @@ def test_load_catalog_does_not_print(tmp_path, capsys):
     assert captured.out == ""
 
 
-
-
 def test_load_catalog_parses_midnight(tmp_path):
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
@@ -68,8 +66,6 @@ def test_load_catalog_parses_midnight(tmp_path):
     matcher = EventMatcher(catalog_path)
 
     assert matcher._catalog.loc[0, "peak_time"] == pd.Timestamp("2024-01-23 00:00:00")
-
-
 
 
 def test_load_catalog_rejects_non_numeric_time(tmp_path):
@@ -157,7 +153,6 @@ def test_query_active_region_missing_catalog_active_region_does_not_match():
     )
 
     assert results == []
-
 
 
 def test_load_catalog_missing_one_required_column(tmp_path):
@@ -294,7 +289,6 @@ def test_load_catalog_full_timestamp_allows_equal_and_missing_times(tmp_path):
     assert catalog["goes_class"].tolist() == ["C3.0", "C1.0", "C2.0"]
     assert catalog["end_time"].isna().tolist() == [False, True, False]
     assert catalog["start_time"].isna().tolist() == [False, False, True]
-
 
 
 # ── event_time (start vs. peak matching) ────────────────────────────────

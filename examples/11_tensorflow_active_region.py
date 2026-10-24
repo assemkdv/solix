@@ -16,7 +16,7 @@ Steps
    every label recomputed from the catalog, region by region, without
    flare_indexer.
 
-Setup:  pip install tensorflow pillow astropy        # TensorFlow needs Python <= 3.13
+Setup:  pip install ".[tensorflow-examples]"        # TensorFlow needs Python <= 3.13
 Run:    python examples/11_tensorflow_active_region.py
 """
 

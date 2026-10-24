@@ -167,20 +167,3 @@ class FluxConverter:
         raise ValueError(f"FluxConverter.to_class got a positive flux {value!r} W/m^2 below the A-class "
                          f"boundary {self.FLUX_MAP['A']!r} W/m^2; the GOES scale has no class for it.")
 
-
-class ThresholdChecker:
-    """
-    Checks whether a flare reaches a threshold GOES class, by comparing
-    fluxes (FluxConverter), not class text.
-    """
-
-    def __init__(self):
-        self._flux_converter = FluxConverter()
-
-    def is_strong(self, goes_class: str, threshold: str = "M") -> bool:
-        """
-        Returns True if the flare meets or exceeds the threshold class.
-
-        Example: is_strong("M2.3") → True, is_strong("C4") → False
-        """
-        return self._flux_converter.to_flux(goes_class) >= self._flux_converter.FLUX_MAP[threshold]

@@ -36,13 +36,12 @@ def test_equivalent_class_text_gives_identical_flux(text, equivalent):
 
 
 def test_binary_m_threshold_at_c10_and_adjacent_floats():
-    from flare_indexer import BinaryThresholdLabeler, ThresholdChecker
+    from flare_indexer import BinaryThresholdLabeler
 
     converter = FluxConverter()
     labeler = BinaryThresholdLabeler("M")
     assert converter.to_flux("C10.0") == 1e-05
     assert labeler.assign(converter.to_flux("C10.0")) == 1
-    assert ThresholdChecker().is_strong("C10.0", "M")
     # The threshold comparison itself stays exact, with no tolerance.
     assert labeler.assign(math.nextafter(1e-05, 0.0)) == 0
     assert labeler.assign(math.nextafter(1e-05, math.inf)) == 1

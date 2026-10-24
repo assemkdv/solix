@@ -16,7 +16,7 @@ def test_query_normalizes_missing_active_region_to_none():
 
     results = matcher.query(
         image_time=pd.Timestamp("2024-01-01 00:00"),
-        prediction_window_hours=1,
+        prediction_window=1,
     )
 
     assert results[0].active_region is None
@@ -36,7 +36,7 @@ def test_query_preserves_non_empty_active_region():
 
     results = matcher.query(
         image_time=pd.Timestamp("2024-01-01 00:00"),
-        prediction_window_hours=1,
+        prediction_window=1,
     )
 
     assert results[0].active_region == "4456"
@@ -92,7 +92,7 @@ def test_query_active_region_same_region_flare_included():
 
     results = matcher.query(
         image_time=pd.Timestamp("2024-01-01 00:00"),
-        prediction_window_hours=1,
+        prediction_window=1,
         active_region="3559",
     )
 
@@ -111,7 +111,7 @@ def test_query_active_region_different_region_flare_ignored():
 
     results = matcher.query(
         image_time=pd.Timestamp("2024-01-01 00:00"),
-        prediction_window_hours=1,
+        prediction_window=1,
         active_region="3559",
     )
 
@@ -129,7 +129,7 @@ def test_query_active_region_stronger_flare_from_other_region_ignored():
 
     results = matcher.query(
         image_time=pd.Timestamp("2024-01-01 00:00"),
-        prediction_window_hours=1,
+        prediction_window=1,
         active_region="3559",
     )
 
@@ -148,7 +148,7 @@ def test_query_active_region_missing_catalog_active_region_does_not_match():
 
     results = matcher.query(
         image_time=pd.Timestamp("2024-01-01 00:00"),
-        prediction_window_hours=1,
+        prediction_window=1,
         active_region="3559",
     )
 
@@ -201,7 +201,7 @@ def test_load_catalog_header_only_is_valid_and_empty(tmp_path):
     catalog_path.write_text("start_time,peak_time,end_time,class,active_region\n")
 
     matcher = EventMatcher(catalog_path)
-    results = matcher.query(pd.Timestamp("2024-01-01"), prediction_window_hours=24)
+    results = matcher.query(pd.Timestamp("2024-01-01"), prediction_window=24)
 
     assert results == []
 
@@ -244,7 +244,7 @@ def test_load_catalog_preserves_dates_crossing_midnight(tmp_path):
     assert row["end_time"].date() == pd.Timestamp("2020-01-02").date()
 
     results = matcher.query(
-        pd.Timestamp("2020-01-01 23:00:00"), prediction_window_hours=2, event_time="start"
+        pd.Timestamp("2020-01-01 23:00:00"), prediction_window=2, event_time="start"
     )
     assert len(results) == 1
     assert results[0].start_time == pd.Timestamp("2020-01-01 23:58:00")
@@ -305,7 +305,7 @@ def test_event_time_defaults_to_start():
 
     # Window [00:00, 00:45) catches the flare by start_time (00:30) but not
     # by peak_time (01:00) -- the default (start) includes it.
-    results = matcher.query(pd.Timestamp("2024-01-01 00:00"), prediction_window_hours=0.75)
+    results = matcher.query(pd.Timestamp("2024-01-01 00:00"), prediction_window=0.75)
     assert len(results) == 1
 
 
@@ -319,8 +319,8 @@ def test_event_time_start_vs_peak_produce_different_results():
     })
     window_start = pd.Timestamp("2024-01-01 00:00")
 
-    peak_results = matcher.query(window_start, prediction_window_hours=0.75, event_time="peak")
-    start_results = matcher.query(window_start, prediction_window_hours=0.75, event_time="start")
+    peak_results = matcher.query(window_start, prediction_window=0.75, event_time="peak")
+    start_results = matcher.query(window_start, prediction_window=0.75, event_time="start")
 
     assert peak_results == []
     assert len(start_results) == 1
@@ -337,7 +337,7 @@ def test_event_time_invalid_value_raises():
     })
 
     with pytest.raises(ValueError) as excinfo:
-        matcher.query(pd.Timestamp("2024-01-01 00:00"), prediction_window_hours=1, event_time="end")
+        matcher.query(pd.Timestamp("2024-01-01 00:00"), prediction_window=1, event_time="end")
 
     assert "event_time" in str(excinfo.value)
 
@@ -370,7 +370,7 @@ def test_window_includes_t_and_excludes_window_end():
     matcher = _boundary_matcher()
     window_start = pd.Timestamp("2024-01-01 00:00:00")
 
-    results = matcher.query(window_start, prediction_window_hours=1)
+    results = matcher.query(window_start, prediction_window=1)
     peak_times = sorted(r.peak_time for r in results)
 
     # [t, t+1h): includes t itself and t+1h-1s, excludes t+1h exactly.
@@ -402,7 +402,7 @@ def test_query_returns_flares_within_window():
     # Query with a 1-hour prediction window starting at midnight
     results = matcher.query(
         image_time=pd.Timestamp("2024-01-01 00:00"),
-        prediction_window_hours=1,
+        prediction_window=1,
     )
 
     # Should find 2 flares (M2.3 and C4.5) — X1.0 is outside the window

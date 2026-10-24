@@ -386,7 +386,7 @@ def test_adapt_goes_catalog_output_is_directly_loadable_by_event_matcher(tmp_pat
 
     matcher = EventMatcher(catalog_path)
     results = matcher.query(
-        pd.Timestamp("2020-01-01 23:00:00"), prediction_window_hours=2, event_time="start"
+        pd.Timestamp("2020-01-01 23:00:00"), prediction_window=2, event_time="start"
     )
 
     assert len(results) == 1

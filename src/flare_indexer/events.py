@@ -375,7 +375,7 @@ class EventMatcher:
     def query(
         self,
         image_time: pd.Timestamp,
-        prediction_window_hours: int,
+        prediction_window,
         active_region: str | None = None,
         event_time: str = "start",
     ) -> list[FlareEvent]:
@@ -392,7 +392,7 @@ class EventMatcher:
         includes image_time itself and excludes the window end, so a 24 h
         window means "less than 24 hours after the image".
 
-        prediction_window_hours is either a number of hours (e.g. 24) or a
+        prediction_window is either a number of hours (e.g. 24) or a
         pandas-compatible duration (e.g. "23h59min59s", pd.Timedelta).
 
         Example: image taken at 10:00, window = 24 hours, defaults
@@ -430,7 +430,7 @@ class EventMatcher:
             active_region = normalized_query_ar
 
         image_time = _to_naive_utc(image_time)
-        window_end = image_time + _parse_prediction_window(prediction_window_hours)
+        window_end = image_time + _parse_prediction_window(prediction_window)
 
         sorted_values, sort_positions = self._sorted_view(event_time)
         image_time_np = np.datetime64(image_time)

@@ -87,6 +87,13 @@ def test_cadence_must_fit_the_images(tmp_path, cadence, message):
         f.FullDiskSingleImage("1h", f.BinaryThresholdStrategy("M"), cadence=cadence).build(index, catalog)
 
 
+@pytest.mark.parametrize("times", [["2024-01-01 01:00:00"], []], ids=["one image", "no images"])
+def test_one_image_or_none_with_a_cadence(tmp_path, times):
+    index, catalog = _files(tmp_path, times)
+    result = f.FullDiskSingleImage("1h", f.BinaryThresholdStrategy("M"), cadence="1h").build(index, catalog)
+    assert result["label"].tolist() == [1] * len(times)
+
+
 def test_start_must_be_an_image_time_and_needs_a_cadence(tmp_path):
     index, catalog = _files(tmp_path, _every(12, 20))
     with pytest.raises(ValueError, match="no exact matching image timestamp"):

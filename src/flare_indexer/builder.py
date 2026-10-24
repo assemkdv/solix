@@ -689,7 +689,8 @@ class DatasetBuilder:
         multiple of the image index's own cadence, as for sequences.
         """
         timestamps = index_df["timestamp"]
-        _validate_requested_cadence(self.image_cadence, _infer_source_cadence(timestamps))
+        if timestamps.nunique() >= 2:   # one image (or none) has no cadence to check against
+            _validate_requested_cadence(self.image_cadence, _infer_source_cadence(timestamps))
         grid_start = self._validated_start(timestamps, path)
         offset = timestamps - grid_start
         on_grid = (offset >= pd.Timedelta(0)) & (offset % self.image_cadence == pd.Timedelta(0))

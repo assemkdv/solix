@@ -382,7 +382,8 @@ class DatasetBuilder:
         Build a labeled dataset.
 
         Single images (no sequence parameters): returns a DataFrame with
-        columns (timestamp, label). An image index with a header row but
+        columns (timestamp, label) -- or, when target="active_region",
+        (timestamp, active_region, label). An image index with a header row but
         zero data rows is valid and produces an empty result with the same
         columns.
 

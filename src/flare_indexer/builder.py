@@ -6,7 +6,7 @@ import pandas as pd
 from dataclasses import dataclass, field
 from pathlib import Path
 from .events import (
-    EventMatcher, _normalize_active_region, _parse_prediction_window, _parse_time_text_column,
+    EventMatcher, _none_for_missing, _normalize_active_region, _parse_prediction_window, _parse_time_text_column,
     _reject_unitless_duration_text, _rename_columns, _to_naive_utc,
     IMAGE_INDEX_COLUMNS, VALID_EVENT_TIMES,
 )
@@ -39,10 +39,10 @@ class SequenceBuildReport:
         candidate start timestamps that were skipped.
     missing_timestamps : up to the first `_MAX_SEQUENCE_REPORT_SAMPLES`
         specific timestamps that were missing and caused a skip.
-    skipped_sequence_regions : target="active_region" only -- the region
+    skipped_sequence_regions : ActiveRegionSequence only -- the region
         of each entry in skipped_sequence_starts (None for the group of
         images without a region); empty for full-disk builds.
-    region_count : target="active_region" only -- how many region groups
+    region_count : ActiveRegionSequence only -- how many region groups
         sequences were built for (the missing-region group counts as one);
         None for full-disk builds.
     """
@@ -293,14 +293,14 @@ class DatasetBuilder:
         Build a labeled dataset.
 
         Single images (no sequence parameters): returns a DataFrame with
-        columns (timestamp, label) -- or, when target="active_region",
+        columns (timestamp, label) -- or, for active regions,
         (timestamp, active_region, label). An image index with a header row but
         zero data rows is valid and produces an empty result with the same
         columns.
 
         Sequences (see the class docstring): returns one row per sequence
         with columns (sequence_start, sequence_end, timestamps, n_images,
-        label) -- or, when target="active_region", (sequence_start,
+        label) -- or, for active regions, (sequence_start,
         sequence_end, timestamps, n_images, active_region, label) -- plus
         one list-column per other image-index column (e.g. an image path),
         holding that column's values for each image in the sequence.
@@ -327,6 +327,8 @@ class DatasetBuilder:
         use, two columns mapped to one name, or a target that already
         exists raises ValueError.
         """
+        if not isinstance(return_report, bool):
+            raise ValueError(f"return_report must be True or False, got {return_report!r}")
         if return_report and not self.time_based:
             raise ValueError(
                 "return_report=True is only supported for sequences "
@@ -353,7 +355,7 @@ class DatasetBuilder:
         if self.target == "active_region" and "active_region" not in index_df.columns:
             raise ValueError(
                 f"Image index at {image_index_path} is missing required column: "
-                "active_region (required when target='active_region')"
+                "active_region (required for active-region labels)"
             )
 
         index_df = index_df.reset_index(drop=True)
@@ -454,7 +456,7 @@ class DatasetBuilder:
                 # anything -- skip the query entirely rather than falling
                 # back to full-disk matching. What happens to the row is
                 # governed by missing_active_region.
-                missing_rows.append(f"row {position} ({ts})")
+                missing_rows.append(f"data row {index_df.index[position] + 1} ({ts})")
                 if self.missing_active_region == "drop":
                     continue
                 flares = []
@@ -472,7 +474,7 @@ class DatasetBuilder:
 
         if not records:
             return pd.DataFrame(columns=columns)
-        return pd.DataFrame(records)[columns]
+        return _missing_regions_as_none(pd.DataFrame(records)[columns])
 
     def _report_missing_active_regions(self, missing: list, unit: str) -> None:
         if not missing:
@@ -541,8 +543,6 @@ class DatasetBuilder:
         """
         catalog = matcher._catalog
         column = "start_time" if self.event_time == "start" else "peak_time"
-        if catalog.empty or column not in catalog.columns:
-            return
         missing = int(catalog[column].isna().sum())
         if missing:
             warnings.warn(
@@ -555,13 +555,11 @@ class DatasetBuilder:
 
     def _warn_catalog_missing_active_region(self, matcher: EventMatcher, path) -> None:
         catalog = matcher._catalog
-        if "active_region" not in catalog.columns or catalog.empty:
-            return
         missing = int(catalog["active_region"].apply(_normalize_active_region).isna().sum())
         if missing:
             warnings.warn(
                 f"{missing} of {len(catalog)} flare(s) in the catalog at {path} have no "
-                "active_region. With target='active_region' they can never match any image, "
+                "active_region. In active-region labels they can never match any image, "
                 "so a region that produced one of them may be labeled negative.",
                 UserWarning,
                 stacklevel=3,
@@ -592,7 +590,7 @@ class DatasetBuilder:
         missing = regions.isna()
         if missing.any() and self.missing_active_region == "error":
             examples = ", ".join(
-                f"row {i} ({index_df['timestamp'].iloc[i]})" for i in index_df.index[missing][:5]
+                f"data row {i + 1} ({index_df['timestamp'].loc[i]})" for i in index_df.index[missing][:5]
             )
             raise ValueError(
                 f"{int(missing.sum())} image(s) in {path} have a missing active_region "
@@ -694,7 +692,7 @@ class DatasetBuilder:
         grid_start = self._validated_start(timestamps, path)
         offset = timestamps - grid_start
         on_grid = (offset >= pd.Timedelta(0)) & (offset % self.image_cadence == pd.Timedelta(0))
-        return index_df[on_grid].reset_index(drop=True)
+        return index_df[on_grid]   # the index keeps each image's row in the file, for messages
 
     def _validated_start(self, timestamps: pd.Series, path: Path) -> pd.Timestamp:
         if self.start is None:
@@ -786,6 +784,12 @@ class DatasetBuilder:
 
         groups = self._region_groups(index_df, path)
         for region, rows in groups:
+            if region is None and rows["timestamp"].duplicated().any():
+                raise ValueError(
+                    f"Image index at {path} has several images without an active_region at the same time "
+                    f"(e.g. {rows['timestamp'][rows['timestamp'].duplicated()].iloc[0]}). They cannot form one "
+                    "sequence; pass missing_active_region='drop' to leave them out, or fill in active_region."
+                )
             self._validate_unique_timestamps(rows["timestamp"], path, self._group_name(region))
 
         inferred_cadence = _infer_source_cadence(index_df["timestamp"])
@@ -899,4 +903,9 @@ def _sequence_frame(records: list, columns: list) -> pd.DataFrame:
         range(len(records)),
         key=lambda i: (records[i]["sequence_start"], records[i]["active_region"] is None, records[i]["active_region"] or ""),
     )
-    return frame.iloc[order].reset_index(drop=True)
+    return _missing_regions_as_none(frame.iloc[order].reset_index(drop=True))
+
+
+def _missing_regions_as_none(frame: pd.DataFrame) -> pd.DataFrame:
+    frame["active_region"] = _none_for_missing(frame["active_region"])
+    return frame

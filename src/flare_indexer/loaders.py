@@ -10,7 +10,7 @@ import pandas as pd
 
 from .goes_class import FluxConverter, validate_goes_class_column
 from .events import (
-    _normalize_active_region, _parse_full_timestamp_column, _rename_columns, _validate_time_order,
+    _none_for_missing, _normalize_active_region, _parse_full_timestamp_column, _rename_columns, _validate_time_order,
     CATALOG_COLUMNS, XRAY_FLUX_COLUMNS,
 )
 
@@ -114,6 +114,9 @@ def build_image_index_from_filenames(
     `image_path` column preserving the original path. If return_report is
     True, instead returns (DataFrame, ImageIndexReport).
     """
+    for name, value in (("strict", strict), ("return_report", return_report)):
+        if not isinstance(value, bool):
+            raise ValueError(f"{name} must be True or False, got {value!r}")
     if duplicate_policy not in VALID_DUPLICATE_POLICIES:
         raise ValueError(
             f"duplicate_policy must be one of {sorted(VALID_DUPLICATE_POLICIES)}, "
@@ -123,7 +126,8 @@ def build_image_index_from_filenames(
     if isinstance(paths, (str, Path)):
         paths = _read_paths_file(Path(paths))
     else:
-        paths = list(paths)
+        # Same rules as for a file: surrounding spaces removed, blank items skipped.
+        paths = [str(path).strip() for path in paths if str(path).strip()]
 
     total_input_rows = len(paths)
     records = []
@@ -250,7 +254,7 @@ def adapt_goes_catalog(
         "peak_time": _parse_full_timestamp_column(df, "peak_time", input_path, what="GOES catalog"),
         "end_time": _parse_full_timestamp_column(df, "end_time", input_path, what="GOES catalog"),
         "class": df["goes_class"],
-        "active_region": df["noaa_active_region"].apply(_normalize_active_region),
+        "active_region": _none_for_missing(df["noaa_active_region"].map(_normalize_active_region)),
     })
 
     for optional_column in GOES_CATALOG_OPTIONAL_COLUMNS:
@@ -269,7 +273,7 @@ def adapt_goes_catalog(
 
 
 def _restore_five_digit_regions(catalog: pd.DataFrame, path: Path) -> pd.DataFrame:
-    """Add the leading 1 to four-digit regions after 2002-06-14 and drop the copies this creates."""
+    """Add the leading 1 to four-digit regions after 2002-06-14 and drop fixed rows that then equal another row."""
     def is_four_digit(region):
         return isinstance(region, str) and region.isdigit() and 1 <= int(region) <= 9999
 
@@ -292,7 +296,9 @@ def _restore_five_digit_regions(catalog: pd.DataFrame, path: Path) -> pd.DataFra
         UserWarning,
         stacklevel=3,
     )
-    return catalog[~dropped].reset_index(drop=True)
+    catalog = catalog[~dropped].reset_index(drop=True)
+    catalog["active_region"] = _none_for_missing(catalog["active_region"])
+    return catalog
 
 
 # Flux values at or below this are treated as bad readings.
@@ -322,7 +328,7 @@ def add_relative_flux(
 
     1. flux values at or below 1e-9 W/m^2 are dropped;
     2. every minute from start_time to end_time of any catalog flare is
-       dropped;
+       dropped (a flare with a blank start_time or end_time is skipped here);
     3. of the minutes from start_time - 24 h to start_time (both
        included), only values below the flux at start_time are kept;
     4. the background is the mean of the kept values.

@@ -57,7 +57,7 @@ def validate_goes_class_column(values: pd.Series, source, column: str = "class")
     """
     Check every value of a catalog's GOES class column, raising one
     InvalidGOESClassError that counts all bad rows and lists the first few
-    (row number in the file, counting the header as line 1, and value).
+    (data row, where row 1 is the first row after the header, and value).
     """
     invalid = []
     for position, value in enumerate(values):
@@ -68,7 +68,7 @@ def validate_goes_class_column(values: pd.Series, source, column: str = "class")
     if not invalid:
         return
     examples = ", ".join(
-        f"line {position + 2}: {'<missing>' if not isinstance(value, str) and pd.isna(value) else repr(value)}"
+        f"data row {position + 1}: {'<missing>' if not isinstance(value, str) and pd.isna(value) else repr(value)}"
         for position, value in invalid[:_MAX_INVALID_EXAMPLES]
     )
     more = ", ..." if len(invalid) > _MAX_INVALID_EXAMPLES else ""

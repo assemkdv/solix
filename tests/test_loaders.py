@@ -391,3 +391,24 @@ def test_adapt_goes_catalog_output_is_directly_loadable_by_event_matcher(tmp_pat
 
     assert len(results) == 1
     assert results[0].peak_time == pd.Timestamp("2020-01-02 00:04:00")
+
+
+def test_a_list_of_paths_follows_the_file_rules(tmp_path):
+    listed = ["", "  ", " HMI.m2010.12.21_21.00.00.jpg "]
+    text = tmp_path / "paths.txt"
+    text.write_text("\n".join(listed) + "\n")
+    from_list, report = build_image_index_from_filenames(listed, return_report=True)
+    from_file = build_image_index_from_filenames(text)
+    pd.testing.assert_frame_equal(from_list, from_file)
+    assert report.total_input_rows == 1 and report.excluded_row_count == 0
+
+
+def test_adapted_catalog_gives_none_for_a_missing_region(tmp_path):
+    source = tmp_path / "goes.csv"
+    source.write_text(
+        "start_time,peak_time,end_time,goes_class,noaa_active_region\n"
+        "2010-01-01 01:00:00,2010-01-01 01:10:00,2010-01-01 01:20:00,C1.0,11000\n"
+        "2010-01-01 02:00:00,2010-01-01 02:10:00,2010-01-01 02:20:00,C2.0,\n"
+    )
+    assert adapt_goes_catalog(source)["active_region"].tolist() == ["11000", None]
+

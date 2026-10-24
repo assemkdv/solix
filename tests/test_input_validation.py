@@ -15,6 +15,7 @@ from flare_indexer import (
     EventMatcher,
     MaxFluxReducer,
     adapt_goes_catalog,
+    build_image_index_from_filenames,
 )
 from flare_indexer.events import _normalize_active_region, _parse_prediction_window
 from flare_indexer.builder import DatasetBuilder
@@ -524,3 +525,21 @@ def test_binary_labeler_rejects_non_finite_values(value):
 def test_a_strategy_without_label_is_rejected_clearly(strategy):
     with pytest.raises(TypeError, match="must have a label\\(flares\\) method.*DatasetBuildingPipeline"):
         DatasetBuilder(prediction_window=24, strategy=strategy)
+
+
+def test_numpy_timedelta_is_a_valid_prediction_window():
+    assert _parse_prediction_window(np.timedelta64(24, "h")) == pd.Timedelta("24h")
+    assert _parse_prediction_window(np.timedelta64(1, "D")) == pd.Timedelta("24h")
+
+
+@pytest.mark.parametrize("value", ["no", 0, None])
+def test_yes_no_settings_must_be_true_or_false(tmp_path, value):
+    index = _write(tmp_path, "index.csv", "timestamp\n2024-01-01 09:00:00\n2024-01-01 10:00:00\n")
+    catalog = _write(tmp_path, "catalog.csv", CATALOG_HEADER + FLARE_ROW)
+    sequences = DatasetBuilder(24, BinaryThresholdStrategy(), cadence="1h", observation_window="1h", sliding_window="1h")
+    with pytest.raises(ValueError, match="return_report must be True or False"):
+        sequences.build(index, catalog, return_report=value)
+    for name in ("strict", "return_report"):
+        with pytest.raises(ValueError, match=f"{name} must be True or False"):
+            build_image_index_from_filenames(["HMI.m2010.12.21_21.00.00.jpg"], **{name: value})
+

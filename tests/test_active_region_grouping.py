@@ -144,7 +144,7 @@ def test_missing_region_rows_never_join_a_region_sequence(tmp_path, catalog):
 
 def test_several_unknown_patches_at_one_time_need_drop(tmp_path, catalog):
     index = _hourly_index(tmp_path, {0: [100, None, None], 1: [100, None, None], 2: [100, None, None]})
-    with pytest.raises(ValueError, match="within rows with a missing active_region"):
+    with pytest.raises(ValueError, match="several images without an active_region at the same time.*missing_active_region='drop'"):
         _build(index, catalog, **TIME_BASED)
     dropped = _build(index, catalog, missing_active_region="drop", **TIME_BASED)
     assert dropped["active_region"].tolist() == ["100"]
@@ -152,7 +152,7 @@ def test_several_unknown_patches_at_one_time_need_drop(tmp_path, catalog):
 
 def test_missing_region_error_policy_names_rows(tmp_path, catalog):
     index = _hourly_index(tmp_path, {0: [100], 1: [100, None], 2: [100]})
-    with pytest.raises(ValueError, match="1 image\\(s\\) in .* have a missing active_region \\(e.g. row 2"):
+    with pytest.raises(ValueError, match="1 image\\(s\\) in .* have a missing active_region \\(e.g. data row 3 "):
         _build(index, catalog, missing_active_region="error", **TIME_BASED)
 
 

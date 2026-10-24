@@ -278,3 +278,34 @@ def test_label_column_in_index_is_fine_without_metadata(tmp_path, ar_catalog):
     index_path = _write(tmp_path / "index.csv", "timestamp,label\n2024-01-01 00:00:00,x\n")
     result = DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy()).build(index_path, ar_catalog)
     assert result["label"].tolist() == [1]
+
+
+# ── Missing regions: None in the output, file row numbers in messages ────
+
+def _region_files(tmp_path, regions):
+    index = tmp_path / "index.csv"
+    pd.DataFrame({"timestamp": pd.date_range("2024-01-01", periods=len(regions), freq="1h"),
+                  "active_region": regions}).to_csv(index, index=False)
+    catalog = tmp_path / "catalog.csv"
+    catalog.write_text("start_time,peak_time,end_time,class,active_region\n"
+                       "2024-01-01 00:30:00,2024-01-01 00:40:00,2024-01-01 00:50:00,M1.0,100\n")
+    return index, catalog
+
+
+@pytest.mark.filterwarnings("ignore:.*missing active_region:UserWarning")
+@pytest.mark.parametrize("sequences", [False, True], ids=["single images", "sequences"])
+def test_a_missing_region_is_none_on_every_pandas_version(tmp_path, sequences):
+    index, catalog = _region_files(tmp_path, [100, None, 100])
+    settings = dict(cadence="1h", observation_window="1h", sliding_window="1h") if sequences else {}
+    result = DatasetBuilder(24, BinaryThresholdStrategy(), target="active_region", **settings).build(index, catalog)
+    assert result["active_region"].tolist() == ["100", None, "100"]
+
+
+def test_missing_region_message_gives_the_row_in_the_file_after_cadence(tmp_path):
+    # Data row 5 (04:00) has no region; cadence 2h keeps rows 1, 3 and 5.
+    index, catalog = _region_files(tmp_path, [100, 100, 100, 100, None])
+    builder = DatasetBuilder(24, BinaryThresholdStrategy(), target="active_region", cadence="2h",
+                             missing_active_region="error")
+    with pytest.raises(ValueError, match="e.g. data row 5 \\(2024-01-01 04:00:00\\)"):
+        builder.build(index, catalog)
+

@@ -51,7 +51,7 @@ def _parse_prediction_window(value) -> pd.Timedelta:
         raise ValueError(f"prediction_window must be a number of hours or a duration, got {value!r}")
     _reject_unitless_duration_text(value, "prediction_window")
     try:
-        if isinstance(value, numbers.Real):
+        if isinstance(value, numbers.Real) and not isinstance(value, np.timedelta64):
             window = pd.Timedelta(hours=float(value))
         else:
             window = pd.Timedelta(value)
@@ -112,6 +112,11 @@ def _normalize_active_region(value) -> str | None:
             return str(int(as_float))
         return str(value)
     return _normalize_active_region(str(value))
+
+
+def _none_for_missing(values: pd.Series) -> pd.Series:
+    """Missing values as None (pandas 3 would otherwise store NaN in a text column)."""
+    return values.astype(object).where(values.notna(), None)
 
 
 def _to_naive_utc(timestamp: pd.Timestamp) -> pd.Timestamp:

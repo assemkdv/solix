@@ -42,8 +42,8 @@ def test_catalog_with_invalid_classes_fails_at_load(tmp_path):
         EventMatcher(path)
     message = str(excinfo.value)
     assert "2 missing or invalid GOES class value(s)" in message
-    assert "line 3: <missing>" in message
-    assert "line 4: 'Q3'" in message
+    assert "data row 2: <missing>" in message
+    assert "data row 3: 'Q3'" in message
 
 
 def test_invalid_class_outside_any_window_is_still_rejected(tmp_path):
@@ -66,7 +66,7 @@ def test_adapt_goes_catalog_validates_classes(tmp_path):
         "2024-01-01 05:00:00,2024-01-01 05:10:00,2024-01-01 05:20:00,M2.0,13600\n"
         "2024-01-01 06:00:00,2024-01-01 06:10:00,2024-01-01 06:20:00,,13600\n"
     )
-    with pytest.raises(InvalidGOESClassError, match="column 'goes_class' \\(line 3: <missing>\\)"):
+    with pytest.raises(InvalidGOESClassError, match="column 'goes_class' \\(data row 2: <missing>\\)"):
         adapt_goes_catalog(source)
 
 

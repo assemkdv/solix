@@ -166,7 +166,7 @@ def test_six_images_per_sequence_and_expected_starts_ends(tmp_path):
 
 
 def test_observation_window_is_half_open_last_image_at_t_plus_5h(tmp_path):
-    timestamps = _hourly("2024-01-01T00:00:00", 6)
+    timestamps = _hourly("2024-01-01T00:00:00", 7)   # 06:00 exists but is outside [t, t+6h)
     index_path = _write_index(tmp_path, timestamps)
     catalog_path = _empty_catalog(tmp_path)
 

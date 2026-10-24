@@ -262,7 +262,7 @@ def test_adapt_goes_catalog_drops_the_copies_the_leading_one_creates(tmp_path):
     source = _write_source_catalog(
         tmp_path,
         _REGION_HEADER
-        # The same flare twice, once with a four-digit number (rows 193/194 of the lab catalog).
+        # The same flare twice, once with a four-digit number (as in some real flare lists).
         + "2010-07-22 17:19:00,2010-07-22 17:23:00,2010-07-22 17:30:00,B3.8,1089.0\n"
         + "2010-07-22 17:19:00,2010-07-22 17:23:00,2010-07-22 17:30:00,B3.8,11089.0\n"
         # Same start and class, different peak: a different flare, kept.

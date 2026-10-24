@@ -5,8 +5,8 @@ The layout conversion and the sequence checks (shared helpers in
 examples/real_data) need neither TensorFlow nor images. Running 08 and 09
 needs TensorFlow, Pillow with JPEG 2000 support and the images from
 examples/real_data/fetch_real_data.py; 11 needs TensorFlow, astropy and the
-SHARP patches. The comparison with the PyTorch examples (06, 07) also needs
-PyTorch. Tests
+SHARP patches. The comparisons with the PyTorch examples (06, 07, 10) also
+need PyTorch. Tests
 whose requirements are missing are skipped, so the base suite runs without
 any framework installed.
 """

@@ -14,8 +14,8 @@ def _write_valid_catalog(tmp_path):
 
 
 def _write_two_flare_catalog(tmp_path):
-    # Flare A: M5.0 at 2024-01-01T02:00 (qualifies M threshold, flux=5e-5)
-    # Flare B: C3.0 at 2024-01-03T02:00 (does not qualify, flux=3e-6)
+    # Flare A: M5.0 starts 2024-01-01T01:50 (qualifies M threshold, flux=5e-5)
+    # Flare B: C3.0 starts 2024-01-03T01:50 (does not qualify, flux=3e-6)
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
         "start_time,peak_time,end_time,class,active_region\n"

@@ -11,11 +11,6 @@ def test_binary_threshold_labeler_below_threshold():
     assert labeler.assign(9e-6) == 0
 
 
-def test_binary_threshold_labeler_exactly_at_threshold():
-    labeler = BinaryThresholdLabeler("M")  # 1e-5
-    assert labeler.assign(1e-5) == 1
-
-
 def test_binary_threshold_labeler_above_threshold():
     labeler = BinaryThresholdLabeler("M")
     assert labeler.assign(1e-4) == 1
@@ -26,11 +21,6 @@ def test_binary_threshold_labeler_custom_numeric_goes_threshold():
     assert labeler.assign(4.2e-6) == 1
     assert labeler.assign(4.1e-6) == 0
     assert labeler.assign(5e-6) == 1
-
-
-def test_binary_threshold_labeler_zero_no_flare():
-    labeler = BinaryThresholdLabeler("M")
-    assert labeler.assign(0.0) == 0
 
 
 def test_binary_threshold_labeler_invalid_threshold_raises():

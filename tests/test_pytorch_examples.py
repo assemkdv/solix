@@ -3,10 +3,10 @@ Checks for the real-image PyTorch examples (examples 06, 07 and 10).
 
 The committed provenance files (image manifest, flare catalog) are checked
 always. Labeling is checked from the manifest's timestamps alone, which
-needs neither images nor PyTorch. Running the examples themselves needs
-PyTorch, Pillow with JPEG 2000 support, astropy, the images downloaded by
-examples/real_data/fetch_real_data.py and the SHARP patches; those tests
-are skipped otherwise.
+needs neither images nor PyTorch. Running 06 and 07 needs PyTorch, Pillow
+with JPEG 2000 support and the images downloaded by
+examples/real_data/fetch_real_data.py; 10 needs PyTorch, astropy and the
+SHARP patches. Those tests are skipped otherwise.
 """
 
 import hashlib

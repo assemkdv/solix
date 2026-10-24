@@ -192,8 +192,8 @@ def test_end_to_end_synthetic_same_day_catalog(tmp_path):
                               ["2030-01-10T00:00:00", "2030-01-12T00:00:00", "2030-01-13T00:00:00"])
 
     # Window [t, t + 24h): includes t, excludes t + 24h.
-    #   2030-01-10 00:00: M2.0 (peak 09:52) -> 1, max flux 2e-5
-    #   2030-01-12 00:00: only C3.0 (peak 12:00), below M -> 0, max flux 3e-6
+    #   2030-01-10 00:00: M2.0 (starts 09:40) -> 1, max flux 2e-5
+    #   2030-01-12 00:00: only C3.0 (starts 12:00), below M -> 0, max flux 3e-6
     #   2030-01-13 00:00: nothing -> 0, 0.0
     binary = DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy("M")) \
         .build(index_path, SYNTHETIC_SAME_DAY_CATALOG_PATH)

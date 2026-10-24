@@ -162,7 +162,7 @@ def test_max_flare_strategy_per_region(tmp_path, catalog):
     assert result.set_index("active_region")["label"].to_dict() == {"100": pytest.approx(2e-5), "200": pytest.approx(5e-6)}
 
 
-def test_single_region_index_unchanged_by_grouping(tmp_path, catalog):
+def test_single_region_gives_one_sequence_per_start(tmp_path, catalog):
     # One region with unique timestamps gives one sequence per start time.
     index = _hourly_index(tmp_path, {h: [100] for h in range(5)})
     result = _build(index, catalog, **TIME_BASED)

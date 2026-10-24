@@ -49,10 +49,9 @@ def _build(index_path, catalog_path, **kwargs):
 TIME_BASED = {"cadence": "1h", "observation_window": "3h", "sliding_window": "1h"}
 
 
-@pytest.mark.parametrize("mode", [TIME_BASED], ids=["time_based"])
-def test_simultaneous_regions_get_separate_sequences(tmp_path, catalog, mode):
+def test_simultaneous_regions_get_separate_sequences(tmp_path, catalog):
     index = _hourly_index(tmp_path, {h: [100, 200] for h in range(4)})
-    result = _build(index, catalog, **mode)
+    result = _build(index, catalog, **TIME_BASED)
 
     assert result["active_region"].tolist() == ["100", "200", "100", "200"]
     assert result["sequence_start"].tolist() == [pd.Timestamp("2024-01-01 00:00")] * 2 + [pd.Timestamp("2024-01-01 01:00")] * 2
@@ -63,11 +62,10 @@ def test_simultaneous_regions_get_separate_sequences(tmp_path, catalog, mode):
     assert result["label"].tolist() == [1, 0, 1, 0]
 
 
-@pytest.mark.parametrize("mode", [TIME_BASED], ids=["time_based"])
-def test_missing_frame_in_one_region_does_not_affect_another(tmp_path, catalog, mode):
+def test_missing_frame_in_one_region_does_not_affect_another(tmp_path, catalog):
     # Region 200 has no image at 02:00.
     index = _hourly_index(tmp_path, {0: [100, 200], 1: [100, 200], 2: [100], 3: [100, 200], 4: [100, 200]})
-    result = _build(index, catalog, **mode)
+    result = _build(index, catalog, **TIME_BASED)
 
     by_region = result.groupby("active_region")["sequence_start"].apply(list).to_dict()
     assert by_region["100"] == [pd.Timestamp(f"2024-01-01 {h:02d}:00") for h in (0, 1, 2)]
@@ -118,11 +116,10 @@ def test_explicit_start_must_be_an_image_time(tmp_path, catalog):
         _build(index, catalog, start="2024-01-01 00:30", **TIME_BASED)
 
 
-@pytest.mark.parametrize("mode", [TIME_BASED], ids=["time_based"])
-def test_duplicate_timestamp_within_a_region_raises(tmp_path, catalog, mode):
+def test_duplicate_timestamp_within_a_region_raises(tmp_path, catalog):
     index = _hourly_index(tmp_path, {0: [100, 200], 1: [100, 100, 200], 2: [100, 200]})
     with pytest.raises(ValueError, match="duplicate timestamp\\(s\\) within active_region 100: 2024-01-01 01:00:00"):
-        _build(index, catalog, **mode)
+        _build(index, catalog, **TIME_BASED)
 
 
 def test_region_index_sorted_by_region_then_time_is_accepted(tmp_path, catalog):
@@ -132,6 +129,7 @@ def test_region_index_sorted_by_region_then_time_is_accepted(tmp_path, catalog):
     index = _write(tmp_path / "index.csv", "\n".join(lines) + "\n")
     result = _build(index, catalog, **TIME_BASED)
     assert result["active_region"].tolist() == ["100", "200"]
+
 
 def test_missing_region_rows_never_join_a_region_sequence(tmp_path, catalog):
     # At 01:00 one patch has no region. Region 100 is complete without it.
@@ -165,7 +163,7 @@ def test_max_flare_strategy_per_region(tmp_path, catalog):
 
 
 def test_single_region_index_unchanged_by_grouping(tmp_path, catalog):
-    # An index with one region and unique timestamps behaves as before.
+    # One region with unique timestamps gives one sequence per start time.
     index = _hourly_index(tmp_path, {h: [100] for h in range(5)})
     result = _build(index, catalog, **TIME_BASED)
     assert result["sequence_start"].tolist() == [pd.Timestamp(f"2024-01-01 {h:02d}:00") for h in range(3)]
@@ -174,6 +172,5 @@ def test_single_region_index_unchanged_by_grouping(tmp_path, catalog):
 
 def test_full_disk_sequences_still_reject_duplicate_timestamps(tmp_path, catalog):
     index = _hourly_index(tmp_path, {h: [100, 200] for h in range(3)})
-    for mode in (TIME_BASED,):
-        with pytest.raises(ValueError, match="contains duplicate timestamp\\(s\\): "):
-            DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy(), **mode).build(index, catalog)
+    with pytest.raises(ValueError, match="contains duplicate timestamp\\(s\\): "):
+        DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy(), **TIME_BASED).build(index, catalog)

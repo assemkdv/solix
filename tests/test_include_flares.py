@@ -79,12 +79,12 @@ def test_time_based_sequences(tmp_path):
 
 def test_active_region_sequences(tmp_path):
     index, catalog = _files(tmp_path, HOURS[:3] * 2, regions=["13324"] * 3 + ["13325"] * 3)
-    for kwargs in (dict(cadence="1h", observation_window="3h", sliding_window="3h"),):
-        result = DatasetBuilder(
-            "8h", BinaryThresholdStrategy("M"), target="active_region", include_flares=True, **kwargs,
-        ).build(index, catalog)
-        assert result["active_region"].tolist() == ["13324", "13325"]
-        assert result["flares"].tolist() == [["C2.0", "M1.0"], ["C5.0"]]
+    result = DatasetBuilder(
+        "8h", BinaryThresholdStrategy("M"), target="active_region", include_flares=True,
+        cadence="1h", observation_window="3h", sliding_window="3h",
+    ).build(index, catalog)
+    assert result["active_region"].tolist() == ["13324", "13325"]
+    assert result["flares"].tolist() == [["C2.0", "M1.0"], ["C5.0"]]
 
 
 def test_index_column_named_flares_is_refused(tmp_path):

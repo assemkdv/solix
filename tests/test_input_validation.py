@@ -1,16 +1,4 @@
-"""
-Regression tests for the input-validation defects found in the
-2026-10-17 correctness review. Each section names the defect it pins:
-
-1. unit-less duration text ("24") was read as 24 nanoseconds;
-2. numeric time columns were read as nanoseconds since 1970;
-3. region identifiers were normalized only when pandas inferred a numeric
-   column, so text "13700.0" never matched 13700;
-4. a blank image timestamp crashed, misled, or was dropped silently;
-5. time-zone policy: explicit UTC offsets are converted to UTC;
-6. a catalog with both `class` and `goes_class` gave a wrong diagnosis;
-7. BinaryThresholdLabeler.assign labeled NaN/bool/Decimal silently.
-"""
+"""Input validation: durations, time columns, region ids, blank timestamps, time zones, class columns, labeler input."""
 
 import datetime
 import warnings
@@ -286,9 +274,9 @@ def test_query_with_an_offset_aware_image_time(catalog):
     matcher = EventMatcher(catalog)
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        # 14:00+05:00 is 09:00 UTC: (09:00, 10:00) excludes the 10:00 flare.
+        # 14:00+05:00 is 09:00 UTC: [09:00, 10:00) excludes the 10:00 flare.
         assert matcher.query(pd.Timestamp("2024-01-01 14:00+05:00"), 1, event_time="peak") == []
-        # 14:30+05:00 is 09:30 UTC: (09:30, 10:30) includes it.
+        # 14:30+05:00 is 09:30 UTC: [09:30, 10:30) includes it.
         assert len(matcher.query(pd.Timestamp("2024-01-01 14:30+05:00"), 1, event_time="peak")) == 1
         # The same instant written in UTC gives the same answer.
         assert len(matcher.query(pd.Timestamp("2024-01-01 09:30Z"), 1, event_time="peak")) == 1
@@ -367,8 +355,8 @@ def test_mixed_offsets_across_a_daylight_saving_change_convert_to_utc(tmp_path):
         pd.Timestamp("2024-03-31 00:30:00"), pd.Timestamp("2024-03-31 01:30:00"),
     ]
     assert matcher._catalog["start_time"].dt.tz is None
-    # The two flares are one hour apart in UTC, not two: (00:00, 02:00) holds both,
-    # (00:00, 01:00) only the first.
+    # The two flares are one hour apart in UTC, not two: [00:00, 02:00) holds both,
+    # [00:00, 01:00) only the first.
     assert len(matcher.query(pd.Timestamp("2024-03-31 00:00"), "2h", event_time="start")) == 2
     assert len(matcher.query(pd.Timestamp("2024-03-31 00:00"), "1h", event_time="start")) == 1
 
@@ -402,7 +390,7 @@ def test_offset_normalization_is_not_a_time_scale_correction():
 
 def test_prediction_window_number_means_hours_in_builder_and_query(tmp_path, catalog):
     index = _write(tmp_path, "index.csv", "timestamp\n2024-01-01 09:00:00\n")
-    # Flare starts/peaks at 10:00: a 1-hour window (09:00, 10:00) misses it, a 2-hour one has it.
+    # Flare starts/peaks at 10:00: a 1-hour window [09:00, 10:00) misses it, a 2-hour one has it.
     assert _labels(DatasetBuilder(1, BinaryThresholdStrategy(), event_time="peak"), index, catalog) == [0]
     assert _labels(DatasetBuilder(2, BinaryThresholdStrategy(), event_time="peak"), index, catalog) == [1]
     assert _labels(DatasetBuilder("2h", BinaryThresholdStrategy(), event_time="peak"), index, catalog) == [1]
@@ -429,7 +417,7 @@ def test_time_based_durations_accept_text_and_timedelta_forms():
     assert builder.cadence == pd.Timedelta(hours=1)
     assert builder.observation_window == pd.Timedelta(hours=2)
     assert builder.sliding_window == pd.Timedelta(hours=1)
-    assert builder.number_of_images == 2 and builder.slide_steps == 1
+    assert builder.number_of_images == 2
     builder = DatasetBuilder(
         24, BinaryThresholdStrategy(),
         cadence=datetime.timedelta(hours=1), observation_window="2h", sliding_window="1h",

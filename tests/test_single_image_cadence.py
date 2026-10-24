@@ -96,7 +96,7 @@ def test_start_must_be_an_image_time_and_needs_a_cadence(tmp_path):
         f.FullDiskSingleImage("1h", f.BinaryThresholdStrategy("M"), start="2024-01-01 00:00:00")
 
 
-def test_relative_flux_labels_allow_cadence(tmp_path):
+def test_relative_flux_labels_allow_cadence():
     pipeline = f.DatasetBuildingPipeline(f.MaxRelativeFluxReducer(), f.RegressionLabeler())
     f.FullDiskSingleImage("24h", pipeline, cadence="1h")
 

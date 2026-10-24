@@ -81,7 +81,7 @@ def test_end_to_end_sequences_against_real_fixture_catalog(tmp_path):
         pd.Timestamp("2024-02-01T10:59:00"),
         pd.Timestamp("2024-02-01T11:59:00"),
     ]
-    # Only the last sequence's 1-hour window ((11:59, 12:59)) catches a
+    # Only the last sequence's 1-hour window [11:59, 12:59) catches a
     # flare (C3.0, peak at 12:00) -- and it's C-class, so the
     # M-threshold binary label is still 0 for all three sequences.
     assert result["label"].tolist() == [0, 0, 0]

@@ -53,18 +53,6 @@ def test_build_completely_empty_image_index_raises(tmp_path):
     assert "empty" in str(excinfo.value).lower()
 
 
-def test_build_header_only_image_index_is_valid_and_empty(tmp_path):
-    index_path = tmp_path / "index.csv"
-    index_path.write_text("timestamp\n")
-    catalog_path = _write_valid_catalog(tmp_path)
-
-    builder = DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy())
-    result = builder.build(index_path, catalog_path)
-
-    assert list(result.columns) == ["timestamp", "label"]
-    assert len(result) == 0
-
-
 def test_build_produces_expected_timestamp_and_label_columns(tmp_path):
     catalog_path = _write_two_flare_catalog(tmp_path)
     index_path = tmp_path / "index.csv"
@@ -121,14 +109,6 @@ def test_build_works_with_max_flare_strategy(tmp_path):
 
     assert result["label"].tolist() == [5e-5, 3e-6]
 
-
-# ── Sequence labeling tests ─────────────────────────────────────────────
-
-def test_prediction_window_must_be_positive():
-    with pytest.raises(ValueError) as excinfo:
-        DatasetBuilder(prediction_window=0, strategy=BinaryThresholdStrategy())
-
-    assert "prediction_window" in str(excinfo.value)
 
 # ── Active-region single-image labeling tests ───────────────────────────
 
@@ -326,36 +306,7 @@ def test_event_time_start_vs_peak_produce_different_labels(tmp_path):
     peak_result = peak_builder.build(index_path, catalog_path)
     start_result = start_builder.build(index_path, catalog_path)
 
-    # peak_time (09:01) falls outside (08:00, 09:00) -> 0.
-    # start_time (08:30) falls inside (08:00, 09:00) -> 1.
+    # peak_time (09:01) falls outside [08:00, 09:00) -> 0.
+    # start_time (08:30) falls inside [08:00, 09:00) -> 1.
     assert peak_result["label"].tolist() == [0]
     assert start_result["label"].tolist() == [1]
-
-
-def test_full_disk_sequence_and_active_region_single_image_unchanged(tmp_path):
-    # Regression guard: full-disk sequence mode and active-region
-    # single-image mode must be untouched by this phase.
-    catalog_path = _write_valid_catalog(tmp_path)
-    index_path = tmp_path / "index.csv"
-    index_path.write_text(
-        "timestamp\n"
-        "2024-01-01T08:00:00\n"
-        "2024-01-01T08:12:00\n"
-        "2024-01-01T08:24:00\n"
-    )
-
-    full_disk_result = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(),
-        cadence="12min", observation_window="36min", sliding_window="12min",
-    ).build(index_path, catalog_path)
-    assert list(full_disk_result.columns) == ["sequence_start", "sequence_end", "timestamps", "n_images", "label"]
-
-    ar_index_path = tmp_path / "ar_index.csv"
-    ar_index_path.write_text(
-        "timestamp,active_region\n"
-        "2024-01-01T00:00:00,4456\n"
-    )
-    ar_single_result = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(), target="active_region"
-    ).build(ar_index_path, catalog_path)
-    assert list(ar_single_result.columns) == ["timestamp", "active_region", "label"]

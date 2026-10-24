@@ -64,7 +64,7 @@ def test_other_columns_keep_their_own_names(tmp_path):
     assert list(result.columns) == ["timestamp", "label", "file"]
 
 
-def test_without_the_settings_the_standard_names_are_required(tmp_path, renamed_catalog):
+def test_without_the_settings_the_standard_names_are_required(renamed_catalog):
     builder = f.FullDiskSingleImage("24h", f.BinaryThresholdStrategy("M"))
     with pytest.raises(ValueError, match="missing required column\\(s\\): active_region, class, end_time"):
         builder.build(FULL_DISK, renamed_catalog)

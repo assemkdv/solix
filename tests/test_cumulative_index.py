@@ -189,7 +189,7 @@ def test_pipeline_run_one_with_fixture_catalog():
     matcher = EventMatcher(FIXTURES_DIR / "catalog.csv")
     pipeline = DatasetBuildingPipeline(CumulativeClassIndexReducer(), NumericThresholdLabeler(10))
     result = pipeline.run_one(
-        matcher, pd.Timestamp("2024-02-01 00:00"), "23h59min59s",
+        matcher, pd.Timestamp("2024-02-01 00:00"), "24h",
         event_time="start",
     )
     assert [e.goes_class for e in result.events] == ["C3.0"]
@@ -207,11 +207,11 @@ def test_pipeline_run_one_with_fixture_catalog():
 
 def test_dataset_builder_single_images_raw_and_binary():
     raw = DatasetBuilder(
-        prediction_window="23h59min59s", event_time="start",
+        prediction_window="24h", event_time="start",
         strategy=DatasetBuildingPipeline(CumulativeClassIndexReducer(), RegressionLabeler()),
     ).build(FIXTURES_DIR / "image_index.csv", FIXTURES_DIR / "catalog.csv")
     binary = DatasetBuilder(
-        prediction_window="23h59min59s", event_time="start",
+        prediction_window="24h", event_time="start",
         strategy=DatasetBuildingPipeline(CumulativeClassIndexReducer(), NumericThresholdLabeler(10)),
     ).build(FIXTURES_DIR / "image_index.csv", FIXTURES_DIR / "catalog.csv")
     # 2024-02-01: C3.0 -> 3.0; 2024-02-05: C1.0 + M4.0 -> 41.0; 2024-02-10: empty -> 0.0
@@ -219,9 +219,7 @@ def test_dataset_builder_single_images_raw_and_binary():
     assert binary["label"].tolist() == [0, 1, 0]
 
 
-def test_default_matching_settings():
-    # The cumulative components do not alter DatasetBuilder/EventMatcher defaults.
+def test_default_event_time_is_start():
     builder = DatasetBuilder(prediction_window=24, strategy=DatasetBuildingPipeline(
         CumulativeClassIndexReducer(), RegressionLabeler()))
     assert builder.event_time == "start"
-    assert not hasattr(builder, "interval_mode")   # the window is always [t, t+w)

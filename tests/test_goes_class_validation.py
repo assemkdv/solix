@@ -38,11 +38,9 @@ def test_error_type_stays_backward_compatible():
         FluxConverter().to_flux("")
 
 
-@pytest.mark.parametrize("header, row", [
-    ("start_time,peak_time,end_time,class,active_region",
-     "2024-01-01 05:00:00,2024-01-01 05:10:00,2024-01-01 05:20:00,{cls},100"),
-    ])
-def test_catalog_with_invalid_classes_fails_at_load(tmp_path, header, row):
+def test_catalog_with_invalid_classes_fails_at_load(tmp_path):
+    header = "start_time,peak_time,end_time,class,active_region"
+    row = "2024-01-01 05:00:00,2024-01-01 05:10:00,2024-01-01 05:20:00,{cls},100"
     lines = [header, row.format(cls="M2.0"), row.format(cls=""), row.format(cls="Q3"), row.format(cls="C1.0")]
     path = tmp_path / "catalog.csv"
     path.write_text("\n".join(lines) + "\n")
@@ -55,7 +53,7 @@ def test_catalog_with_invalid_classes_fails_at_load(tmp_path, header, row):
 
 
 def test_invalid_class_outside_any_window_is_still_rejected(tmp_path):
-    # Previously a bad class only failed if it fell inside a window.
+    # A bad class fails at load, even when no window would reach it.
     catalog = tmp_path / "catalog.csv"
     catalog.write_text(
         "start_time,peak_time,end_time,class,active_region\n"

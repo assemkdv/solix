@@ -112,14 +112,11 @@ def test_invalid_rxfi_is_refused(tmp_path, bad):
         EventMatcher(catalog_path)
 
 
-@pytest.mark.parametrize("sequence_kwargs", [
-    dict(cadence="1h", observation_window="3h", sliding_window="1h"),
-])
 @pytest.mark.parametrize("reducer", [MaxRelativeFluxReducer(), SumRelativeFluxReducer()])
-def test_sequences_are_refused(reducer, sequence_kwargs):
+def test_sequences_are_refused(reducer):
     with pytest.raises(ValueError, match="single images only"):
         DatasetBuilder(prediction_window="24h", strategy=DatasetBuildingPipeline(reducer, RegressionLabeler()),
-                       **sequence_kwargs)
+                       cadence="1h", observation_window="3h", sliding_window="1h")
 
 
 def test_other_labels_ignore_rxfi_column(tmp_path):

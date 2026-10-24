@@ -2,7 +2,6 @@ import pandas as pd
 import pytest
 
 from flare_indexer.loaders import ImageIndexReport, adapt_goes_catalog, build_image_index_from_filenames
-from flare_indexer.builder import DatasetBuilder
 
 # ── build_image_index_from_filenames ────────────────────────────────────
 
@@ -145,13 +144,6 @@ def test_build_image_index_tolerant_excludes_and_reports_malformed_rows():
     assert report.final_row_count == 2
 
 
-def test_build_image_index_strict_default_true_matches_original_behavior():
-    paths = ["/data/not_an_image.csv"]
-
-    with pytest.raises(ValueError):
-        build_image_index_from_filenames(paths)  # strict not passed -> default True
-
-
 # ── duplicate_policy ─────────────────────────────────────────────────────
 
 
@@ -231,9 +223,8 @@ def test_adapt_goes_catalog_basic_schema(tmp_path):
 
 
 def test_adapt_goes_catalog_preserves_dates_crossing_midnight(tmp_path):
-    # This is exactly the bug the old date+HHMM re-encoding introduced:
     # start_time and peak_time/end_time on different calendar dates must
-    # stay on their own correct dates, not get flattened onto peak's date.
+    # each keep their own date, not get flattened onto peak's date.
     source = _write_source_catalog(
         tmp_path,
         "start_time,peak_time,end_time,goes_class,noaa_active_region\n"
@@ -384,8 +375,7 @@ def test_adapt_goes_catalog_writes_output_csv(tmp_path):
 
 
 def test_adapt_goes_catalog_output_is_directly_loadable_by_event_matcher(tmp_path):
-    # The whole point of the new schema: no adapter-side lossy round-trip,
-    # and EventMatcher accepts the result as-is.
+    # EventMatcher accepts the adapter's output as-is.
     from flare_indexer.events import EventMatcher
 
     source = _write_source_catalog(

@@ -194,7 +194,7 @@ def test_multiclass_agrees_with_binary_and_regression_on_the_same_windows(catalo
     binary = _builder(fidx.BinaryThresholdStrategy("M")).build(full_disk_index, catalog)["label"]
     regression = _builder(fidx.MaxFlareStrategy()).build(full_disk_index, catalog)["label"]
 
-    # Binary and regression results are unchanged by the new labeler.
+    # Multiclass M/X matches the binary M threshold on every window.
     assert binary.tolist() == [1, 0, 0, 0, 0, 0, 1, 0]
     assert regression.tolist() == pytest.approx([1e-4, 0.0, 2e-7, 0.0, 9.9e-6, 0.0, 1e-4, 0.0])
     assert [int(c in ("M", "X")) for c in multiclass] == binary.tolist()

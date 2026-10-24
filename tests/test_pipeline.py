@@ -34,7 +34,7 @@ def _default_pipeline() -> DatasetBuildingPipeline:
     return DatasetBuildingPipeline(reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"))
 
 
-# ── Component validation (Task 9) ─────────────────────────────────────────
+# ── Component validation ──────────────────────────────────────────────────
 
 
 def test_invalid_reducer_fails_clearly():
@@ -108,7 +108,7 @@ def test_extract_events_event_time_start():
     events = pipeline.extract_events(
         matcher, pd.Timestamp("2024-01-01 00:00"), prediction_window=0.75, event_time="start",
     )
-    assert len(events) == 1  # start (00:30) is inside (00:00, 00:45)
+    assert len(events) == 1  # start (00:30) is inside [00:00, 00:45)
 
 
 def test_extract_events_event_time_peak():
@@ -123,7 +123,7 @@ def test_extract_events_event_time_peak():
     events = pipeline.extract_events(
         matcher, pd.Timestamp("2024-01-01 00:00"), prediction_window=0.75, event_time="peak",
     )
-    assert len(events) == 0  # peak (01:00) is outside (00:00, 00:45)
+    assert len(events) == 0  # peak (01:00) is outside [00:00, 00:45)
 
 
 def test_extract_events_excludes_window_end():
@@ -256,7 +256,7 @@ def test_extract_events_returns_fresh_list_not_shared_with_matcher():
     assert len(events_b) == 1  # unaffected by mutating the earlier result
 
 
-# ── DatasetBuilder compatibility via label() ──────────────────────────────
+# ── label() ───────────────────────────────────────────────────────────────
 
 
 def test_pipeline_label_method_matches_manual_reduce_then_assign():
@@ -265,16 +265,7 @@ def test_pipeline_label_method_matches_manual_reduce_then_assign():
     assert pipeline.label(events) == pipeline.assign_label(pipeline.reduce_events(events))
 
 
-def test_dataset_builder_accepts_pipeline_as_strategy():
-    pipeline = DatasetBuildingPipeline(reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler())
-    builder = DatasetBuilder(prediction_window=24, strategy=pipeline)
-    result = builder.build(IMAGE_INDEX_PATH, CATALOG_PATH)
-
-    assert list(result.columns) == ["timestamp", "label"]
-    assert result["label"].tolist() == [0, 1, 0]  # matches test_end_to_end_binary_threshold_strategy
-
-
-# ── Exception propagation (Task 10) ────────────────────────────────────────
+# ── Exception propagation ─────────────────────────────────────────────────
 
 
 def test_exceptions_from_custom_reducer_are_not_swallowed():
@@ -309,32 +300,8 @@ def test_invalid_goes_class_from_event_matcher_propagates_through_pipeline():
         pipeline.run_one(matcher, pd.Timestamp("2024-01-01 00:00"), prediction_window=1)
 
 
-# ── Backward compatibility ─────────────────────────────────────────────
+# ── DatasetBuilder with a pipeline ────────────────────────────────────────
 
-
-def test_binary_threshold_strategy_produces_same_labels_as_before():
-    strategy = BinaryThresholdStrategy(threshold="M")
-    assert strategy.label([_flare("M2.3")]) == 1
-    assert strategy.label([_flare("C4.0")]) == 0
-    assert strategy.label([]) == 0
-
-
-def test_max_flare_strategy_produces_same_values_as_before():
-    strategy = MaxFlareStrategy()
-    assert strategy.label([_flare("C4.0"), _flare("X1.0"), _flare("M2.3")]) == 1e-4
-    assert strategy.label([]) == 0.0
-
-
-def test_dataset_builder_works_with_old_binary_threshold_strategy(tmp_path):
-    builder = DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy())
-    result = builder.build(IMAGE_INDEX_PATH, CATALOG_PATH)
-    assert result["label"].tolist() == [0, 1, 0]
-
-
-def test_dataset_builder_works_with_old_max_flare_strategy(tmp_path):
-    builder = DatasetBuilder(prediction_window=24, strategy=MaxFlareStrategy())
-    result = builder.build(IMAGE_INDEX_PATH, CATALOG_PATH)
-    assert result["label"].tolist() == [3e-6, 4e-5, 0.0]
 
 def test_full_disk_time_based_sequences_work_with_pipeline(tmp_path):
     index_path = tmp_path / "index.csv"
@@ -437,7 +404,7 @@ def test_extra_columns_preserved_with_pipeline(tmp_path):
 # ── End-to-end equivalence (strategy vs. pipeline) ────────────────────────
 
 
-def test_binary_threshold_strategy_equivalent_to_pipeline(tmp_path):
+def test_binary_threshold_strategy_equivalent_to_pipeline():
     legacy_result = DatasetBuilder(
         prediction_window=24, strategy=BinaryThresholdStrategy(threshold="M"),
     ).build(IMAGE_INDEX_PATH, CATALOG_PATH)
@@ -450,7 +417,7 @@ def test_binary_threshold_strategy_equivalent_to_pipeline(tmp_path):
     pd.testing.assert_frame_equal(legacy_result, pipeline_result)
 
 
-def test_max_flare_strategy_equivalent_to_pipeline(tmp_path):
+def test_max_flare_strategy_equivalent_to_pipeline():
     legacy_result = DatasetBuilder(
         prediction_window=24, strategy=MaxFlareStrategy(),
     ).build(IMAGE_INDEX_PATH, CATALOG_PATH)

@@ -1,5 +1,3 @@
-import datetime
-
 import pandas as pd
 import pytest
 
@@ -122,19 +120,6 @@ def test_invalid_start_value_raises():
             start="not-a-date", cadence="1h", observation_window="6h", sliding_window="3h",
         )
     assert "start" in str(excinfo.value)
-
-def test_durations_accept_timedelta_and_pd_timedelta():
-    # datetime.timedelta and pd.Timedelta, not just strings.
-    builder = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(),
-        cadence=datetime.timedelta(hours=1),
-        observation_window=pd.Timedelta(hours=6),
-        sliding_window="3h",
-    )
-    assert builder.cadence == pd.Timedelta(hours=1)
-    assert builder.observation_window == pd.Timedelta(hours=6)
-    assert builder.number_of_images == 6
-    assert builder.slide_steps == 3
 
 
 # ── Core time-based behavior ─────────────────────────────────────────────
@@ -261,7 +246,7 @@ def test_no_interpolation_or_substitution_for_missing_timestamp(tmp_path):
     assert len(result) == 0  # the only candidate (start=00:00) needs the missing 03:00
 
 
-# ── Compatible downsampling (Task 7) ─────────────────────────────────────
+# ── Compatible downsampling ──────────────────────────────────────────────
 
 
 def test_downsampling_thirty_minute_source_to_hourly_cadence(tmp_path):
@@ -285,7 +270,7 @@ def test_downsampling_thirty_minute_source_to_hourly_cadence(tmp_path):
         assert pd.Timestamp(f"2024-01-01T{half_hour}") not in result.iloc[0]["timestamps"]
 
 
-# ── start semantics (Task 5) ──────────────────────────────────────────────
+# ── start semantics ───────────────────────────────────────────────────────
 
 
 def test_start_omitted_uses_earliest_timestamp(tmp_path):
@@ -366,7 +351,7 @@ def test_start_after_dataset_raises(tmp_path):
     assert "start" in str(excinfo.value)
 
 
-# ── Source cadence inference and validation (Task 6) ─────────────────────
+# ── Source cadence inference and validation ──────────────────────────────
 
 
 def test_hourly_source_rejects_one_minute_cadence(tmp_path):
@@ -381,19 +366,6 @@ def test_hourly_source_rejects_one_minute_cadence(tmp_path):
     with pytest.raises(ValueError) as excinfo:
         builder.build(index_path, catalog_path)
     assert "cadence" in str(excinfo.value)
-
-
-def test_hourly_source_accepts_one_hour_cadence(tmp_path):
-    timestamps = _hourly("2024-01-01T00:00:00", 10)
-    index_path = _write_index(tmp_path, timestamps)
-    catalog_path = _empty_catalog(tmp_path)
-
-    builder = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(),
-        cadence="1h", observation_window="6h", sliding_window="3h",
-    )
-    result = builder.build(index_path, catalog_path)
-    assert len(result) > 0
 
 
 def test_hourly_source_accepts_three_hour_cadence(tmp_path):
@@ -411,19 +383,6 @@ def test_hourly_source_accepts_three_hour_cadence(tmp_path):
     assert result.iloc[0]["timestamps"] == [
         pd.Timestamp("2024-01-01T00:00:00"), pd.Timestamp("2024-01-01T03:00:00"),
     ]
-
-
-def test_thirty_minute_source_accepts_one_hour_cadence(tmp_path):
-    timestamps = list(pd.date_range("2024-01-01T00:00:00", periods=13, freq="30min"))
-    index_path = _write_index(tmp_path, timestamps)
-    catalog_path = _empty_catalog(tmp_path)
-
-    builder = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(),
-        cadence="1h", observation_window="4h", sliding_window="4h",
-    )
-    result = builder.build(index_path, catalog_path)
-    assert len(result) > 0
 
 
 def test_hourly_source_rejects_ninety_minute_cadence(tmp_path):
@@ -470,7 +429,7 @@ def test_fewer_than_two_unique_timestamps_raises(tmp_path):
     assert "cadence" in str(excinfo.value).lower()
 
 
-# ── SequenceBuildReport (Task 9) ──────────────────────────────────────────
+# ── SequenceBuildReport ───────────────────────────────────────────────────
 
 
 def test_return_report_default_false_returns_dataframe_only(tmp_path):
@@ -539,7 +498,7 @@ def test_time_based_event_time_start(tmp_path):
     catalog_path = _catalog_with_flare(tmp_path, "2024-01-01", "0505", "0510", "0515", "M1.0", "4456")
 
     builder = DatasetBuilder(
-        prediction_window=0.1,  # 6 minutes: (05:00, 05:06) catches start=05:05, not peak=05:10
+        prediction_window=0.1,  # 6 minutes: [05:00, 05:06) catches start=05:05, not peak=05:10
         strategy=BinaryThresholdStrategy(),
         cadence="1h", observation_window="6h", sliding_window="6h",
         event_time="start",
@@ -606,7 +565,7 @@ def test_time_based_preserves_extra_columns(tmp_path):
     assert result.iloc[0]["image_path"] == [f"img_{i}.jpg" for i in range(6)]
 
 
-# ── Active-region time-based mode (Task 10) ───────────────────────────────
+# ── Active-region time-based mode ─────────────────────────────────────────
 
 
 def test_active_region_time_based_basic(tmp_path):

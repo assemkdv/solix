@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 from flare_indexer.goes_class import ThresholdChecker
-from flare_indexer.events import EventMatcher, FlareEvent
+from flare_indexer.events import EventMatcher
 
 # ── ThresholdChecker tests ──────────────────────────────────────────────
 
@@ -36,8 +36,7 @@ def test_is_strong_invalid_threshold_letter_raises():
 
 
 def test_query_returns_flares_within_window():
-    # Build a tiny fake catalog instead of loading a real CSV
-    # This lets us test the logic without needing the NOAA dataset yet
+    # A small in-memory catalog, no CSV needed.
     matcher = EventMatcher.__new__(EventMatcher)  # create object without calling __init__
     matcher._catalog = pd.DataFrame({
         "peak_time": pd.to_datetime([

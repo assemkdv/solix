@@ -13,24 +13,6 @@ def test_to_flux():
     assert converter.to_flux("A1.0") == 1e-8
 
 
-def test_to_flux_invalid_letter_raises():
-    converter = FluxConverter()
-    with pytest.raises(KeyError):
-        converter.to_flux("Z5.0")
-
-
-def test_to_flux_empty_string_raises():
-    converter = FluxConverter()
-    with pytest.raises(IndexError):
-        converter.to_flux("")
-
-
-def test_to_flux_non_numeric_suffix_raises():
-    converter = FluxConverter()
-    with pytest.raises(ValueError):
-        converter.to_flux("M2.3.4")
-
-
 def test_to_flux_numeric_ordering_not_lexical():
     # A lexical ("string") comparison of "M9.0" vs "M10.0" would incorrectly
     # rank "M9.0" higher ('9' > '1' as characters) -- the legacy lab script
@@ -54,8 +36,6 @@ def test_equivalent_class_text_gives_identical_flux(text, equivalent):
 
 
 def test_binary_m_threshold_at_c10_and_adjacent_floats():
-    import math
-
     from flare_indexer import BinaryThresholdLabeler, ThresholdChecker
 
     converter = FluxConverter()

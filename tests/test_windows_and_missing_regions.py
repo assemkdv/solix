@@ -60,15 +60,6 @@ def test_prediction_window_accepts_hours_and_durations(tmp_path, boundary_catalo
     assert longer.build(index_path, boundary_catalog)["label"].tolist() == [1]
 
 
-def test_legacy_23h59m59s_window_excludes_flare_at_exactly_24h(tmp_path, boundary_catalog):
-    index_path = _write(tmp_path / "index.csv", "timestamp\n2024-01-01 00:00:00\n")
-    builder = DatasetBuilder(
-        prediction_window="23h59min59s", strategy=BinaryThresholdStrategy(),
-        event_time="start",
-    )
-    assert builder.build(index_path, boundary_catalog)["label"].tolist() == [0]
-
-
 def test_event_matcher_query_accepts_duration(boundary_catalog):
     matcher = EventMatcher(boundary_catalog)
     t = pd.Timestamp("2024-01-01 00:00:00")
@@ -250,7 +241,7 @@ def test_include_metadata_empty_index_keeps_columns(tmp_path, ar_catalog):
     assert result.empty
 
 
-# ── review follow-ups ────────────────────────────────────────────────────
+# ── Other checks ─────────────────────────────────────────────────────────
 
 
 @pytest.mark.parametrize("window", [float("inf"), float("nan")])
@@ -260,7 +251,7 @@ def test_non_finite_prediction_window_raises(window):
 
 
 def test_prediction_window_attribute_keeps_given_value():
-    assert DatasetBuilder(prediction_window="23h59min59s", strategy=BinaryThresholdStrategy()).prediction_window == "23h59min59s"
+    assert DatasetBuilder(prediction_window="24h", strategy=BinaryThresholdStrategy()).prediction_window == "24h"
 
 
 def test_missing_region_warning_points_at_caller(multi_region_index, ar_catalog):

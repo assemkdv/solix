@@ -64,10 +64,10 @@ def test_active_region_time_sequence_summary(capsys):
 
 def test_skipped_sequences_and_class_labels(capsys):
     pipeline = f.DatasetBuildingPipeline(f.MaxFluxReducer(), f.MulticlassLabeler())
-    DatasetBuilder("23h59min59s", pipeline, cadence="1h", observation_window="3h", sliding_window="1h",
-                     verbose=True).build(FULL_DISK, CATALOG)
+    DatasetBuilder("24h", pipeline, cadence="1h", observation_window="3h", sliding_window="1h",
+                   verbose=True).build(FULL_DISK, CATALOG)
     lines = capsys.readouterr().out.splitlines()
-    assert "window [t, t + 23h59min59s) on start_time" in lines[2]
+    assert "window [t, t + 24h) on start_time" in lines[2]
     assert "skipped: missing images" in lines[3]
     assert "label NF: " in lines[3]
 

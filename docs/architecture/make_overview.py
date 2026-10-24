@@ -80,11 +80,12 @@ BOXES = {
                             "ClassCount / Presence"], 97, 20.5, 18, 9, False),
 
     # Output layer.
-    "table": ("Labeled table (pandas DataFrame)",
-              ["timestamp or sequence columns, [active_region], label,", "[flares], [image_path, ...]",
-               "verbose summary, SequenceBuildReport"], 33, 4, 46, 7.8, False),
-    "frameworks": ("PyTorch Dataset / Keras PyDataset",
-                   ["examples 06-09, outside the package"], 84, 4.8, 31, 6.2, True),
+    "table": ("Labeled table (pandas DataFrame), one row per image or sequence",
+              ["single images:  timestamp, [active_region], label     sequences:  sequence_start, sequence_end,"
+               " timestamps, n_images, [active_region], label",
+               "optional:  flares (include_flares=True), image_path and other index columns (include_metadata=True)",
+               "verbose=True prints a summary;  sequences can also return a SequenceBuildReport"],
+              33, 4, 82, 7.8, False),
 }
 
 # (from, to, from side, to side, dashed)
@@ -99,7 +100,6 @@ EDGES = [
     ("sample", "matcher", "right", "left", False),
     ("matcher", "reducer", "right", "left", False),
     ("reducer", "labeler", "right", "left", False),
-    ("table", "frameworks", "right", "left", True),
 ]
 
 # Arrows between layers: (x, from y, to y, label)

@@ -78,3 +78,18 @@ def decode_magnetogram(path: Path) -> np.ndarray:
     if pixels.shape != (IMAGE_SIZE, IMAGE_SIZE):
         raise ValueError(f"{path}: decoded shape {pixels.shape}, expected {(IMAGE_SIZE, IMAGE_SIZE)}")
     return (pixels / 255.0)[np.newaxis]
+
+
+def load_image(path: Path, expected_time) -> np.ndarray:
+    """Decode one image after checking that its header time is the index time."""
+    observed = observation_time(read_jp2_header(path))
+    if observed != pd.Timestamp(expected_time):
+        raise ValueError(f"{path}: header time {observed} != index time {expected_time}")
+    return decode_magnetogram(path)
+
+
+def to_channels_last(array: np.ndarray) -> np.ndarray:
+    """[C, H, W] (PyTorch's layout) -> [H, W, C] (TensorFlow's layout)."""
+    if array.ndim != 3:
+        raise ValueError(f"expected [C, H, W], got shape {array.shape}")
+    return np.ascontiguousarray(np.transpose(array, (1, 2, 0)))

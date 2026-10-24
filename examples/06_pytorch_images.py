@@ -8,8 +8,9 @@ Steps
 1. Image index: built from examples/real_data/image_manifest.csv, which
    fetch_real_data.py wrote from each downloaded file's header (DATE_OBS).
 2. Labels: flare_indexer.FullDiskSingleImage with every labeling choice explicit.
-3. Loading: a torch Dataset that decodes each JPEG 2000 file and a
-   DataLoader that yields image batches shaped [B, C, H, W] = [B, 1, 256, 256].
+3. Loading: FlareDataset, a torch Dataset that gives one (image, label)
+   per row of the label table, and a DataLoader that yields image batches
+   shaped [B, C, H, W] = [B, 1, 256, 256].
 4. Checks: header time vs. index time for every loaded image, and one
    positive and one negative label recomputed from the catalog without
    flare_indexer.
@@ -28,6 +29,8 @@ import sys
 from pathlib import Path
 
 import pandas as pd
+import torch
+from torch.utils.data import DataLoader, Dataset
 
 import flare_indexer as fidx
 
@@ -41,31 +44,26 @@ PREDICTION_WINDOW = "24h"
 BATCH_SIZE = 4
 
 
-def make_dataset_class():
-    import torch
-    from torch.utils.data import Dataset
+class FlareDataset(Dataset):
+    """
+    One labeled image per item: (image [C, H, W], label).
 
-    class FullDiskImageDataset(Dataset):
-        """One labeled image per item: (image [C, H, W], label, timestamp, image_path)."""
+    labels is the table built by flare_indexer, one row per image with
+    timestamp, image_path and label; image_root is the folder the image
+    paths are relative to.
+    """
 
-        def __init__(self, labels: pd.DataFrame, image_root: Path):
-            self.labels = labels.reset_index(drop=True)
-            self.image_root = image_root
+    def __init__(self, labels: pd.DataFrame, image_root: Path):
+        self.labels = labels.reset_index(drop=True)
+        self.image_root = Path(image_root)
 
-        def __len__(self):
-            return len(self.labels)
+    def __len__(self):
+        return len(self.labels)
 
-        def __getitem__(self, i):
-            row = self.labels.iloc[i]
-            path = self.image_root / row["image_path"]
-            observed = hmi_jp2.observation_time(hmi_jp2.read_jp2_header(path))
-            if observed != row["timestamp"]:
-                raise ValueError(f"{path}: header time {observed} != index time {row['timestamp']}")
-            image = torch.from_numpy(hmi_jp2.decode_magnetogram(path))
-            label = torch.tensor(int(row["label"]), dtype=torch.long)
-            return image, label, real.format_time(row["timestamp"]), str(row["image_path"])
-
-    return FullDiskImageDataset
+    def __getitem__(self, i):
+        row = self.labels.iloc[i]
+        image = hmi_jp2.load_image(self.image_root / row["image_path"], row["timestamp"])
+        return torch.from_numpy(image), torch.tensor(int(row["label"]))
 
 
 def main(argv=None):
@@ -73,8 +71,6 @@ def main(argv=None):
     parser.add_argument("--output", type=Path, default=EXAMPLES / "output")
     args = parser.parse_args(argv)
     real.require_optional_dependencies()
-    import torch
-    from torch.utils.data import DataLoader
 
     args.output.mkdir(parents=True, exist_ok=True)
     index_path = args.output / "06_image_index.csv"
@@ -101,20 +97,20 @@ def main(argv=None):
     print(labels.to_string(index=False))
 
     # 3. Dataset and DataLoader.
-    dataset = make_dataset_class()(labels, real.REAL_DATA)
-    loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=0)
-    print(f"\nDataLoader(batch_size={BATCH_SIZE}, shuffle=False)")
+    dataset = FlareDataset(labels, real.REAL_DATA)
+    loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=False)
+    print(f"\nDataLoader(FlareDataset, batch_size={BATCH_SIZE}, shuffle=False)")
     seen = []
-    for number, (images, batch_labels, timestamps, paths) in enumerate(loader):
+    for number, (images, batch_labels) in enumerate(loader):
         assert images.dim() == 4 and images.shape[1:] == (1, hmi_jp2.IMAGE_SIZE, hmi_jp2.IMAGE_SIZE)
         assert images.dtype == torch.float32 and 0.0 <= images.min() and images.max() <= 1.0
         print(f"batch {number}: images {list(images.shape)} {images.dtype} "
               f"range [{images.min():.3f}, {images.max():.3f}]  labels {batch_labels.tolist()}")
-        for t, path in zip(timestamps, paths):
-            print(f"    {t}  {path}")
-        seen += list(zip(timestamps, paths, batch_labels.tolist()))
-    expected = list(zip(labels["timestamp"].map(real.format_time), labels["image_path"], labels["label"]))
-    assert seen == expected, "DataLoader order or labels differ from the label table"
+        rows = labels.iloc[len(seen):len(seen) + len(batch_labels)]
+        for t, path in zip(rows["timestamp"], rows["image_path"]):
+            print(f"    {real.format_time(t)}  {path}")
+        seen += batch_labels.tolist()
+    assert seen == labels["label"].tolist(), "DataLoader order or labels differ from the label table"
 
     # 4. Independent label check: no flare_indexer, just the catalog rows.
     #    The reference time is the full-precision DATE_OBS parsed straight

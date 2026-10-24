@@ -3,12 +3,12 @@
 Four examples label the same real SDO/HMI full-disk images with
 `flare_indexer` and load them with a deep-learning framework:
 
-| Example | Framework | Sample | Batch shape |
+| Example | Dataset class | Sample | Batch shape |
 |---|---|---|---|
-| [`06_pytorch_images.py`](../06_pytorch_images.py) | PyTorch `Dataset`/`DataLoader` | one image, labeled from its observation time `t` | `[B, C, H, W]` = `[B, 1, 256, 256]` |
-| [`07_pytorch_sequences.py`](../07_pytorch_sequences.py) | PyTorch `Dataset`/`DataLoader` | 3 images 1 h apart, labeled from the final observation time `t_end` | `[B, T, C, H, W]` = `[B, 3, 1, 256, 256]` |
-| [`08_tensorflow_images.py`](../08_tensorflow_images.py) | `tf.data.Dataset` | as 06 | `[B, H, W, C]` = `[B, 256, 256, 1]` |
-| [`09_tensorflow_sequences.py`](../09_tensorflow_sequences.py) | `tf.data.Dataset` | as 07, oldest image first | `[B, T, H, W, C]` = `[B, 3, 256, 256, 1]` |
+| [`06_pytorch_images.py`](../06_pytorch_images.py) | `FlareDataset` (PyTorch `Dataset`) | one image, labeled from its observation time `t` | `[B, C, H, W]` = `[B, 1, 256, 256]` |
+| [`07_pytorch_sequences.py`](../07_pytorch_sequences.py) | `FlareSequenceDataset` (PyTorch `Dataset`) | 3 images 1 h apart, labeled from the final observation time `t_end` | `[B, T, C, H, W]` = `[B, 3, 1, 256, 256]` |
+| [`08_tensorflow_images.py`](../08_tensorflow_images.py) | `FlareDataset` (`keras.utils.PyDataset`) | as 06 | `[B, H, W, C]` = `[B, 256, 256, 1]` |
+| [`09_tensorflow_sequences.py`](../09_tensorflow_sequences.py) | `FlareSequenceDataset` (`keras.utils.PyDataset`) | as 07, oldest image first | `[B, T, H, W, C]` = `[B, 3, 256, 256, 1]` |
 
 Framework code lives only in these example scripts, not in the package.
 PyTorch, TensorFlow and Pillow are optional dependencies; the base
@@ -18,7 +18,9 @@ The TensorFlow examples use the same manifest, cached images, catalog,
 decoder, provenance checks and independent label checks as the PyTorch
 ones. The shared decoder returns channel-first `[C, H, W]`; examples 08
 and 09 convert each image explicitly to TensorFlow's channel-last
-`[H, W, C]` (`to_channels_last` in example 08) before batching.
+`[H, W, C]` (`hmi_jp2.to_channels_last`) before batching. A Keras
+`PyDataset` returns whole batches, so it takes `batch_size` itself and can
+be passed straight to `model.fit`.
 
 ## Labeling settings
 

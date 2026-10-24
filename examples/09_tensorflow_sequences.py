@@ -1,16 +1,16 @@
 """
 Example 9 -- real full-disk image sequences on a time grid, loaded with TensorFlow.
 
-The TensorFlow counterpart of example 8: same images, same catalog, same
+The TensorFlow counterpart of example 7: same images, same catalog, same
 labeling and grid settings, same checks. Only the loader differs.
 
 Each sample is T = 3 images one hour apart (observation_window 3h,
 cadence 1h); a new sequence starts every hour (sliding_window 1h). A
 sequence is labeled from its FINAL observation time t_end: 1 if an M-class
-or stronger flare starts in (t_end, t_end + 24h], else 0.
+or stronger flare starts in [t_end, t_end + 24h), else 0.
 
 The grid uses full-precision DATE_OBS times and has no tolerance. With
-this data only 2 of 8 candidate sequences are complete (see example 8 for
+this data only 2 of 8 candidate sequences are complete (see example 7 for
 why: images 0.1 s off the grid, a missing hour, and an image at
 09:00:34.9); both are labeled 0. Missing grid images are never replaced.
 
@@ -18,9 +18,10 @@ Steps
 1. Image index from the manifest (same as examples 6, 7 and 8).
 2. Sequences and labels: flare_indexer.FullDiskSequence on a time grid.
 3. CSV round trip of the list-valued columns (timestamps, image_path).
-4. Loading: a tf.data.Dataset that decodes the T images of each sequence,
-   oldest first, converts each from [C, H, W] to [H, W, C], stacks them
-   to [T, H, W, C], and yields batches [B, T, H, W, C] = [B, 3, 256, 256, 1].
+4. Loading: FlareSequenceDataset, a keras.utils.PyDataset that gives one
+   batch of (images, labels) per item, oldest image first, as
+   [B, T, H, W, C] = [B, 3, 256, 256, 1]. It can be passed straight to
+   model.fit.
 5. Checks: order and spacing of every sequence, header time of every
    image, batch shapes, order of paths and labels against the sequence
    table, and every label recomputed from the catalog without flare_indexer.
@@ -31,13 +32,17 @@ Run:    python examples/09_tensorflow_sequences.py
 """
 
 import argparse
-import importlib.util
+import math
 import os
 import sys
 from pathlib import Path
 
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
+
 import numpy as np
 import pandas as pd
+import tensorflow as tf
+from tensorflow import keras
 
 import flare_indexer as fidx
 
@@ -56,47 +61,34 @@ N_IMAGES = round(pd.Timedelta(OBSERVATION_WINDOW) / pd.Timedelta(CADENCE))
 SEQUENCE_SHAPE = (N_IMAGES, hmi_jp2.IMAGE_SIZE, hmi_jp2.IMAGE_SIZE, 1)  # [T, H, W, C]
 
 
-def _image_example():
-    """Reuse example 8's channel conversion and per-image loading (header check + decode)."""
-    spec = importlib.util.spec_from_file_location("example_10", EXAMPLES / "08_tensorflow_images.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+class FlareSequenceDataset(keras.utils.PyDataset):
+    """
+    One batch of labeled sequences per item: (images [B, T, H, W, C],
+    labels [B]), oldest image first.
 
+    sequences is the table built by flare_indexer, one row per sequence
+    with lists of timestamps and image paths and one label; image_root is
+    the folder the image paths are relative to.
+    """
 
-images_example = _image_example()
+    def __init__(self, sequences: pd.DataFrame, image_root: Path, cadence, batch_size: int, **kwargs):
+        super().__init__(**kwargs)
+        self.sequences = sequences.reset_index(drop=True)
+        self.image_root = Path(image_root)
+        self.cadence = pd.Timedelta(cadence)
+        self.batch_size = batch_size
 
+    def __len__(self):
+        return math.ceil(len(self.sequences) / self.batch_size)
 
-def load_sequence(row, image_root: Path, cadence: pd.Timedelta) -> np.ndarray:
-    """Check one sequence row and return float32 [T, H, W, C], oldest image first."""
-    timestamps, paths = row.timestamps, row.image_path
-    if len(timestamps) != len(paths) or len(paths) != row.n_images:
-        raise ValueError(f"sequence ending {row.sequence_end}: {len(timestamps)} timestamps, {len(paths)} paths")
-    if any(later - earlier != cadence for earlier, later in zip(timestamps, timestamps[1:])):
-        raise ValueError(f"sequence ending {row.sequence_end}: images are not {cadence} apart: {timestamps}")
-    if timestamps[-1] != row.sequence_end:
-        raise ValueError(f"sequence ending {row.sequence_end}: last image is at {timestamps[-1]}")
-    frames = [images_example.load_image(image_root / p, t) for t, p in zip(timestamps, paths)]
-    return np.stack(frames)
-
-
-def make_dataset(sequences: pd.DataFrame, image_root: Path, cadence):
-    """tf.data.Dataset of (images [T, H, W, C], label, sequence_end, image_paths), in table order."""
-    import tensorflow as tf
-
-    cadence = pd.Timedelta(cadence)
-
-    def samples():
-        for row in sequences.itertuples(index=False):
-            yield (load_sequence(row, image_root, cadence), np.int32(row.label),
-                   real.format_time(row.sequence_end), np.array(row.image_path))
-
-    return tf.data.Dataset.from_generator(samples, output_signature=(
-        tf.TensorSpec(shape=SEQUENCE_SHAPE, dtype=tf.float32),
-        tf.TensorSpec(shape=(), dtype=tf.int32),
-        tf.TensorSpec(shape=(), dtype=tf.string),
-        tf.TensorSpec(shape=(N_IMAGES,), dtype=tf.string),
-    ))
+    def __getitem__(self, i):
+        rows = self.sequences.iloc[i * self.batch_size:(i + 1) * self.batch_size]
+        batch = []
+        for _, row in rows.iterrows():
+            real.check_sequence(row, self.cadence)
+            batch.append(np.stack([hmi_jp2.to_channels_last(hmi_jp2.load_image(self.image_root / path, t))
+                                   for t, path in zip(row["timestamps"], row["image_path"])]))
+        return np.stack(batch), rows["label"].to_numpy(dtype=np.int32)
 
 
 def main(argv=None):
@@ -104,8 +96,6 @@ def main(argv=None):
     parser.add_argument("--output", type=Path, default=EXAMPLES / "output")
     args = parser.parse_args(argv)
     real.require_optional_dependencies("tensorflow")
-    os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
-    import tensorflow as tf
 
     args.output.mkdir(parents=True, exist_ok=True)
     index_path = args.output / "09_image_index.csv"
@@ -143,24 +133,20 @@ def main(argv=None):
     print(f"\nSequences -> {sequences_path} (reloaded and compared: identical)")
     print(sequences[["sequence_start", "sequence_end", "n_images", "label"]].to_string(index=False))
 
-    # 4. tf.data pipeline.
-    dataset = make_dataset(reloaded, real.REAL_DATA, CADENCE).batch(BATCH_SIZE)
-    print(f"\ntf.data.Dataset.from_generator(...).batch({BATCH_SIZE})  element_spec images: "
-          f"{dataset.element_spec[0]}")
+    # 4. Dataset.
+    dataset = FlareSequenceDataset(reloaded, real.REAL_DATA, CADENCE, batch_size=BATCH_SIZE)
+    print(f"\nFlareSequenceDataset(batch_size={BATCH_SIZE}): {len(dataset)} batches")
     seen = []
-    for number, (images, labels, ends, paths) in enumerate(dataset):
-        assert images.shape.rank == 5 and tuple(images.shape[1:]) == SEQUENCE_SHAPE
-        assert images.dtype == tf.float32
-        assert 0.0 <= float(tf.reduce_min(images)) and float(tf.reduce_max(images)) <= 1.0
-        ends = [e.decode() for e in ends.numpy()]
-        paths = [tuple(p.decode() for p in row) for row in paths.numpy()]
-        print(f"batch {number}: images {images.shape.as_list()} {images.dtype.name}  labels {labels.numpy().tolist()}")
-        for end, label, sequence_paths in zip(ends, labels.numpy().tolist(), paths):
-            print(f"    sequence_end {end}  label {label}  {[Path(p).name for p in sequence_paths]}")
-        seen += list(zip(ends, labels.numpy().tolist(), paths))
-    expected = list(zip(sequences["sequence_end"].map(real.format_time), sequences["label"],
-                        map(tuple, sequences["image_path"])))
-    assert seen == expected, "tf.data order or labels differ from the sequence table"
+    for number in range(len(dataset)):
+        images, labels = dataset[number]
+        assert images.ndim == 5 and images.shape[1:] == SEQUENCE_SHAPE
+        assert images.dtype == np.float32 and 0.0 <= images.min() and images.max() <= 1.0
+        print(f"batch {number}: images {list(images.shape)} {images.dtype}  labels {labels.tolist()}")
+        rows = sequences.iloc[len(seen):len(seen) + len(labels)]
+        for end, label, sequence_paths in zip(rows["sequence_end"], labels.tolist(), rows["image_path"]):
+            print(f"    sequence_end {real.format_time(end)}  label {label}  {[Path(p).name for p in sequence_paths]}")
+        seen += labels.tolist()
+    assert seen == sequences["label"].tolist(), "dataset order or labels differ from the sequence table"
 
     # 5. Independent label check from the final observation time of each
     #    sequence: the full-precision DATE_OBS of its last image.

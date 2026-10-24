@@ -1,7 +1,7 @@
 """
 Example 8 -- real full-disk images, one label per image, loaded with TensorFlow.
 
-The TensorFlow counterpart of example 7: same images, same catalog, same
+The TensorFlow counterpart of example 6: same images, same catalog, same
 labeling settings, same checks. Only the loader differs.
 
 Question answered for every image: "Does an M-class or stronger flare start
@@ -12,10 +12,11 @@ Steps
 1. Image index from examples/real_data/image_manifest.csv (timestamps are
    the full-precision DATE_OBS read from each file's header).
 2. Labels: flare_indexer.FullDiskSingleImage with every labeling choice explicit.
-3. Loading: a tf.data.Dataset that decodes each JPEG 2000 file with the
-   shared decoder (channel-first [C, H, W]), converts it explicitly to
-   TensorFlow's channel-last layout [H, W, C], and yields batches
-   [B, H, W, C] = [B, 256, 256, 1].
+3. Loading: FlareDataset, a keras.utils.PyDataset (TensorFlow's
+   counterpart of a torch Dataset). Keras asks it for whole batches, so
+   each item is (images, labels) for one batch, with images in
+   TensorFlow's channel-last layout [B, H, W, C] = [B, 256, 256, 1]. It can
+   be passed straight to model.fit.
 4. Checks: header time vs. index time for every loaded image, batch shapes,
    order of image paths, timestamps and labels against the label table, and
    every label recomputed from the catalog without flare_indexer.
@@ -26,12 +27,17 @@ Run:    python examples/08_tensorflow_images.py
 """
 
 import argparse
+import math
 import os
 import sys
 from pathlib import Path
 
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
+
 import numpy as np
 import pandas as pd
+import tensorflow as tf
+from tensorflow import keras
 
 import flare_indexer as fidx
 
@@ -46,36 +52,29 @@ BATCH_SIZE = 4
 IMAGE_SHAPE = (hmi_jp2.IMAGE_SIZE, hmi_jp2.IMAGE_SIZE, 1)  # [H, W, C]
 
 
-def to_channels_last(array: np.ndarray) -> np.ndarray:
-    """[C, H, W] (the shared decoder's layout) -> [H, W, C] (TensorFlow's layout)."""
-    if array.ndim != 3:
-        raise ValueError(f"expected [C, H, W], got shape {array.shape}")
-    return np.ascontiguousarray(np.transpose(array, (1, 2, 0)))
+class FlareDataset(keras.utils.PyDataset):
+    """
+    One batch of labeled images per item: (images [B, H, W, C], labels [B]).
 
+    labels is the table built by flare_indexer, one row per image with
+    timestamp, image_path and label; image_root is the folder the image
+    paths are relative to.
+    """
 
-def load_image(path: Path, expected_time: pd.Timestamp) -> np.ndarray:
-    """Check the header time, decode, and return float32 [H, W, C]."""
-    observed = hmi_jp2.observation_time(hmi_jp2.read_jp2_header(path))
-    if observed != expected_time:
-        raise ValueError(f"{path}: header time {observed} != index time {expected_time}")
-    return to_channels_last(hmi_jp2.decode_magnetogram(path))
+    def __init__(self, labels: pd.DataFrame, image_root: Path, batch_size: int, **kwargs):
+        super().__init__(**kwargs)
+        self.labels = labels.reset_index(drop=True)
+        self.image_root = Path(image_root)
+        self.batch_size = batch_size
 
+    def __len__(self):
+        return math.ceil(len(self.labels) / self.batch_size)
 
-def make_dataset(labels: pd.DataFrame, image_root: Path):
-    """tf.data.Dataset of (image [H, W, C], label, timestamp, image_path), in label-table order."""
-    import tensorflow as tf
-
-    def samples():
-        for row in labels.itertuples(index=False):
-            image = load_image(image_root / row.image_path, row.timestamp)
-            yield image, np.int32(row.label), real.format_time(row.timestamp), row.image_path
-
-    return tf.data.Dataset.from_generator(samples, output_signature=(
-        tf.TensorSpec(shape=IMAGE_SHAPE, dtype=tf.float32),
-        tf.TensorSpec(shape=(), dtype=tf.int32),
-        tf.TensorSpec(shape=(), dtype=tf.string),
-        tf.TensorSpec(shape=(), dtype=tf.string),
-    ))
+    def __getitem__(self, i):
+        rows = self.labels.iloc[i * self.batch_size:(i + 1) * self.batch_size]
+        images = np.stack([hmi_jp2.to_channels_last(hmi_jp2.load_image(self.image_root / path, t))
+                           for t, path in zip(rows["timestamp"], rows["image_path"])])
+        return images, rows["label"].to_numpy(dtype=np.int32)
 
 
 def main(argv=None):
@@ -83,8 +82,6 @@ def main(argv=None):
     parser.add_argument("--output", type=Path, default=EXAMPLES / "output")
     args = parser.parse_args(argv)
     real.require_optional_dependencies("tensorflow")
-    os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
-    import tensorflow as tf
 
     args.output.mkdir(parents=True, exist_ok=True)
     index_path = args.output / "08_image_index.csv"
@@ -111,25 +108,21 @@ def main(argv=None):
     print(f"\nLabels -> {labels_path}")
     print(labels.to_string(index=False))
 
-    # 3. tf.data pipeline.
-    dataset = make_dataset(labels, real.REAL_DATA).batch(BATCH_SIZE)
-    print(f"\ntf.data.Dataset.from_generator(...).batch({BATCH_SIZE})  element_spec images: "
-          f"{dataset.element_spec[0]}")
+    # 3. Dataset.
+    dataset = FlareDataset(labels, real.REAL_DATA, batch_size=BATCH_SIZE)
+    print(f"\nFlareDataset(batch_size={BATCH_SIZE}): {len(dataset)} batches")
     seen = []
-    for number, (images, batch_labels, timestamps, paths) in enumerate(dataset):
-        assert images.shape.rank == 4 and tuple(images.shape[1:]) == IMAGE_SHAPE
-        assert images.dtype == tf.float32
-        assert 0.0 <= float(tf.reduce_min(images)) and float(tf.reduce_max(images)) <= 1.0
-        timestamps = [t.decode() for t in timestamps.numpy()]
-        paths = [p.decode() for p in paths.numpy()]
-        print(f"batch {number}: images {images.shape.as_list()} {images.dtype.name} "
-              f"range [{float(tf.reduce_min(images)):.3f}, {float(tf.reduce_max(images)):.3f}]  "
-              f"labels {batch_labels.numpy().tolist()}")
-        for t, path in zip(timestamps, paths):
-            print(f"    {t}  {path}")
-        seen += list(zip(timestamps, paths, batch_labels.numpy().tolist()))
-    expected = list(zip(labels["timestamp"].map(real.format_time), labels["image_path"], labels["label"]))
-    assert seen == expected, "tf.data order or labels differ from the label table"
+    for number in range(len(dataset)):
+        images, batch_labels = dataset[number]
+        assert images.ndim == 4 and images.shape[1:] == IMAGE_SHAPE
+        assert images.dtype == np.float32 and 0.0 <= images.min() and images.max() <= 1.0
+        print(f"batch {number}: images {list(images.shape)} {images.dtype} "
+              f"range [{images.min():.3f}, {images.max():.3f}]  labels {batch_labels.tolist()}")
+        rows = labels.iloc[len(seen):len(seen) + len(batch_labels)]
+        for t, path in zip(rows["timestamp"], rows["image_path"]):
+            print(f"    {real.format_time(t)}  {path}")
+        seen += batch_labels.tolist()
+    assert seen == labels["label"].tolist(), "dataset order or labels differ from the label table"
 
     # 4. Independent label check: no flare_indexer, just the catalog rows.
     catalog = real.load_catalog()

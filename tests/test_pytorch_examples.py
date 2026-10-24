@@ -9,7 +9,6 @@ examples/real_data/fetch_real_data.py; those tests are skipped otherwise.
 """
 
 import hashlib
-import importlib.util
 import json
 import subprocess
 import sys
@@ -40,13 +39,6 @@ EXPECTED_IMAGE_LABELS = {
     "2017-09-03 07:59:50.000": 1, "2017-09-03 09:00:34.900": 1, "2017-09-03 09:59:49.900": 1,
 }
 EXPECTED_SEQUENCE_ENDS = {"2017-09-03 02:59:49.900": 0, "2017-09-03 03:59:49.900": 0}
-
-
-def _load_example(name):
-    spec = importlib.util.spec_from_file_location(f"example_{name[:2]}", EXAMPLES / name)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
 
 
 def _builder(**sequence):
@@ -177,11 +169,10 @@ def test_tenth_of_a_second_off_grid_is_not_turned_into_an_hourly_step(tmp_path):
 
 
 def test_sequence_csv_round_trip(index_csv, tmp_path):
-    example = _load_example("07_pytorch_sequences.py")
     sequences = _builder(cadence="1h", observation_window="3h", sliding_window="1h").build(index_csv, real.CATALOG)
     path = tmp_path / "sequences.csv"
-    example.save_sequences(sequences, path)
-    reloaded = example.load_sequences(path)
+    real.save_sequences(sequences, path)
+    reloaded = real.load_sequences(path)
     pd.testing.assert_frame_equal(reloaded, sequences, check_dtype=False)
     assert isinstance(reloaded["image_path"].iloc[0], list)
     assert isinstance(reloaded["timestamps"].iloc[0][0], pd.Timestamp)

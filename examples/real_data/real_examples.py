@@ -152,5 +152,16 @@ def load_sequences(path: Path) -> pd.DataFrame:
     return sequences
 
 
+def check_sequence(row, cadence) -> None:
+    """Raise if a sequence row's images are not `cadence` apart or do not end at sequence_end."""
+    timestamps, paths, cadence = row["timestamps"], row["image_path"], pd.Timedelta(cadence)
+    if len(timestamps) != len(paths) or len(paths) != row["n_images"]:
+        raise ValueError(f"sequence ending {row['sequence_end']}: {len(timestamps)} timestamps, {len(paths)} paths")
+    if any(later - earlier != cadence for earlier, later in zip(timestamps, timestamps[1:])):
+        raise ValueError(f"sequence ending {row['sequence_end']}: images are not {cadence} apart: {timestamps}")
+    if timestamps[-1] != row["sequence_end"]:
+        raise ValueError(f"sequence ending {row['sequence_end']}: last image is at {timestamps[-1]}")
+
+
 def load_catalog() -> pd.DataFrame:
     return pd.read_csv(CATALOG, parse_dates=["start_time", "peak_time", "end_time"])

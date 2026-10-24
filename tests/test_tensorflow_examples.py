@@ -1,8 +1,8 @@
 """
 Checks for the real-image TensorFlow examples (examples 08 and 09).
 
-The layout conversion and the sequence checks need neither TensorFlow nor
-images. Running the examples needs TensorFlow, Pillow with JPEG 2000
+The layout conversion and the sequence checks (shared helpers in
+examples/real_data) need neither TensorFlow nor images. Running the examples needs TensorFlow, Pillow with JPEG 2000
 support and the images from examples/real_data/fetch_real_data.py; the
 comparison with the PyTorch examples (06, 07) also needs PyTorch. Tests
 whose requirements are missing are skipped, so the base suite runs without
@@ -25,6 +25,11 @@ REAL_DATA = EXAMPLES / "real_data"
 
 pytestmark = pytest.mark.skipif(not REAL_DATA.is_dir(), reason="examples/ not available (installed package)")
 
+if REAL_DATA.is_dir():
+    sys.path.insert(0, str(REAL_DATA))
+    import hmi_jp2
+    import real_examples as real
+
 
 def _load(name):
     spec = importlib.util.spec_from_file_location(f"example_{name[:2]}", EXAMPLES / name)
@@ -44,6 +49,7 @@ def _images_available():
     return all((REAL_DATA / p).exists() for p in manifest.loc[manifest["status"] == "ok", "image_path"])
 
 
+needs_tf_only = pytest.mark.skipif(not _has("tensorflow"), reason="needs tensorflow")
 needs_tf = pytest.mark.skipif(not _has("tensorflow") or not _images_available(),
                               reason="needs tensorflow and the downloaded real images")
 needs_tf_and_torch = pytest.mark.skipif(not _has("tensorflow") or not _has("torch") or not _images_available(),
@@ -53,18 +59,16 @@ needs_tf_and_torch = pytest.mark.skipif(not _has("tensorflow") or not _has("torc
 # ── Without TensorFlow ───────────────────────────────────────────────────
 
 def test_channels_first_is_converted_to_channels_last():
-    images = _load("08_tensorflow_images.py")
     chw = np.arange(2 * 3 * 4, dtype=np.float32).reshape(2, 3, 4)  # C=2, H=3, W=4
-    hwc = images.to_channels_last(chw)
+    hwc = hmi_jp2.to_channels_last(chw)
     assert hwc.shape == (3, 4, 2) and hwc.flags["C_CONTIGUOUS"]
     for c in range(2):
         np.testing.assert_array_equal(hwc[:, :, c], chw[c])
     with pytest.raises(ValueError):
-        images.to_channels_last(chw[0])
+        hmi_jp2.to_channels_last(chw[0])
 
 
 def test_sequence_checks_reject_bad_rows_before_decoding():
-    sequences = _load("09_tensorflow_sequences.py")
     t = pd.to_datetime(["2017-09-03 00:59:49.9", "2017-09-03 01:59:49.9", "2017-09-03 02:59:49.9"])
     good = dict(timestamps=list(t), image_path=["a", "b", "c"], n_images=3, sequence_end=t[-1])
     cadence = pd.Timedelta("1h")
@@ -72,25 +76,27 @@ def test_sequence_checks_reject_bad_rows_before_decoding():
     def row(**changes):
         return pd.Series({**good, **changes})
 
+    real.check_sequence(row(), cadence)
     off_grid = list(t[:2]) + [t[2] + pd.Timedelta("100ms")]
     with pytest.raises(ValueError, match="not 0 days 01:00:00 apart"):
-        sequences.load_sequence(row(timestamps=off_grid, sequence_end=off_grid[-1]), REAL_DATA, cadence)
+        real.check_sequence(row(timestamps=off_grid, sequence_end=off_grid[-1]), cadence)
     with pytest.raises(ValueError, match="not 0 days 01:00:00 apart"):
-        sequences.load_sequence(row(timestamps=list(reversed(t)), sequence_end=t[0]), REAL_DATA, cadence)
+        real.check_sequence(row(timestamps=list(reversed(t)), sequence_end=t[0]), cadence)
     with pytest.raises(ValueError, match="last image"):
-        sequences.load_sequence(row(sequence_end=t[1]), REAL_DATA, cadence)
+        real.check_sequence(row(sequence_end=t[1]), cadence)
     with pytest.raises(ValueError, match="paths"):
-        sequences.load_sequence(row(image_path=["a", "b"]), REAL_DATA, cadence)
+        real.check_sequence(row(image_path=["a", "b"]), cadence)
 
 
+# ── With TensorFlow ──────────────────────────────────────────────────────
+
+@needs_tf_only
 def test_tensorflow_shapes_follow_the_shared_decoder():
     images = _load("08_tensorflow_images.py")
     sequences = _load("09_tensorflow_sequences.py")
     assert images.IMAGE_SHAPE == (256, 256, 1)
     assert sequences.SEQUENCE_SHAPE == (3, 256, 256, 1)
 
-
-# ── With TensorFlow ──────────────────────────────────────────────────────
 
 def _run(script, output):
     completed = subprocess.run([sys.executable, str(EXAMPLES / script), "--output", str(output)],
@@ -147,19 +153,46 @@ def test_tensorflow_and_pytorch_loaders_yield_the_same_samples(tmp_path):
     sequences = DatasetBuilder(cadence="1h", observation_window="3h", sliding_window="1h", **options) \
         .build(index_path, real.CATALOG)
 
-    torch_dataset = torch_images.make_dataset_class()(labels, real.REAL_DATA)
-    tf_samples = list(tf_images.make_dataset(labels, real.REAL_DATA).as_numpy_iterator())
+    torch_dataset = torch_images.FlareDataset(labels, real.REAL_DATA)
+    tf_dataset = tf_images.FlareDataset(labels, real.REAL_DATA, batch_size=4)
+    tf_samples = [sample for i in range(len(tf_dataset)) for sample in zip(*tf_dataset[i])]
     assert len(torch_dataset) == len(tf_samples) == 9
-    for i, (tf_image, tf_label, tf_time, tf_path) in enumerate(tf_samples):
-        image, label, timestamp, path = torch_dataset[i]
+    for i, (tf_image, tf_label) in enumerate(tf_samples):
+        image, label = torch_dataset[i]
         np.testing.assert_array_equal(image.permute(1, 2, 0).numpy(), tf_image)       # [C,H,W] -> [H,W,C]
-        assert (int(label), timestamp, path) == (int(tf_label), tf_time.decode(), tf_path.decode())
+        assert int(label) == int(tf_label) == labels["label"].iloc[i]
 
-    torch_dataset = torch_sequences.make_dataset_class()(sequences, real.REAL_DATA, "1h")
-    tf_samples = list(tf_sequences.make_dataset(sequences, real.REAL_DATA, "1h").as_numpy_iterator())
+    torch_dataset = torch_sequences.FlareSequenceDataset(sequences, real.REAL_DATA, "1h")
+    tf_dataset = tf_sequences.FlareSequenceDataset(sequences, real.REAL_DATA, "1h", batch_size=2)
+    tf_samples = [sample for i in range(len(tf_dataset)) for sample in zip(*tf_dataset[i])]
     assert len(torch_dataset) == len(tf_samples) == 2
-    for i, (tf_images_t, tf_label, tf_end, tf_paths) in enumerate(tf_samples):
-        images, label, end, paths = torch_dataset[i]
+    for i, (tf_images_t, tf_label) in enumerate(tf_samples):
+        images, label = torch_dataset[i]
         np.testing.assert_array_equal(images.permute(0, 2, 3, 1).numpy(), tf_images_t)  # [T,C,H,W] -> [T,H,W,C]
-        assert (int(label), end, paths) == (int(tf_label), tf_end.decode(), [p.decode() for p in tf_paths])
-        assert end == real.format_time(sequences["sequence_end"].iloc[i])
+        assert int(label) == int(tf_label) == sequences["label"].iloc[i]
+
+
+@needs_tf
+def test_tensorflow_datasets_train_with_model_fit(tmp_path):
+    tf_images = _load("08_tensorflow_images.py")
+    tf_sequences = _load("09_tensorflow_sequences.py")
+    real = tf_images.real
+    import flare_indexer as fidx
+    from tensorflow import keras
+
+    index_path = tmp_path / "index.csv"
+    real.build_image_index(index_path)
+    options = dict(prediction_window="24h", strategy=fidx.BinaryThresholdStrategy("M"), target="full_disk",
+                   event_time="start")
+    labels = DatasetBuilder(include_metadata=True, **options).build(index_path, real.CATALOG)
+    sequences = DatasetBuilder(cadence="1h", observation_window="3h", sliding_window="1h", **options) \
+        .build(index_path, real.CATALOG)
+
+    for shape, dataset in [
+        (tf_images.IMAGE_SHAPE, tf_images.FlareDataset(labels, real.REAL_DATA, batch_size=4)),
+        (tf_sequences.SEQUENCE_SHAPE, tf_sequences.FlareSequenceDataset(sequences, real.REAL_DATA, "1h", batch_size=2)),
+    ]:
+        model = keras.Sequential([keras.Input(shape), keras.layers.Flatten(), keras.layers.Dense(1, activation="sigmoid")])
+        model.compile(optimizer="adam", loss="binary_crossentropy")
+        history = model.fit(dataset, epochs=1, verbose=0)
+        assert np.isfinite(history.history["loss"][0])

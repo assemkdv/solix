@@ -68,7 +68,7 @@ def test_event_matcher_query_accepts_duration(boundary_catalog):
     assert len(matcher.query(t, "23h59min59s", event_time="start")) == 0
 
 
-@pytest.mark.parametrize("window", [0, -1, "0h", "-2h", "soon", None, True])
+@pytest.mark.parametrize("window", [0, -1, "0h", "-2h", "soon", None, True, float("inf"), float("nan")])
 def test_invalid_prediction_window_raises(window):
     with pytest.raises(ValueError, match="prediction_window"):
         DatasetBuilder(prediction_window=window, strategy=BinaryThresholdStrategy())
@@ -242,12 +242,6 @@ def test_include_metadata_empty_index_keeps_columns(tmp_path, ar_catalog):
 
 
 # ── Other checks ─────────────────────────────────────────────────────────
-
-
-@pytest.mark.parametrize("window", [float("inf"), float("nan")])
-def test_non_finite_prediction_window_raises(window):
-    with pytest.raises(ValueError, match="prediction_window"):
-        DatasetBuilder(prediction_window=window, strategy=BinaryThresholdStrategy())
 
 
 def test_prediction_window_attribute_keeps_given_value():

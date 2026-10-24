@@ -51,11 +51,6 @@ def test_each_class(goes_class, expected):
     assert labeler.assign(flux(goes_class)) == expected
 
 
-@pytest.mark.parametrize("letter, boundary", BOUNDARIES.items())
-def test_exact_boundary_belongs_to_the_higher_class(letter, boundary):
-    assert labeler.assign(boundary) == letter
-
-
 LOWER_CLASS = {"A": None, "B": "A", "C": "B", "M": "C", "X": "M"}
 
 

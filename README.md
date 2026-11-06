@@ -1,88 +1,62 @@
 # flare-indexer
 
-flare-indexer builds labeled datasets for solar flare prediction. You give it
-the times of your solar images and a GOES flare catalog. For each image, or
-each sequence of images, it finds the flares in the prediction window after
-the image and turns them into a label: binary, flux, class, counts, a
-cumulative index or the relative X-ray flux. Full-disk and active-region
-data are both supported.
+flare-indexer builds labeled datasets for solar flare prediction.
+
+You give it two tables: the times of your solar images and a GOES flare
+catalog. For each image, or each sequence of images, it finds the flares
+that start in a prediction window after the image and turns them into a
+label. The result is one pandas DataFrame, one row per image or sequence,
+ready for a machine-learning data loader.
+
+- Full-disk images and active-region patches.
+- Single images and sequences of images.
+- Binary, flux, class, count, cumulative-index and relative-X-ray-flux
+  labels, or your own.
+- Every choice is a named parameter, so a dataset can be rebuilt exactly.
+- Pure Python. Only pandas and NumPy.
+
+**Contents**
+
+1. [How it works](#how-it-works)
+2. [Installation](#installation)
+3. [Quick start](#quick-start)
+4. [Inputs](#inputs)
+5. [The four dataset classes](#the-four-dataset-classes)
+6. [Parameters](#parameters)
+7. [The prediction window](#the-prediction-window)
+8. [Labels: strategies, reducers and labelers](#labels-strategies-reducers-and-labelers)
+9. [Output](#output)
+10. [Preparing real data](#preparing-real-data)
+11. [Errors and warnings](#errors-and-warnings)
+12. [Examples](#examples)
+13. [Repository structure](#repository-structure)
+14. [Tests](#tests)
+15. [License](#license)
+
+---
 
 ## How it works
 
-```mermaid
-flowchart TD
-    subgraph prep["Optional: prepare the inputs (loaders.py)"]
-        direction LR
-        hmi["HMI file names"] --> f1["build_image_index_from_filenames"]
-        goes["GOES flare list"] --> f2["adapt_goes_catalog<br/>renames columns,<br/>restores 5-digit NOAA numbers"]
-        xrs["GOES 1-minute X-ray flux"] --> f3["add_relative_flux<br/>adds background_flux and rxfi"]
-    end
+![Architecture of flare-indexer](docs/architecture/architecture.png)
 
-    f1 --> index[("Image index CSV<br/>timestamp, [active_region], [image_path], ...")]
-    f2 --> catalog[("Flare catalog CSV<br/>start_time, peak_time, end_time,<br/>class, active_region, [rxfi]")]
-    catalog --> f3
-    f3 --> catalog
+1. **Input.** Two CSV files: an image index and a flare catalog. Optional
+   helpers in `loaders.py` make them from raw data. The configuration is a
+   dataset class and its parameters.
+2. **Processing.** `dataset.build(image_index, flare_catalog)`:
+   1. validates both files;
+   2. makes the samples, single images or sequences;
+   3. for each sample, `EventMatcher` finds the flares that start in the
+      window `[t, t + w)`;
+   4. the strategy turns those flares into a label: a **reducer** makes
+      one value from the flares, and a **labeler** makes the label from
+      the value.
+3. **Output.** A pandas DataFrame with one row per sample.
 
-    subgraph choose["You choose (datasets.py)"]
-        direction LR
-        cls["Dataset class<br/>FullDiskSingleImage, FullDiskSequence,<br/>ActiveRegionSingleImage, ActiveRegionSequence"]
-        settings["Settings<br/>prediction_window, cadence, start,<br/>observation_window, sliding_window,<br/>missing_active_region"]
-        strategy["Strategy<br/>BinaryThresholdStrategy, MaxFlareStrategy,<br/>DatasetBuildingPipeline(reducer, labeler),<br/>or any object with label(flares)"]
-    end
-
-    index --> build
-    catalog --> build
-    choose --> build["build(image index, flare catalog)<br/>builder.py"]
-
-    build --> check["Read and check both files<br/>times, GOES classes, column names<br/>(events.py, goes_class.py)"]
-    check --> samples["Make the samples<br/>single images, or sequences on an exact time grid<br/>(a sequence with a missing image is skipped);<br/>active regions are handled one region at a time"]
-
-    subgraph each["For each image or sequence"]
-        direction LR
-        t["Reference time t<br/>the image, or the<br/>last image of the sequence"] --> match["Find flares<br/>that start in [t, t + w);<br/>same region only for patches<br/>(EventMatcher, events.py)"]
-        match --> reduce["Reducer<br/>flares to one value<br/>(reducers.py)"]
-        reduce --> assign["Labeler<br/>value to label<br/>(labelers.py)"]
-    end
-
-    samples --> each
-    each --> out[("Labeled table, pandas DataFrame<br/>one row per image or sequence<br/>+ SequenceBuildReport for sequences, on request")]
-    out --> ml["Your training code<br/>e.g. PyTorch or TensorFlow (examples 06 to 11)"]
-```
-
-Reducers: MaxFlux, MinFlux, MeanFlux, ClassCount, CumulativeClassIndex,
-MaxRelativeFlux, SumRelativeFlux. Labelers: BinaryThreshold,
-NumericThreshold, Regression, Multiclass, ClassCount, ClassPresence.
-`BinaryThresholdStrategy` is MaxFlux + BinaryThreshold, and
-`MaxFlareStrategy` is MaxFlux + Regression.
-
-## Repository structure
-
-```text
-flare-indexer/
-├── src/flare_indexer/          the package
-│   ├── __init__.py             the public names (import flare_indexer as fidx)
-│   ├── datasets.py             the four dataset classes you choose from
-│   ├── builder.py              DatasetBuilder: reads the inputs, makes the samples, collects the labels
-│   ├── events.py               loads and checks the flare catalog; finds the flares in a window
-│   ├── goes_class.py           GOES class text to flux and back (C10.0 == M1.0)
-│   ├── reducers.py             flares to one value
-│   ├── labelers.py             value to label
-│   ├── strategies.py           two ready-made reducer + labeler pairs
-│   ├── pipeline.py             DatasetBuildingPipeline: any reducer + labeler
-│   └── loaders.py              optional helpers that prepare the two input files
-├── examples/                   01 to 05 synthetic data, 06 to 11 real data with PyTorch and TensorFlow
-│   ├── data/                   the synthetic image indexes and flare catalog
-│   └── real_data/              download scripts, image readers, manifests and the real flare catalog
-├── tests/                      the automated tests, one file per topic
-├── docs/                       DATASETS.md, LABELS.md and the architecture figure
-├── .github/workflows/test.yml  runs the tests on Python 3.10 to 3.13 for every push
-├── setup.cfg, setup.py         package metadata and dependencies
-└── LICENSE                     GPL-3.0-or-later
-```
+---
 
 ## Installation
 
-Python 3.10 or newer. The only dependencies are pandas (2.0 or newer) and numpy.
+Python 3.10 or newer. Dependencies: pandas (2.0 or newer) and NumPy.
 
 ```bash
 git clone https://github.com/assemkdv/flare-indexer.git
@@ -90,71 +64,397 @@ cd flare-indexer
 pip install .
 ```
 
+Optional extras:
+
+| Command | Installs |
+|---|---|
+| `pip install -e ".[dev]"` | pytest, to run the tests |
+| `pip install ".[pytorch-examples]"` | torch, pillow, astropy, for examples 06, 07, 10 |
+| `pip install ".[tensorflow-examples]"` | tensorflow, pillow, astropy, for examples 08, 09, 11 |
+
+The package is not on PyPI yet.
+
+---
+
 ## Quick start
 
 ```python
 import flare_indexer as fidx
 
-builder = fidx.FullDiskSingleImage(
-    prediction_window="24h",                     # window [t, t + 24h)
-    strategy=fidx.BinaryThresholdStrategy("M"),  # 1 if a flare >= M1.0 starts in it
+dataset = fidx.FullDiskSingleImage(
+    prediction_window="24h",                     # flares that start in [t, t + 24h)
+    strategy=fidx.BinaryThresholdStrategy("M"),  # 1 if any of them is M1.0 or stronger
 )
-labels = builder.build("examples/data/full_disk_image_index.csv",
+labels = dataset.build("examples/data/full_disk_image_index.csv",
                        "examples/data/flare_catalog.csv")
+print(labels.head(3))
 ```
 
-The result is a pandas DataFrame with one row per image and a `label`
-column. A flare counts if it starts at the image time `t` or later, and
-before `t + 24h`.
+```text
+            timestamp  label
+0 2024-03-01 00:00:00      1
+1 2024-03-01 01:00:00      1
+2 2024-03-01 02:00:00      1
+```
 
-The image index is a CSV with a `timestamp` column (plus `active_region`
-for active-region labels). The flare catalog is a CSV with
-`start_time, peak_time, end_time, class, active_region`.
+Two steps, always the same: **create** a dataset object with a class and
+its parameters, then **build** it from the two files.
 
-## Four kinds of dataset
+---
 
-| Class | Each row is labeled from |
+## Inputs
+
+### Image index
+
+One row per image (or per active-region patch).
+
+| Column | Required | Meaning |
+|---|---|---|
+| `timestamp` | always | observation time of the image |
+| `active_region` | active-region classes | NOAA region number of the patch |
+| any other, e.g. `image_path` | no | kept in the output on request |
+
+```text
+timestamp,active_region,image_path
+2024-03-01 00:00:00,13600,patches/13600/patch_13600_20240301_0000.jpg
+2024-03-01 00:00:00,13601,patches/13601/patch_13601_20240301_0000.jpg
+```
+
+A row can describe any observation with a time, not only an image.
+
+### Flare catalog
+
+One row per flare.
+
+| Column | Required | Meaning |
+|---|---|---|
+| `start_time`, `peak_time`, `end_time` | yes | full date and time of the flare |
+| `class` | yes | GOES class, e.g. `M1.4` |
+| `active_region` | yes (cells may be blank) | NOAA region number |
+| `rxfi` | only for the relative-flux reducers | relative X-ray flux increase, from `add_relative_flux` |
+| `fl_lon`, `fl_lat` | no | flare location, kept if present |
+
+```text
+start_time,peak_time,end_time,class,active_region
+2024-03-01 04:00:00,2024-03-01 04:12:00,2024-03-01 04:30:00,C3.2,13600
+2024-03-01 13:20:00,2024-03-01 13:35:00,2024-03-01 13:50:00,M1.4,13600
+```
+
+Only `start_time` decides whether a flare is in a window. The three times
+are checked for order: `start_time ≤ peak_time ≤ end_time`.
+
+### Your own column names
+
+If your files use other names, map them in `build()`:
+
+```python
+labels = dataset.build(
+    "my_images.csv", "my_flares.csv",
+    index_columns={"obs_time": "timestamp"},
+    catalog_columns={"goes_class": "class"},
+)
+```
+
+The output always uses the package's names.
+
+### Times
+
+Times with a UTC offset are converted to UTC. Times without one are used
+as they are, so the image index and the catalog must use the same time
+scale (UTC for GOES). There is no TAI-to-UTC correction.
+
+---
+
+## The four dataset classes
+
+| Class | One row per | Flares that count |
+|---|---|---|
+| `FullDiskSingleImage` | full-disk image | all flares |
+| `FullDiskSequence` | sequence of full-disk images | all flares |
+| `ActiveRegionSingleImage` | active-region patch | flares of the patch's region |
+| `ActiveRegionSequence` | sequence of patches of one region | flares of that region |
+
+All four share one engine (`DatasetBuilder`), so a parameter means the
+same thing in every class.
+
+**Sequences.** A sequence is a run of images at a fixed time step. It is
+labeled from the window after its **last** image. Sequences are built on
+an exact time grid: if any image of the grid is missing, the sequence is
+skipped, not filled with a nearby image. Active-region sequences are built
+separately for each region.
+
+---
+
+## Parameters
+
+| Parameter | Single images | Sequences | Default | Meaning |
+|---|---|---|---|---|
+| `prediction_window` | required | required | | length of the window, e.g. `"24h"`, `"12h"`, or a number of hours |
+| `strategy` | required | required | | how flares become a label (see below) |
+| `cadence` | optional | required | `None` | time between images; for single images, keeps one image per cadence |
+| `start` | optional | optional | earliest image | first point of the cadence grid; must be an image time |
+| `observation_window` | | required | | time one sequence covers; a multiple of `cadence` |
+| `sliding_window` | | required | | time between the starts of two sequences |
+| `missing_active_region` | active region only | active region only | `"negative"` | images without a region: `"negative"` (labeled as no flare, with a warning), `"drop"`, or `"error"` |
+| `include_metadata` | optional | | `False` | keep the other image-index columns, e.g. `image_path` |
+| `include_flares` | optional | optional | `False` | add a `flares` column listing the flares of each window |
+| `verbose` | optional | optional | `False` | print a short summary of the build |
+
+`cadence` and `sliding_window` must be multiples of the image index's own
+time step. A sequence has `observation_window / cadence` images.
+
+`build()` takes:
+
+| Argument | Meaning |
 |---|---|
-| `FullDiskSingleImage` | one full-disk image |
-| `FullDiskSequence` | a sequence of full-disk images |
-| `ActiveRegionSingleImage` | one active-region patch (only that region's flares count) |
-| `ActiveRegionSequence` | a sequence of patches of one region |
+| `image_index_path` | path to the image index CSV |
+| `event_catalog_path` | path to the flare catalog CSV |
+| `return_report=False` | sequences only: also return a `SequenceBuildReport` |
+| `index_columns`, `catalog_columns` | `{your column name: package column name}` |
 
-All four are used the same way. The sequence classes also take `cadence`,
-`observation_window` and `sliding_window`.
+---
 
-## Labels
+## The prediction window
 
-Binary (≥ a GOES class), peak flux (strongest, weakest, mean), GOES class,
-flare counts per class, the cumulative index ΣC + 10ΣM + 100ΣX, and the
-relative X-ray flux increase (RXF), or your own.
+For a sample with reference time `t` and a prediction window `w`, a flare
+counts if it **starts** in
 
-## Documentation
+```text
+[t, t + w)        from t, up to but not including t + w
+```
 
-- [docs/DATASETS.md](docs/DATASETS.md): inputs, the prediction window, the
-  four classes and all their settings, preparing real data
-- [docs/LABELS.md](docs/LABELS.md): every label with an example, building
-  your own, and RXF
+- `t` is the image time, or the time of the **last** image of a sequence.
+- For active-region classes, only flares with the same `active_region`
+  count.
+- A flare that started before `t` does not count, even if it is still in
+  progress.
+
+---
+
+## Labels: strategies, reducers and labelers
+
+The `strategy` parameter decides how the flares of a window become a
+label. A label is made in two steps:
+
+```text
+flares in the window  ──reducer──>  one value  ──labeler──>  label
+```
+
+### Ready-made strategies
+
+| Strategy | Reducer + labeler | Label |
+|---|---|---|
+| `BinaryThresholdStrategy("M")` | MaxFlux + BinaryThreshold | 1 if the strongest flare is ≥ M1.0, else 0 |
+| `MaxFlareStrategy()` | MaxFlux + Regression | peak flux of the strongest flare (W/m²), 0.0 if none |
+
+The threshold can be a letter (`"C"`, `"M"`, `"X"`) or a full class
+(`"M5.0"`).
+
+### Any reducer with any labeler
+
+```python
+strategy = fidx.DatasetBuildingPipeline(
+    reducer=fidx.CumulativeClassIndexReducer(),
+    labeler=fidx.NumericThresholdLabeler(10),
+)
+```
+
+**Reducers** (flares → one value):
+
+| Reducer | Value | Empty window |
+|---|---|---|
+| `MaxFluxReducer` | peak flux of the strongest flare (W/m²) | 0.0 |
+| `MinFluxReducer` | peak flux of the weakest flare | 0.0 |
+| `MeanFluxReducer` | mean peak flux of all flares | 0.0 |
+| `ClassCountReducer` | number of flares per class, `{A, B, C, M, X}` | all zeros |
+| `CumulativeClassIndexReducer` | ΣC + 10·ΣM + 100·ΣX of the class numbers (C2.6 → 2.6, M1.5 → 15) | 0.0 |
+| `MaxRelativeFluxReducer` | largest `rxfi` | 0.0 |
+| `SumRelativeFluxReducer` | sum of `rxfi` | 0.0 |
+
+The two relative-flux reducers need the `rxfi` column and work for single
+images only.
+
+**Labelers** (value → label):
+
+| Labeler | Label | Use with |
+|---|---|---|
+| `BinaryThresholdLabeler("M")` | 1 if value ≥ the class flux, else 0 | flux reducers |
+| `NumericThresholdLabeler(10)` | 1 if value ≥ the number, else 0 | cumulative index, rxfi |
+| `RegressionLabeler()` | the value itself | any number |
+| `MulticlassLabeler()` | `"NF"`, `"A"`, `"B"`, `"C"`, `"M"` or `"X"` | `MaxFluxReducer` |
+| `ClassCountLabeler()` | counts per class | `ClassCountReducer` |
+| `ClassPresenceLabeler()` | 0/1 per class | `ClassCountReducer` |
+
+### Your own strategy
+
+Any object with a `label(flares)` method works as a strategy. In the same
+way, any object with a `reduce(flares)` method works as a reducer, and any
+object with an `assign(value)` method works as a labeler.
+
+```python
+class StrongestClassLetter:
+    def label(self, flares):
+        if not flares:
+            return "none"
+        flux = fidx.FluxConverter()
+        strongest = max(flares, key=lambda f: flux.to_flux(f.goes_class))
+        return strongest.goes_class[0]
+
+dataset = fidx.FullDiskSingleImage("24h", StrongestClassLetter())
+```
+
+### GOES classes
+
+Classes are converted to peak flux before they are compared, so `C10.0`
+equals `M1.0`, and `M9.0` is weaker than `M10.0`. Comparing the class
+text would get both wrong.
+
+---
+
+## Output
+
+A pandas DataFrame, one row per sample.
+
+**Single images**
+
+| Column | When |
+|---|---|
+| `timestamp` | always |
+| `active_region` | active-region classes |
+| `label` | always |
+| other image-index columns, e.g. `image_path` | `include_metadata=True` |
+| `flares` | `include_flares=True` |
+
+```text
+            timestamp active_region  label                                   image_path
+0 2024-03-01 00:00:00         13600      1  patches/13600/patch_13600_20240301_0000.jpg
+1 2024-03-01 00:00:00         13601      1  patches/13601/patch_13601_20240301_0000.jpg
+```
+
+**Sequences**
+
+| Column | Meaning |
+|---|---|
+| `sequence_start`, `sequence_end` | first and last image time |
+| `timestamps` | list of the image times |
+| `n_images` | number of images |
+| `active_region` | active-region classes |
+| `label` | label from the window after the last image |
+| other image-index columns | one list per column, e.g. the image paths of the sequence |
+| `flares` | `include_flares=True` |
+
+With `return_report=True`, `build()` returns `(DataFrame,
+SequenceBuildReport)`. The report counts the candidate, emitted and skipped
+sequences and lists the missing times that caused the skips.
+
+```python
+dataset = fidx.FullDiskSequence("24h", fidx.MaxFlareStrategy(),
+                                cadence="1h", observation_window="3h", sliding_window="1h")
+labels, report = dataset.build("examples/data/full_disk_image_index.csv",
+                               "examples/data/flare_catalog.csv", return_report=True)
+print(report.emitted_sequences, report.skipped_sequences)   # 114 4
+```
+
+---
+
+## Preparing real data
+
+Three optional helpers in `loaders.py` make the two input files from raw
+data.
+
+| Helper | Input | Output |
+|---|---|---|
+| `build_image_index_from_filenames(paths, output_path=None)` | HMI file names like `HMI.m2024.03.01_00.00.00.jpg` | image index with `timestamp` and `image_path` |
+| `adapt_goes_catalog(input_path, output_path=None)` | integrated GOES flare list | flare catalog in the package format; restores five-digit NOAA numbers (3324 → 13324) for flares from 2002-06-14 on |
+| `add_relative_flux(catalog_path, xray_flux_path, output_path=None)` | flare catalog + GOES 1–8 Å X-ray flux, one value per minute (`time`, `flux`) | catalog with `background_flux` and `rxfi` columns |
+
+```python
+fidx.build_image_index_from_filenames("hmi_image_list.txt", "image_index.csv")
+fidx.adapt_goes_catalog("goes_flares.csv", "flare_catalog.csv")
+fidx.add_relative_flux("flare_catalog.csv", "xray_flux.csv", "flare_catalog_rxfi.csv")
+```
+
+**rxfi.** The background of a flare is the mean X-ray flux in the 24 hours
+before its start, leaving out flare times and values above the flux at the
+start. `rxfi` = peak flux of the flare's class / background.
+
+More detail: [docs/DATASETS.md](docs/DATASETS.md#preparing-real-data) and
+[examples/real_data/README.md](examples/real_data/README.md).
+
+---
+
+## Errors and warnings
+
+The package stops with a `ValueError` instead of guessing a label. The
+message names the file, the row and the value.
+
+| Problem | Result |
+|---|---|
+| missing required column | `ValueError` |
+| time that cannot be read | `ValueError` |
+| invalid GOES class, e.g. `M1.x` | `InvalidGOESClassError` (a `ValueError`) |
+| `start_time` after `peak_time`, or `peak_time` after `end_time` | `ValueError` |
+| sequence parameter missing, or `observation_window` not a multiple of `cadence` | `ValueError` |
+| relative-flux reducer without an `rxfi` column | `ValueError` |
+| active-region image without a region | warning (`"negative"`), dropped (`"drop"`) or `ValueError` (`"error"`) |
+| flares without a region, in active-region mode | warning: they can never match a patch |
+
+---
 
 ## Examples
 
 | Script | Shows |
 |---|---|
 | `examples/01_full_disk.py` | single-image labels |
-| `examples/02_sequences.py` | image sequences |
+| `examples/02_sequences.py` | image sequences and the build report |
 | `examples/03_active_region.py` | active-region labels |
-| `examples/04_loaders.py` | preparing real inputs |
-| `examples/05_flare_indices.py` | GC max, GC sum, RXF max, RXF sum |
+| `examples/04_loaders.py` | preparing real inputs with the helpers |
+| `examples/05_flare_indices.py` | cumulative index and rxfi labels |
 | `examples/06_pytorch_images.py`, `07_pytorch_sequences.py` | real HMI images in PyTorch |
 | `examples/08_tensorflow_images.py`, `09_tensorflow_sequences.py` | real HMI images in TensorFlow |
 | `examples/10_pytorch_active_region.py`, `11_tensorflow_active_region.py` | real active-region patches in PyTorch and TensorFlow |
 
-Examples 01–05 use the synthetic data in `examples/data/`. Examples 06–11
-need `pip install ".[pytorch-examples]"` or `".[tensorflow-examples]"`.
-06–09 need about 10 MB of full-disk images, downloaded once by
-`examples/real_data/fetch_real_data.py`; the active-region patches of
-10–11 are in the repository. See
-[examples/real_data/README.md](examples/real_data/README.md).
+```bash
+python examples/01_full_disk.py
+```
+
+Examples 01–05 use the synthetic data in `examples/data/`. Examples 06–09
+need about 10 MB of full-disk images, downloaded once by
+`examples/real_data/fetch_real_data.py`; the active-region patches for 10
+and 11 are in the repository.
+
+---
+
+## Repository structure
+
+```text
+flare-indexer/
+├── src/flare_indexer/          the package
+│   ├── __init__.py             public names (import flare_indexer as fidx)
+│   ├── datasets.py             the four dataset classes
+│   ├── builder.py              DatasetBuilder: validates inputs, makes samples, collects labels
+│   ├── events.py               reads and checks the flare catalog; EventMatcher finds the flares in a window
+│   ├── goes_class.py           GOES class ↔ flux (FluxConverter) and class validation
+│   ├── reducers.py             the seven reducers
+│   ├── labelers.py             the six labelers
+│   ├── strategies.py           BinaryThresholdStrategy, MaxFlareStrategy
+│   ├── pipeline.py             DatasetBuildingPipeline: any reducer + labeler
+│   └── loaders.py              helpers that prepare the input files from raw data
+├── examples/
+│   ├── 01_… to 11_….py         runnable examples (see above)
+│   ├── data/                   synthetic image indexes, flare catalog and X-ray flux
+│   └── real_data/              download scripts, image readers, manifests, real flare catalog
+├── tests/                      711 automated tests, one file per topic
+├── docs/
+│   ├── DATASETS.md             inputs, prediction window, classes, parameters, real data
+│   ├── LABELS.md               every label with an example, custom labels, rxfi
+│   └── architecture/           the architecture figure
+├── .github/workflows/test.yml  runs the tests on Python 3.10–3.13 for every push
+├── setup.cfg, setup.py         package metadata and dependencies
+└── LICENSE                     GPL-3.0-or-later
+```
+
+---
 
 ## Tests
 
@@ -162,6 +462,11 @@ need `pip install ".[pytorch-examples]"` or `".[tensorflow-examples]"`.
 pip install -e ".[dev]"
 pytest
 ```
+
+711 tests. They run on Python 3.10, 3.11, 3.12 and 3.13 for every push,
+including tests that run the PyTorch and TensorFlow examples.
+
+---
 
 ## License
 

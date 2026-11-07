@@ -133,3 +133,21 @@ def test_add_relative_flux_xray_column_mistake_raises(tmp_path):
     xray = _renamed(XRAY, {"time": "time_tag"}, tmp_path / "xray.csv")
     with pytest.raises(ValueError, match="xray_columns maps 'time_tag' to 'timestamp', .* Allowed: time, flux"):
         f.add_relative_flux(CATALOG, xray, xray_columns={"time_tag": "timestamp"})
+
+
+def test_errors_name_the_columns_as_the_file_does(tmp_path):
+    catalog = tmp_path / "catalog.csv"
+    catalog.write_text("begin,peak,end,goes_class,noaa_ar\n"
+                       "2024-03-01 04:00,2024-03-01 04:10,2024-03-01 04:20,Q1,13600\n")
+    index = tmp_path / "index.csv"
+    index.write_text("obs_time\n2024-03-01 00:00\nnot a time\n")
+    names = {"begin": "start_time", "peak": "peak_time", "end": "end_time", "goes_class": "class",
+             "noaa_ar": "active_region"}
+    with pytest.raises(f.InvalidGOESClassError, match="column 'goes_class'"):
+        f.EventMatcher(catalog, columns=names)
+    good = tmp_path / "good.csv"
+    good.write_text("begin,peak,end,goes_class,noaa_ar\n"
+                    "2024-03-01 04:00,2024-03-01 04:10,2024-03-01 04:20,M1.0,13600\n")
+    builder = f.FullDiskSingleInstance("24h", reducer=f.MaxFluxReducer(), labeler=f.BinaryThresholdLabeler("M"))
+    with pytest.raises(ValueError, match="column 'obs_time'"):
+        builder.build(index, good, index_columns={"obs_time": "timestamp"}, catalog_columns=names)

@@ -2,6 +2,7 @@ import datetime
 import numbers
 import re
 from collections.abc import Mapping
+from contextlib import contextmanager
 
 import numpy as np
 import pandas as pd
@@ -239,6 +240,26 @@ CATALOG_COLUMNS = ("start_time", "peak_time", "end_time", "class", "active_regio
 XRAY_FLUX_COLUMNS = ("time", "flux")
 
 
+@contextmanager
+def _file_column_names(columns):
+    """
+    Inside this block, an error message that names a renamed column
+    ("column 'class'") names it as the user's file does ("column
+    'goes_class'"), so the user can find it. columns is the same
+    {their name: package name} mapping given to _rename_columns.
+    """
+    try:
+        yield
+    except ValueError as exc:
+        renamed = {ours: theirs for theirs, ours in (columns or {}).items() if theirs != ours}
+        text = str(exc)
+        for ours, theirs in renamed.items():
+            text = text.replace(f"column '{ours}'", f"column '{theirs}'")
+        if text == str(exc):
+            raise
+        raise type(exc)(text) from None
+
+
 def _rename_columns(df: pd.DataFrame, columns, allowed: tuple, path, what: str, setting: str) -> pd.DataFrame:
     """
     Rename a file's own column names to the package's, from a
@@ -364,13 +385,14 @@ class EventMatcher:
             )
 
         df = df.rename(columns={"class": "goes_class"})
-        df["start_time"] = _parse_full_timestamp_column(df, "start_time", path)
-        df["peak_time"] = _parse_full_timestamp_column(df, "peak_time", path)
-        df["end_time"] = _parse_full_timestamp_column(df, "end_time", path)
-        _validate_time_order(df, path)
-        validate_goes_class_column(df["goes_class"], path)
-        if "rxfi" in df.columns:
-            _validate_rxfi_column(df, path)
+        with _file_column_names(columns):
+            df["start_time"] = _parse_full_timestamp_column(df, "start_time", path)
+            df["peak_time"] = _parse_full_timestamp_column(df, "peak_time", path)
+            df["end_time"] = _parse_full_timestamp_column(df, "end_time", path)
+            _validate_time_order(df, path)
+            validate_goes_class_column(df["goes_class"], path)
+            if "rxfi" in df.columns:
+                _validate_rxfi_column(df, path)
 
         return df.sort_values("peak_time").reset_index(drop=True)
 

@@ -191,7 +191,7 @@ def _builders_for_every_mode(**common):
 def test_blank_instance_timestamp_is_rejected_before_any_sample_is_built(tmp_path, catalog):
     index = _write(tmp_path, "index.csv", "timestamp,image_path\n2024-01-01 00:00:00,a\n,b\n2024-01-01 01:00:00,c\n")
     for builder in _builders_for_every_mode():
-        with pytest.raises(ValueError, match=r"Index at .* has 1 blank/missing timestamp\(s\) \(data row\(s\) 2;"):
+        with pytest.raises(ValueError, match=r"Index at .* has 1 blank/missing time\(s\) in column .timestamp. \(data row\(s\) 2;"):
             builder.build(index, catalog)
 
 
@@ -201,7 +201,7 @@ def test_blank_instance_timestamp_is_rejected_in_active_region_modes(tmp_path, c
         "timestamp,active_region\n2024-01-01 00:00:00,100\n,100\n2024-01-01 01:00:00,100\n,100\n",
     )
     for builder in _builders_for_every_mode(target="active_region"):
-        with pytest.raises(ValueError, match=r"has 2 blank/missing timestamp\(s\) \(data row\(s\) 2, 4;"):
+        with pytest.raises(ValueError, match=r"has 2 blank/missing time\(s\) in column .timestamp. \(data row\(s\) 2, 4;"):
             builder.build(index, catalog)
 
 
@@ -459,10 +459,10 @@ def test_all_blank_instance_timestamp_column_raises_in_every_mode(tmp_path, cata
     full_disk_index = _write(tmp_path, "fd.csv", "timestamp,image_path\n,a\n,b\n")
     region_index = _write(tmp_path, "ar.csv", "timestamp,active_region\n,100\n,100\n")
     for builder in _builders_for_every_mode():
-        with pytest.raises(ValueError, match=r"has 2 blank/missing timestamp\(s\) \(data row\(s\) 1, 2;"):
+        with pytest.raises(ValueError, match=r"has 2 blank/missing time\(s\) in column .timestamp. \(data row\(s\) 1, 2;"):
             builder.build(full_disk_index, catalog)
     for builder in _builders_for_every_mode(target="active_region"):
-        with pytest.raises(ValueError, match=r"has 2 blank/missing timestamp\(s\) \(data row\(s\) 1, 2;"):
+        with pytest.raises(ValueError, match=r"has 2 blank/missing time\(s\) in column .timestamp. \(data row\(s\) 1, 2;"):
             builder.build(region_index, catalog)
 
 

@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from .events import (
     EventMatcher, _none_for_missing, _normalize_active_region, _parse_prediction_window, _parse_time_text_column,
-    _reject_unitless_duration_text, _rename_columns, _to_naive_utc,
+    _file_column_names, _reject_unitless_duration_text, _rename_columns, _to_naive_utc,
     INDEX_COLUMNS,
 )
 
@@ -115,7 +115,7 @@ def _parse_index_timestamps(column: pd.Series, path: Path) -> pd.Series:
         rows = [int(i) + 1 for i in np.flatnonzero(missing.to_numpy())]
         shown = ", ".join(str(r) for r in rows[:10]) + (", ..." if len(rows) > 10 else "")
         raise ValueError(
-            f"Index at {path} has {len(rows)} blank/missing timestamp(s) "
+            f"Index at {path} has {len(rows)} blank/missing time(s) in column 'timestamp' "
             f"(data row(s) {shown}; row 1 is the first row after the header). "
             "Fill or remove those rows; samples are never built from an instance without a time."
         )
@@ -361,7 +361,8 @@ class DatasetBuilder:
             )
 
         index_df = index_df.reset_index(drop=True)
-        index_df["timestamp"] = _parse_index_timestamps(index_df["timestamp"], index_path)
+        with _file_column_names(index_columns):
+            index_df["timestamp"] = _parse_index_timestamps(index_df["timestamp"], index_path)
 
         matcher = EventMatcher(event_catalog_path, columns=catalog_columns)
         self._check_required_catalog_column(matcher, event_catalog_path)

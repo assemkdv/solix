@@ -1,4 +1,4 @@
-"""Figure 1: software architecture of flare-indexer.
+"""Figure 1: software architecture of SOLIX.
 
 Run:  python make_architecture.py   ->  architecture.pdf, architecture.png
 """
@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
 
 plt.rcParams["font.family"] = "DejaVu Sans"
+plt.rcParams["pdf.fonttype"] = 42   # embed TrueType fonts; journals reject Type 3
 MONO = "DejaVu Sans Mono"
 
 W, H = 100, 104
@@ -48,18 +49,17 @@ def band(y, label):
 # ============================ INPUT =========================================
 band(101.5, "INPUT")
 
-# raw data and helpers (optional)
+# input preparation: helpers that make the two files from raw data (optional)
 box(2, 86, 60, 13, BLUE, ls="--", fc="white")
-text(32, 96, "Raw data (optional)", size=8.5, weight="bold")
-text(32, 92.2, "HMI/SHARP file names  ·  GOES flare list  ·  GOES X-ray flux", size=7)
-text(32, 88.6, "loaders.py:  build_image_index_from_filenames()\n"
+text(32, 95.4, "Input preparation (optional)", size=8.5, weight="bold")
+text(32, 90.4, "loaders.py:  build_index_from_hmi_filenames()\n"
      "adapt_goes_catalog()   add_relative_flux()", size=6.6, family=MONO, va="center")
 # (two lines: shift so they sit inside the box)
 
 # two CSV files
 box(2, 66, 29, 16, BLUE)
-text(16.5, 79, "image_index.csv", size=8.5, weight="bold", family=MONO)
-text(16.5, 72.5, "timestamp\n[active_region]\n[image_path]", size=7, family=MONO)
+text(16.5, 79, "index.csv", size=8.5, weight="bold", family=MONO)
+text(16.5, 72.5, "timestamp\n[active_region]\n[file_path …]", size=7, family=MONO)
 
 box(33, 66, 29, 16, BLUE)
 text(47.5, 79, "flare_catalog.csv", size=8.5, weight="bold", family=MONO)
@@ -74,16 +74,16 @@ text(4, 64.3, "[ ] optional column", size=6.5, color="#666666", style="italic", 
 box(66, 66, 32, 33, YELLOW)
 text(82, 96, "Configuration", size=8.5, weight="bold")
 text(82, 92.6, "one dataset class:", size=7, style="italic", color="#7a5c00")
-text(82, 86.4, "FullDiskSingleImage\nFullDiskSequence\nActiveRegionSingleImage\n"
+text(82, 86.4, "FullDiskSingleInstance\nFullDiskSequence\nActiveRegionSingleInstance\n"
      "ActiveRegionSequence", size=6.8, family=MONO)
 text(82, 80.2, "parameters:", size=7, style="italic", color="#7a5c00")
-text(82, 73.2, "prediction_window  strategy\ncadence  start\nobservation_window\n"
+text(82, 72.6, "prediction_window\nreducer  labeler\ncadence  start\nobservation_window\n"
      "sliding_window\nmissing_active_region", size=6.6, family=MONO)
 
 # ============================ CORE ==========================================
 band(61.5, "PROCESSING")
 box(2, 17, 96, 43, GREY, lw=1.3, fc="#fafafa")
-text(50, 57, "dataset.build(image_index.csv, flare_catalog.csv)", size=8.5,
+text(50, 57, "dataset.build(index.csv, flare_catalog.csv)", size=8.5,
      family=MONO, weight="bold")
 
 arrow(32, 64, 32, 60)            # files into build()
@@ -94,7 +94,7 @@ sy, sh, sw = 41, 12, 28
 xs = [5, 36, 67]
 titles = ["1  Validate inputs", "2  Make samples", "3  Match flares"]
 bodies = ["columns, times, GOES classes\nerror on invalid rows",
-          "single image or sequence\nfrom the image index",
+          "single instance or sequence\nfrom the index",
           "EventMatcher.query(t, w, region)\nflares starting in [t, t+w)"]
 for x, t, b in zip(xs, titles, bodies):
     box(x, sy, sw, sh, ("white", GREY[1]))
@@ -103,25 +103,24 @@ for x, t, b in zip(xs, titles, bodies):
 arrow(xs[0] + sw, sy + sh / 2, xs[1], sy + sh / 2)
 arrow(xs[1] + sw, sy + sh / 2, xs[2], sy + sh / 2)
 
-# bottom row: strategy = reducer + labeler
+# bottom row: the reducer, then the labeler
 box(5, 19, 90, 18, GREEN, lw=1.1)
-text(8, 34.6, "4  strategy.label(flares)", size=8, weight="bold", ha="left")
+text(8, 34.6, "4  label = labeler.assign(reducer.reduce(flares))", size=8, weight="bold", ha="left")
 
-box(8, 24, 38, 9, ("white", GREEN[1]), lw=0.9)
-text(27, 31.2, "Reducer   flares → value", size=7.5, weight="bold")
-text(27, 26.9, "MaxFlux  MinFlux  MeanFlux  ClassCount\nCumulativeClassIndex  "
+box(8, 23.2, 38, 9, ("white", GREEN[1]), lw=0.9)
+text(27, 30.4, "Reducer   flares → value", size=7.5, weight="bold")
+text(27, 26.1, "MaxFlux  MinFlux  MeanFlux  ClassCount\nCumulativeClassIndex  "
      "MaxRelativeFlux\nSumRelativeFlux", size=6, family=MONO)
 
-box(54, 24, 38, 9, ("white", GREEN[1]), lw=0.9)
-text(73, 31.2, "Labeler   value → label", size=7.5, weight="bold")
-text(73, 26.9, "BinaryThreshold  NumericThreshold\nRegression  Multiclass\n"
+box(54, 23.2, 38, 9, ("white", GREEN[1]), lw=0.9)
+text(73, 30.4, "Labeler   value → label", size=7.5, weight="bold")
+text(73, 26.1, "BinaryThreshold  NumericThreshold\nRegression  Multiclass\n"
      "ClassCount  ClassPresence", size=6, family=MONO)
-text(50, 21.4, "ready-made: BinaryThresholdStrategy, MaxFlareStrategy   "
-     "any pair: DatasetBuildingPipeline(reducer, labeler)", size=6.2,
-     family=MONO, color="#2d5f34")
-arrow(46, 28.5, 54, 28.5)
+text(50, 20.9, "any reducer can be paired with any labeler; user-defined reducers and labelers are supported",
+     size=6.4, style="italic", color="#2d5f34")
+arrow(46, 27.7, 54, 27.7)
 
-# flares go down into the strategy
+# flares go down into the reducer
 arrow(xs[2] + sw / 2, sy, xs[2] + sw / 2, 37, label="flares in window")
 text(50, 38.8, "repeated for each sample", size=6.6, style="italic", color="#666666")
 
@@ -130,9 +129,9 @@ band(14.5, "OUTPUT")
 arrow(50, 17, 50, 13.5)
 box(2, 1, 96, 12.5, RED)
 text(50, 10.6, "pandas DataFrame, one row per sample", size=8.5, weight="bold")
-text(50, 6.6, "single image:  timestamp  [active_region]  label  [image_path …]",
+text(50, 6.6, "single instance:  timestamp  [active_region]  label  [file_path …]",
      size=6.8, family=MONO)
-text(50, 3.4, "sequence:  sequence_start  sequence_end  timestamps  n_images  "
+text(50, 3.4, "sequence:  sequence_start  sequence_end  timestamps  n_instances  "
      "[active_region]  label", size=6.8, family=MONO)
 
 fig.savefig("architecture.pdf")

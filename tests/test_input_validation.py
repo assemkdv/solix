@@ -14,7 +14,7 @@ from flare_indexer import (
     EventMatcher,
     MaxFluxReducer,
     adapt_goes_catalog,
-    build_image_index_from_filenames,
+    build_index_from_hmi_filenames,
 )
 from flare_indexer.events import _normalize_active_region, _parse_prediction_window
 from flare_indexer.builder import DatasetBuilder
@@ -90,9 +90,9 @@ def test_numeric_catalog_time_column_is_rejected_with_context(tmp_path, value):
     assert "not date-time text" in message
 
 
-def test_numeric_image_timestamp_column_is_rejected_with_context(tmp_path, catalog):
+def test_numeric_instance_timestamp_column_is_rejected_with_context(tmp_path, catalog):
     index = _write(tmp_path, "index.csv", "timestamp\n20240101000000\n1704067200\n")
-    with pytest.raises(ValueError, match=r"Image index at .*column 'timestamp', data row 1: the value 20240101000000"):
+    with pytest.raises(ValueError, match=r"Index at .*column 'timestamp', data row 1: the value 20240101000000"):
         DatasetBuilder(24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M")).build(index, catalog)
 
 
@@ -138,7 +138,7 @@ def test_missing_region_values_become_none(value):
     assert _normalize_active_region(value) is None
 
 
-def test_text_typed_image_region_column_matches_the_catalog(tmp_path, catalog):
+def test_text_typed_instance_region_column_matches_the_catalog(tmp_path, catalog):
     # "AR100" makes pandas read the whole column as text; the numeric
     # spellings must still match catalog region 100 (M1.0 at 10:00).
     rows = ["100.0", " 100", "0100", "AR100", "100"]
@@ -152,7 +152,7 @@ def test_text_typed_image_region_column_matches_the_catalog(tmp_path, catalog):
     assert out["active_region"].tolist() == ["100", "100", "100", "AR100", "100"]
 
 
-def test_text_typed_catalog_region_column_matches_an_integer_image_region(tmp_path):
+def test_text_typed_catalog_region_column_matches_an_integer_instance_region(tmp_path):
     catalog = _write(
         tmp_path, "catalog.csv",
         CATALOG_HEADER
@@ -178,14 +178,14 @@ def test_query_rejects_a_blank_region_instead_of_matching_the_full_disk(catalog)
     assert matcher.query(T0, 24, active_region="101") == []
 
 
-def test_whitespace_only_image_region_counts_as_missing(tmp_path, catalog):
+def test_whitespace_only_instance_region_counts_as_missing(tmp_path, catalog):
     index = _write(tmp_path, "index.csv", 'timestamp,active_region\n2024-01-01 09:00:00,"   "\n2024-01-01 09:00:00,AR1\n')
     builder = DatasetBuilder(24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), target="active_region", missing_active_region="error")
     with pytest.raises(ValueError, match="missing active_region"):
         builder.build(index, catalog)
 
 
-# --- 4. blank image timestamps --------------------------------------------
+# --- 4. blank instance timestamps --------------------------------------------
 
 def _builders_for_every_mode(**common):
     return [
@@ -194,14 +194,14 @@ def _builders_for_every_mode(**common):
     ]
 
 
-def test_blank_image_timestamp_is_rejected_before_any_sample_is_built(tmp_path, catalog):
+def test_blank_instance_timestamp_is_rejected_before_any_sample_is_built(tmp_path, catalog):
     index = _write(tmp_path, "index.csv", "timestamp,image_path\n2024-01-01 00:00:00,a\n,b\n2024-01-01 01:00:00,c\n")
     for builder in _builders_for_every_mode():
-        with pytest.raises(ValueError, match=r"Image index at .* has 1 blank/missing timestamp\(s\) \(data row\(s\) 2;"):
+        with pytest.raises(ValueError, match=r"Index at .* has 1 blank/missing timestamp\(s\) \(data row\(s\) 2;"):
             builder.build(index, catalog)
 
 
-def test_blank_image_timestamp_is_rejected_in_active_region_modes(tmp_path, catalog):
+def test_blank_instance_timestamp_is_rejected_in_active_region_modes(tmp_path, catalog):
     index = _write(
         tmp_path, "index.csv",
         "timestamp,active_region\n2024-01-01 00:00:00,100\n,100\n2024-01-01 01:00:00,100\n,100\n",
@@ -211,22 +211,22 @@ def test_blank_image_timestamp_is_rejected_in_active_region_modes(tmp_path, cata
             builder.build(index, catalog)
 
 
-def test_unparseable_image_timestamp_names_the_index_file(tmp_path, catalog):
+def test_unparseable_instance_timestamp_names_the_index_file(tmp_path, catalog):
     index = _write(tmp_path, "index.csv", "timestamp\n2024-01-01 00:00:00\nnot a date\n")
-    with pytest.raises(ValueError, match=r"Image index at .*index\.csv has an unparseable value in column 'timestamp'"):
+    with pytest.raises(ValueError, match=r"Index at .*index\.csv has an unparseable value in column 'timestamp'"):
         DatasetBuilder(24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M")).build(index, catalog)
 
 
-def test_header_only_image_index_still_builds_an_empty_result(tmp_path, catalog):
+def test_header_only_index_still_builds_an_empty_result(tmp_path, catalog):
     index = _write(tmp_path, "index.csv", "timestamp\n")
     out = DatasetBuilder(24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M")).build(index, catalog)
     assert out.empty and list(out.columns) == ["timestamp", "label"]
 
 
-def test_query_rejects_a_missing_or_non_timestamp_image_time(catalog):
+def test_query_rejects_a_missing_or_non_timestamp_instance_time(catalog):
     matcher = EventMatcher(catalog)
     for bad in [pd.NaT, None, "2024-01-01 09:00", 1700000000]:
-        with pytest.raises(ValueError, match="image_time must be a pandas Timestamp"):
+        with pytest.raises(ValueError, match="reference_time must be a pandas Timestamp"):
             matcher.query(bad, 24)
     assert len(matcher.query(datetime.datetime(2024, 1, 1, 9), 24)) == 1
     assert len(matcher.query(np.datetime64("2024-01-01T09:00"), 24)) == 1
@@ -262,7 +262,7 @@ def test_adapted_goes_catalog_with_offsets_is_naive_utc_and_loadable(tmp_path):
     assert len(EventMatcher(output).query(T0, 24)) == 1
 
 
-def test_image_index_with_offsets_is_converted_to_utc_without_warnings(tmp_path, catalog):
+def test_index_with_offsets_is_converted_to_utc_without_warnings(tmp_path, catalog):
     index = _write(tmp_path, "index.csv", "timestamp\n2024-01-01T14:00:00+05:00\n2024-01-02T14:00:00+05:00\n")
     with warnings.catch_warnings():
         warnings.simplefilter("error")
@@ -271,7 +271,7 @@ def test_image_index_with_offsets_is_converted_to_utc_without_warnings(tmp_path,
     assert out["label"].tolist() == [1, 0]
 
 
-def test_query_with_an_offset_aware_image_time(catalog):
+def test_query_with_an_offset_aware_instance_time(catalog):
     matcher = EventMatcher(catalog)
     with warnings.catch_warnings():
         warnings.simplefilter("error")
@@ -312,9 +312,9 @@ def test_mixed_naive_and_offset_cells_in_one_column_are_rejected_clearly(tmp_pat
     )
     with pytest.raises(ValueError, match=r"\(first at data row 2\) and times with one \(first at data row 1\)"):
         EventMatcher(reversed_path)
-    # The same rule for the image index and the adapter input.
+    # The same rule for the index and the adapter input.
     index = _write(tmp_path, "index.csv", "timestamp\n2024-01-01 09:00:00\n2024-01-01T09:00:00+05:00\n")
-    with pytest.raises(ValueError, match=r"Image index at .*column 'timestamp' mixes times without a UTC offset"):
+    with pytest.raises(ValueError, match=r"Index at .*column 'timestamp' mixes times without a UTC offset"):
         DatasetBuilder(24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M")).build(index, catalog)
     goes = _write(
         tmp_path, "goes.csv",
@@ -418,7 +418,7 @@ def test_time_based_durations_accept_text_and_timedelta_forms():
     assert builder.cadence == pd.Timedelta(hours=1)
     assert builder.observation_window == pd.Timedelta(hours=2)
     assert builder.sliding_window == pd.Timedelta(hours=1)
-    assert builder.number_of_images == 2
+    assert builder.number_of_instances == 2
     builder = DatasetBuilder(
         24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
         cadence=datetime.timedelta(hours=1), observation_window="2h", sliding_window="1h",
@@ -427,7 +427,7 @@ def test_time_based_durations_accept_text_and_timedelta_forms():
 
 # --- 2b. all-blank timestamp column; catalog missing-time policy -----------
 
-def test_all_blank_image_timestamp_column_raises_in_every_mode(tmp_path, catalog):
+def test_all_blank_instance_timestamp_column_raises_in_every_mode(tmp_path, catalog):
     full_disk_index = _write(tmp_path, "fd.csv", "timestamp,image_path\n,a\n,b\n")
     region_index = _write(tmp_path, "ar.csv", "timestamp,active_region\n,100\n,100\n")
     for builder in _builders_for_every_mode():
@@ -546,5 +546,5 @@ def test_yes_no_settings_must_be_true_or_false(tmp_path, value):
         sequences.build(index, catalog, return_report=value)
     for name in ("strict", "return_report"):
         with pytest.raises(ValueError, match=f"{name} must be True or False"):
-            build_image_index_from_filenames(["HMI.m2010.12.21_21.00.00.jpg"], **{name: value})
+            build_index_from_hmi_filenames(["HMI.m2010.12.21_21.00.00.jpg"], **{name: value})
 

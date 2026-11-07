@@ -1,6 +1,6 @@
 """
 Active-region sequences are built per region: several regions may share
-timestamps, and a region's sequence only ever contains that region's images.
+timestamps, and a region's sequence only ever contains that region's instances.
 """
 
 import warnings
@@ -57,7 +57,7 @@ def test_simultaneous_regions_get_separate_sequences(tmp_path, catalog):
 
     assert result["active_region"].tolist() == ["100", "200", "100", "200"]
     assert result["sequence_start"].tolist() == [pd.Timestamp("2024-01-01 00:00")] * 2 + [pd.Timestamp("2024-01-01 01:00")] * 2
-    # Each sequence holds only its own region's images.
+    # Each sequence holds only its own region's instances.
     for region, paths in zip(result["active_region"], result["image_path"]):
         assert all(path.startswith(f"p_{region}_") for path in paths)
     # Region 100's M2.0 counts only for region 100; region 200's flare is C-class.
@@ -65,7 +65,7 @@ def test_simultaneous_regions_get_separate_sequences(tmp_path, catalog):
 
 
 def test_missing_frame_in_one_region_does_not_affect_another(tmp_path, catalog):
-    # Region 200 has no image at 02:00.
+    # Region 200 has no instance at 02:00.
     index = _hourly_index(tmp_path, {0: [100, 200], 1: [100, 200], 2: [100], 3: [100, 200], 4: [100, 200]})
     result = _build(index, catalog, **TIME_BASED)
 
@@ -103,7 +103,7 @@ def test_explicit_start_gives_all_regions_one_grid(tmp_path, catalog):
     assert by_region["200"] == [pd.Timestamp("2024-01-01 02:00")]
 
 
-def test_without_start_each_region_starts_at_its_first_image(tmp_path, catalog):
+def test_without_start_each_region_starts_at_its_first_instance(tmp_path, catalog):
     index = _hourly_index(tmp_path, {0: [100], 1: [100, 200], 2: [100, 200], 3: [100, 200]})
     result = _build(index, catalog, cadence="1h", observation_window="2h", sliding_window="2h")
 
@@ -112,9 +112,9 @@ def test_without_start_each_region_starts_at_its_first_image(tmp_path, catalog):
     assert by_region["200"] == [pd.Timestamp("2024-01-01 01:00")]
 
 
-def test_explicit_start_must_be_an_image_time(tmp_path, catalog):
+def test_explicit_start_must_be_an_instance_time(tmp_path, catalog):
     index = _hourly_index(tmp_path, {h: [100, 200] for h in range(3)})
-    with pytest.raises(ValueError, match="no exact matching image timestamp"):
+    with pytest.raises(ValueError, match="no exact matching instance timestamp"):
         _build(index, catalog, start="2024-01-01 00:30", **TIME_BASED)
 
 
@@ -134,9 +134,9 @@ def test_region_index_sorted_by_region_then_time_is_accepted(tmp_path, catalog):
 
 
 def test_missing_region_rows_never_join_a_region_sequence(tmp_path, catalog):
-    # At 01:00 one patch has no region. Region 100 is complete without it.
+    # At 01:00 one instance has no region. Region 100 is complete without it.
     index = _hourly_index(tmp_path, {0: [100], 1: [100, None], 2: [100]})
-    with pytest.warns(UserWarning, match="1 image\\(s\\) have a missing active_region"):
+    with pytest.warns(UserWarning, match="1 instance\\(s\\) have a missing active_region"):
         result = DatasetBuilder(
             prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), target="active_region", **TIME_BASED,
         ).build(index, catalog)
@@ -144,9 +144,9 @@ def test_missing_region_rows_never_join_a_region_sequence(tmp_path, catalog):
     assert "p_na_01.jpg" not in result["image_path"].iloc[0]
 
 
-def test_several_unknown_patches_at_one_time_need_drop(tmp_path, catalog):
+def test_several_unknown_instances_at_one_time_need_drop(tmp_path, catalog):
     index = _hourly_index(tmp_path, {0: [100, None, None], 1: [100, None, None], 2: [100, None, None]})
-    with pytest.raises(ValueError, match="several images without an active_region at the same time.*missing_active_region='drop'"):
+    with pytest.raises(ValueError, match="several instances without an active_region at the same time.*missing_active_region='drop'"):
         _build(index, catalog, **TIME_BASED)
     dropped = _build(index, catalog, missing_active_region="drop", **TIME_BASED)
     assert dropped["active_region"].tolist() == ["100"]
@@ -154,7 +154,7 @@ def test_several_unknown_patches_at_one_time_need_drop(tmp_path, catalog):
 
 def test_missing_region_error_policy_names_rows(tmp_path, catalog):
     index = _hourly_index(tmp_path, {0: [100], 1: [100, None], 2: [100]})
-    with pytest.raises(ValueError, match="1 image\\(s\\) in .* have a missing active_region \\(e.g. data row 3 "):
+    with pytest.raises(ValueError, match="1 instance\\(s\\) in .* have a missing active_region \\(e.g. data row 3 "):
         _build(index, catalog, missing_active_region="error", **TIME_BASED)
 
 

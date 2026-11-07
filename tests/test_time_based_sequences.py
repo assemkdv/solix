@@ -106,7 +106,7 @@ def test_observation_window_not_divisible_by_cadence_raises():
 
 
 def test_sliding_window_smaller_than_cadence(tmp_path):
-    # 12-minute images, hourly sequences of 3 images, a new one every 12 minutes.
+    # 12-minute instances, hourly sequences of 3 instances, a new one every 12 minutes.
     timestamps = list(pd.date_range("2024-03-01", periods=16, freq="12min"))
     builder = DatasetBuilder(
         prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
@@ -118,7 +118,7 @@ def test_sliding_window_smaller_than_cadence(tmp_path):
 
 
 @pytest.mark.parametrize("target", ["full_disk", "active_region"])
-def test_sliding_window_between_images_raises(tmp_path, target):
+def test_sliding_window_between_instances_raises(tmp_path, target):
     index = _write_index(tmp_path, _hourly("2024-03-01", 12), active_regions=[13600] * 12)
     builder = DatasetBuilder(
         prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), target=target,
@@ -140,9 +140,9 @@ def test_invalid_start_value_raises():
 # ── Core time-based behavior ─────────────────────────────────────────────
 
 
-def test_six_images_per_sequence_and_expected_starts_ends(tmp_path):
-    # 10 hourly images: 00:00 .. 09:00. cadence=1h, observation_window=6h
-    # (6 images), sliding_window=3h.
+def test_six_instances_per_sequence_and_expected_starts_ends(tmp_path):
+    # 10 hourly instances: 00:00 .. 09:00. cadence=1h, observation_window=6h
+    # (6 instances), sliding_window=3h.
     timestamps = _hourly("2024-01-01T00:00:00", 10)
     index_path = _write_index(tmp_path, timestamps)
     catalog_path = _empty_catalog(tmp_path)
@@ -153,7 +153,7 @@ def test_six_images_per_sequence_and_expected_starts_ends(tmp_path):
     )
     result = builder.build(index_path, catalog_path)
 
-    assert list(result.columns) == ["sequence_start", "sequence_end", "timestamps", "n_images", "label"]
+    assert list(result.columns) == ["sequence_start", "sequence_end", "timestamps", "n_instances", "label"]
     assert len(result) == 2
     assert result["sequence_start"].tolist() == [
         pd.Timestamp("2024-01-01T00:00:00"), pd.Timestamp("2024-01-01T03:00:00"),
@@ -161,12 +161,12 @@ def test_six_images_per_sequence_and_expected_starts_ends(tmp_path):
     assert result["sequence_end"].tolist() == [
         pd.Timestamp("2024-01-01T05:00:00"), pd.Timestamp("2024-01-01T08:00:00"),
     ]
-    assert result["n_images"].tolist() == [6, 6]
+    assert result["n_instances"].tolist() == [6, 6]
     assert result.iloc[0]["timestamps"] == _hourly("2024-01-01T00:00:00", 6)
     assert result.iloc[1]["timestamps"] == _hourly("2024-01-01T03:00:00", 6)
 
 
-def test_observation_window_is_half_open_last_image_at_t_plus_5h(tmp_path):
+def test_observation_window_is_half_open_last_instance_at_t_plus_5h(tmp_path):
     timestamps = _hourly("2024-01-01T00:00:00", 7)   # 06:00 exists but is outside [t, t+6h)
     index_path = _write_index(tmp_path, timestamps)
     catalog_path = _empty_catalog(tmp_path)
@@ -178,16 +178,16 @@ def test_observation_window_is_half_open_last_image_at_t_plus_5h(tmp_path):
     result = builder.build(index_path, catalog_path)
 
     assert len(result) == 1
-    # [t, t+6h) -> images at t..t+5h, NOT t+6h.
+    # [t, t+6h) -> instances at t..t+5h, NOT t+6h.
     assert result.iloc[0]["sequence_end"] == pd.Timestamp("2024-01-01T05:00:00")
-    assert result.iloc[0]["n_images"] == 6
+    assert result.iloc[0]["n_instances"] == 6
     assert pd.Timestamp("2024-01-01T06:00:00") not in result.iloc[0]["timestamps"]
 
 
-def test_label_uses_final_image_timestamp_not_sequence_start(tmp_path):
+def test_label_uses_final_instance_timestamp_not_sequence_start(tmp_path):
     timestamps = _hourly("2024-01-01T00:00:00", 6)
     index_path = _write_index(tmp_path, timestamps)
-    # Flare starts one minute after the final image's timestamp (05:00); a
+    # Flare starts one minute after the final instance's timestamp (05:00); a
     # window measured from sequence_start (00:00) with a short
     # prediction_window would miss it, but one from sequence_end catches it.
     catalog_path = _catalog_with_flare(tmp_path, "2024-01-01", "0501", "0501", "0505", "M1.0", "4456")
@@ -204,7 +204,7 @@ def test_label_uses_final_image_timestamp_not_sequence_start(tmp_path):
 
 
 def test_insufficient_data_returns_empty_dataframe_with_correct_schema(tmp_path):
-    timestamps = _hourly("2024-01-01T00:00:00", 3)  # only 00,01,02 -- not enough for a 6-image sequence
+    timestamps = _hourly("2024-01-01T00:00:00", 3)  # only 00,01,02 -- not enough for a 6-instance sequence
     index_path = _write_index(tmp_path, timestamps)
     catalog_path = _empty_catalog(tmp_path)
 
@@ -214,7 +214,7 @@ def test_insufficient_data_returns_empty_dataframe_with_correct_schema(tmp_path)
     )
     result = builder.build(index_path, catalog_path)
 
-    assert list(result.columns) == ["sequence_start", "sequence_end", "timestamps", "n_images", "label"]
+    assert list(result.columns) == ["sequence_start", "sequence_end", "timestamps", "n_instances", "label"]
     assert len(result) == 0
 
 
@@ -247,7 +247,7 @@ def test_missing_required_timestamp_skips_sequence_later_one_still_emitted(tmp_p
 
 def test_no_interpolation_or_substitution_for_missing_timestamp(tmp_path):
     # Confirms a skipped candidate never appears with a repeated or
-    # substituted image in place of the missing one.
+    # substituted instance in place of the missing one.
     timestamps = [t for t in _hourly("2024-01-01T00:00:00", 7) if t != pd.Timestamp("2024-01-01T03:00:00")]
     index_path = _write_index(tmp_path, timestamps)
     catalog_path = _empty_catalog(tmp_path)
@@ -302,7 +302,7 @@ def test_start_omitted_uses_earliest_timestamp(tmp_path):
     assert report.effective_start == pd.Timestamp("2024-01-01T00:00:00")
 
 
-def test_explicit_start_present_excludes_earlier_images(tmp_path):
+def test_explicit_start_present_excludes_earlier_instances(tmp_path):
     timestamps = _hourly("2024-01-01T00:00:00", 10)  # 00:00 .. 09:00
     index_path = _write_index(tmp_path, timestamps)
     catalog_path = _empty_catalog(tmp_path)
@@ -478,7 +478,7 @@ def test_return_report_true_returns_dataframe_and_report(tmp_path):
     assert report.sliding_window == pd.Timedelta(hours=3)
     assert report.total_candidate_sequences == report.emitted_sequences + report.skipped_sequences
 
-def test_return_report_true_in_single_image_mode_raises(tmp_path):
+def test_return_report_true_in_single_instance_mode_raises(tmp_path):
     catalog_path = _empty_catalog(tmp_path)
     index_path = _write_index(tmp_path, _hourly("2024-01-01T00:00:00", 3))
 
@@ -488,9 +488,9 @@ def test_return_report_true_in_single_image_mode_raises(tmp_path):
     assert "return_report" in str(excinfo.value)
 
 
-# ── Single-image mode is the default ──────────────────────────────────────
+# ── Single-instance mode is the default ──────────────────────────────────────
 
-def test_default_is_single_image_mode(tmp_path):
+def test_default_is_single_instance_mode(tmp_path):
     timestamps = _hourly("2024-01-01T00:00:00", 2)
     index_path = _write_index(tmp_path, timestamps)
     catalog_path = _empty_catalog(tmp_path)
@@ -580,7 +580,7 @@ def test_active_region_time_based_basic(tmp_path):
     result = builder.build(index_path, catalog_path)
 
     assert list(result.columns) == [
-        "sequence_start", "sequence_end", "timestamps", "n_images", "active_region", "label",
+        "sequence_start", "sequence_end", "timestamps", "n_instances", "active_region", "label",
     ]
     assert len(result) == 1
     assert result.iloc[0]["active_region"] == "3559"
@@ -589,8 +589,8 @@ def test_active_region_time_based_basic(tmp_path):
 
 
 def test_active_region_time_based_regions_are_grouped(tmp_path):
-    # Grouped by region: region 3559 lacks 02:00 (that image is 9999's),
-    # so its only 6-hour candidate is skipped; 9999 has a single image.
+    # Grouped by region: region 3559 lacks 02:00 (that instance is 9999's),
+    # so its only 6-hour candidate is skipped; 9999 has a single instance.
     timestamps = _hourly("2024-01-01T00:00:00", 6)
     index_path = _write_index(
         tmp_path, timestamps, active_regions=["3559", "3559", "9999", "3559", "3559", "3559"]
@@ -623,7 +623,7 @@ def test_active_region_time_based_missing_active_region_breaks_the_region_grid(t
     with pytest.warns(UserWarning, match="missing active_region"):
         result = builder.build(index_path, catalog_path)
 
-    # The 02:00 image has no region, so region 3559's grid is incomplete
+    # The 02:00 instance has no region, so region 3559's grid is incomplete
     # and its sequence is skipped -- never labeled from the X1.0 flare.
     assert result.empty
 

@@ -9,9 +9,9 @@ in [t, t + 24h), where t is the image's full-precision observation time
 (DATE_OBS)?"
 
 Steps
-1. Image index from examples/real_data/image_manifest.csv (timestamps are
+1. Index from examples/real_data/image_manifest.csv (timestamps are
    the full-precision DATE_OBS read from each file's header).
-2. Labels: flare_indexer.FullDiskSingleImage with every labeling choice explicit.
+2. Labels: flare_indexer.FullDiskSingleInstance with every labeling choice explicit.
 3. Loading: FlareDataset, a keras.utils.PyDataset (TensorFlow's
    counterpart of a torch Dataset). Keras asks it for whole batches, so
    each item is (images, labels) for one batch, with images in
@@ -84,19 +84,19 @@ def main(argv=None):
     real.require_optional_dependencies()
 
     args.output.mkdir(parents=True, exist_ok=True)
-    index_path = args.output / "08_image_index.csv"
+    index_path = args.output / "08_index.csv"
     labels_path = args.output / "08_image_labels.csv"
 
-    # 1. Image index from actual, full-precision observation times.
+    # 1. Index from actual, full-precision observation times.
     index = real.build_image_index(index_path)
     provenance = real.check_catalog_coverage(index["timestamp"], PREDICTION_WINDOW)
     print(f"TensorFlow {tf.__version__}")
-    print(f"Image index: {len(index)} images -> {index_path}")
+    print(f"Index: {len(index)} images -> {index_path}")
     print(f"Catalog: {provenance['catalog_rows']} flares, queried {provenance['query_start']} .. "
           f"{provenance['query_end']}; covers every [t, t+{PREDICTION_WINDOW}) window")
 
     # 2. Labels.
-    builder = fidx.FullDiskSingleImage(
+    builder = fidx.FullDiskSingleInstance(
         prediction_window=PREDICTION_WINDOW,
         reducer=fidx.MaxFluxReducer(),               # the strongest flare in the window
         labeler=fidx.BinaryThresholdLabeler("M"),    # 1 if any flare >= M1.0 in the window

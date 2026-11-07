@@ -2,14 +2,16 @@
 
 ## Inputs
 
-`build(image_index, flare_catalog)` reads two CSV files.
+`build(index, flare_catalog)` reads two CSV files.
 
-**Image index**: one row per image.
+**Index**: one row per instance. An instance is one point in time and
+whatever file belongs to it: an image, a `.npy` array, anything. The
+package never opens the files.
 
 | Column | Needed |
 |---|---|
-| `timestamp` | always: the image's observation time |
-| `active_region` | for the two active-region classes: the NOAA region of the patch |
+| `timestamp` | always: the instance's observation time |
+| `active_region` | for the two active-region classes: the NOAA region of the instance |
 | anything else, e.g. `image_path` | optional; kept in the output (see below) |
 
 **Flare catalog**: one row per flare.
@@ -31,7 +33,7 @@ If your files use other names, tell `build` which column is which, as
 
 ```python
 labels = builder.build(
-    "my_images.csv", "my_flares.csv",
+    "my_index.csv", "my_flares.csv",
     index_columns={"obs_time": "timestamp", "noaa_ar": "active_region"},
     catalog_columns={"goes_class": "class", "begin": "start_time"},
 )
@@ -45,11 +47,11 @@ error.
 
 ## The prediction window
 
-Each image at time `t` is labeled from the flares in `[t, t + w)`: a flare
+Each instance at time `t` is labeled from the flares in `[t, t + w)`: a flare
 counts if it starts at `t` or later and before `t + w`. `w` is
 `prediction_window`, e.g. `"24h"`, `"12h"` or a number of hours (`24`).
 
-In `examples/data/`, the image at 04:00 counts the C3.2 flare that starts at
+In `examples/data/`, the instance at 04:00 counts the C3.2 flare that starts at
 exactly 04:00 (here with `MaxFluxReducer()` and `RegressionLabeler()`, whose
 label is the strongest flare's peak flux, and `include_flares=True`):
 
@@ -66,80 +68,81 @@ even if it peaks after the window ends.
 
 | Class | One row per | Flares counted |
 |---|---|---|
-| `FullDiskSingleImage` | image | all |
-| `FullDiskSequence` | sequence of images | all |
-| `ActiveRegionSingleImage` | patch | the patch's own region only |
-| `ActiveRegionSequence` | sequence of patches of one region | that region only |
+| `FullDiskSingleInstance` | full-disk instance | all |
+| `FullDiskSequence` | sequence of full-disk instances | all |
+| `ActiveRegionSingleInstance` | active-region instance | its own region only |
+| `ActiveRegionSequence` | sequence of instances of one region | that region only |
 
 Every class takes `prediction_window` first and `reducer` and `labeler` by
 name (see [LABELS.md](LABELS.md)), then its own settings by name:
 
-| Setting | Single image | Sequence | Default |
+| Setting | Single instance | Sequence | Default |
 |---|---|---|---|
 | `cadence` | optional | required | none |
-| `start` | optional, with `cadence` | optional | the first image |
+| `start` | optional, with `cadence` | optional | the first instance |
 | `observation_window`, `sliding_window` | | required | |
 | `include_metadata` | ✓ | (always on) | `False` |
 | `include_flares` | ✓ | ✓ | `False` |
 | `verbose` | ✓ | ✓ | `False` |
 | `missing_active_region` | active region only | active region only | `"negative"` |
 
-## Single images
+## Single instances
 
 ```python
-builder = fidx.FullDiskSingleImage(
+builder = fidx.FullDiskSingleInstance(
     "24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"),
 )
-labels = builder.build("image_index.csv", "flare_catalog.csv")
+labels = builder.build("index.csv", "flare_catalog.csv")
 ```
 
 The result has the columns `timestamp, label`.
 
-`cadence` keeps only some of the images: `cadence="6h"` keeps the images at
-the first image's time, +6 h, +12 h, and so on (or from `start=`, which
-must be an image time). The cadence must be a multiple of the time between
-the images.
+`cadence` keeps only some of the instances: `cadence="6h"` keeps the
+instances at the first instance's time, +6 h, +12 h, and so on (or from
+`start=`, which must be an instance time). The cadence must be a multiple
+of the time between the instances.
 
 ## Sequences
 
 ```python
 builder = fidx.FullDiskSequence(
     "24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"),
-    cadence="1h",              # time between images in a sequence
-    observation_window="3h",   # time one sequence covers: 3 images
+    cadence="1h",              # time between instances in a sequence
+    observation_window="3h",   # time one sequence covers: 3 instances
     sliding_window="1h",       # a new sequence starts every hour
 )
-sequences = builder.build("image_index.csv", "flare_catalog.csv")
+sequences = builder.build("index.csv", "flare_catalog.csv")
 ```
 
 ```text
-     sequence_start        sequence_end                                                      timestamps  n_images  label
-2024-03-01 00:00:00 2024-03-01 02:00:00 [2024-03-01 00:00:00, 2024-03-01 01:00:00, 2024-03-01 02:00:00]         3      1
-2024-03-01 01:00:00 2024-03-01 03:00:00 [2024-03-01 01:00:00, 2024-03-01 02:00:00, 2024-03-01 03:00:00]         3      1
+     sequence_start        sequence_end                                                      timestamps  n_instances  label
+2024-03-01 00:00:00 2024-03-01 02:00:00 [2024-03-01 00:00:00, 2024-03-01 01:00:00, 2024-03-01 02:00:00]            3      1
+2024-03-01 01:00:00 2024-03-01 03:00:00 [2024-03-01 01:00:00, 2024-03-01 02:00:00, 2024-03-01 03:00:00]            3      1
 ```
 
-- Each sequence is labeled from its last image: the window is
+- Each sequence is labeled from its last instance: the window is
   `[sequence_end, sequence_end + w)`.
-- Other image-index columns, such as `image_path`, come as lists in the
+- Other index columns, such as `image_path`, come as lists in the
   same order as `timestamps`.
-- A sequence with a missing image is skipped; no nearby image is used in its
-  place.
-- `cadence` may be coarser than the images (hourly sequences from 12-minute
-  images), not finer, and must be a multiple of the images' own spacing.
+- A sequence with a missing instance is skipped; no nearby instance is used
+  in its place.
+- `cadence` may be coarser than the index (hourly sequences from a
+  12-minute index), not finer, and must be a multiple of the index's own
+  spacing.
   `observation_window` must be a multiple of `cadence`.
-- `sliding_window` may be smaller than `cadence`: from 12-minute images,
+- `sliding_window` may be smaller than `cadence`: from a 12-minute index,
   `cadence="1h"` and `sliding_window="12min"` start a new hourly sequence
-  every 12 minutes. It must be a multiple of the images' own spacing.
+  every 12 minutes. It must be a multiple of the index's own spacing.
 - `build(..., return_report=True)` also returns a `SequenceBuildReport`: how
-  many sequences were made and skipped, and which image times were missing.
+  many sequences were made and skipped, and which instance times were missing.
 
 ## Active regions
 
 ```python
-builder = fidx.ActiveRegionSingleImage(
+builder = fidx.ActiveRegionSingleInstance(
     "24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"),
 )
-labels = builder.build("active_region_image_index.csv", "flare_catalog.csv")
+labels = builder.build("active_region_index.csv", "flare_catalog.csv")
 ```
 
 ```text
@@ -148,18 +151,18 @@ labels = builder.build("active_region_image_index.csv", "flare_catalog.csv")
 2024-03-01 00:00:00         13601      1
 ```
 
-- Only the flares of a patch's own region count.
+- Only the flares of an instance's own region count.
 - Several regions can share a timestamp, so the result always has an
   `active_region` column.
 - `ActiveRegionSequence` takes the same settings as `FullDiskSequence` and
-  builds each region's sequences from that region's patches only.
-- A catalog flare with no region can never match a patch, and a warning
+  builds each region's sequences from that region's instances only.
+- A catalog flare with no region can never match an instance, and a warning
   says how many there are.
 
-`missing_active_region` decides what happens to a patch with no region in
-the image index:
+`missing_active_region` decides what happens to an instance with no region
+in the index:
 
-| Value | Patch with no region |
+| Value | Instance with no region |
 |---|---|
 | `"negative"` | labeled as if no flare occurred, with a warning |
 | `"drop"` | left out |
@@ -167,7 +170,7 @@ the image index:
 
 ## Extra columns
 
-- `include_metadata=True` (single images) keeps every other image-index
+- `include_metadata=True` (single instances) keeps every other index
   column, e.g. `image_path`.
 - `include_flares=True` adds a `flares` column next to the label: the
   classes of the flares in each window, e.g. `["C3.2", "M1.4"]`, so any
@@ -175,25 +178,25 @@ the image index:
 - `verbose=True` prints a short summary of each build:
 
 ```text
-Image index: 118 images (examples/data/full_disk_image_index.csv)
+Index: 118 instances (examples/data/full_disk_index.csv)
 Flare catalog: 8 flares (examples/data/flare_catalog.csv)
-Settings: window [t, t + 24h) on start_time, full disk, single images
+Settings: window [t, t + 24h) on start_time, full disk, single instances
 Result: 118 rows; label 0: 41, label 1: 77
 ```
 
 ## Preparing real data
 
 ```python
-index = fidx.build_image_index_from_filenames(
-    "hmi_image_list.txt", output_path="image_index.csv",
+index = fidx.build_index_from_hmi_filenames(
+    "hmi_image_list.txt", output_path="index.csv",
     strict=False)  # skip lines that are not HMI images
 catalog = fidx.adapt_goes_catalog(
     "goes_flares.csv", output_path="flare_catalog.csv")
 ```
 
-- `build_image_index_from_filenames` reads HMI full-disk file names such as
+- `build_index_from_hmi_filenames` reads HMI full-disk file names such as
   `HMI.m2010.12.21_21.00.00.jpg` (a list or a text file with one per line)
-  and writes the image index. The timestamp comes from the file name. Other
+  and writes the index. The timestamp comes from the file name. Other
   names, including SHARP patch names, stop it with an error (or are left
   out with `strict=False`); for patches, write the index yourself with
   `timestamp` and `active_region`.

@@ -1,37 +1,41 @@
 """
 The four kinds of labeled dataset, one class each:
 
-    FullDiskSingleImage       one full-disk image   -> one label
-    FullDiskSequence          a sequence of full-disk images -> one label
-    ActiveRegionSingleImage   one active-region patch -> one label
-    ActiveRegionSequence      a sequence of patches of one region -> one label
+    FullDiskSingleInstance       one full-disk instance -> one label
+    FullDiskSequence             a sequence of full-disk instances -> one label
+    ActiveRegionSingleInstance   one active-region instance -> one label
+    ActiveRegionSequence         a sequence of instances of one region -> one label
+
+An instance is one row of the index: one point in time, with whatever
+file belongs to it (an image, a .npy array, ...). The files are never
+opened, so any file type works.
 
 Each class takes only the settings that apply to its case and runs the
 shared DatasetBuilder engine. All four are used the same way:
 
-    labels = FullDiskSingleImage(
+    labels = FullDiskSingleInstance(
         "24h", reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
-    ).build("image_index.csv", "flare_catalog.csv")
+    ).build("index.csv", "flare_catalog.csv")
 
 The reducer turns the flares of one window into one value and the
 labeler turns that value into the label; see reducers.py and labelers.py.
 
 Sequences are built on a time grid: `cadence` is the
-time between images, `observation_window` the time a sequence covers,
-`sliding_window` the step between sequence starts, and `start` the
-optional first sequence start. Each sequence is labeled from its last
-image.
+time between instances, `observation_window` the time a sequence
+covers, `sliding_window` the step between sequence starts, and `start`
+the optional first sequence start. Each sequence is labeled from its
+last instance.
 """
 
 from .builder import DatasetBuilder
 
 
-class FullDiskSingleImage(DatasetBuilder):
-    """One label per full-disk image, from all flares in its window.
+class FullDiskSingleInstance(DatasetBuilder):
+    """One label per full-disk instance, from all flares in its window.
 
-    cadence (optional) keeps only the images at start, start + cadence, ...
-    (e.g. one image per hour from a 12-minute image list); start defaults
-    to the earliest image.
+    cadence (optional) keeps only the instances at start, start + cadence,
+    ... (e.g. one per hour from a 12-minute index); start defaults to the
+    earliest instance.
     """
 
     def __init__(
@@ -54,7 +58,7 @@ class FullDiskSingleImage(DatasetBuilder):
 
 
 class FullDiskSequence(DatasetBuilder):
-    """One label per sequence of full-disk images, from the window after its last image."""
+    """One label per sequence of full-disk instances, from the window after its last instance."""
 
     def __init__(
         self,
@@ -76,11 +80,12 @@ class FullDiskSequence(DatasetBuilder):
         )
 
 
-class ActiveRegionSingleImage(DatasetBuilder):
-    """One label per active-region patch, from that region's flares only.
+class ActiveRegionSingleInstance(DatasetBuilder):
+    """One label per active-region instance, from that region's flares only.
 
-    cadence (optional) keeps only the patches at start, start + cadence, ...;
-    all regions share this grid, and start defaults to the earliest patch.
+    cadence (optional) keeps only the instances at start, start + cadence,
+    ...; all regions share this grid, and start defaults to the earliest
+    instance.
     """
 
     def __init__(
@@ -105,7 +110,7 @@ class ActiveRegionSingleImage(DatasetBuilder):
 
 
 class ActiveRegionSequence(DatasetBuilder):
-    """One label per sequence of patches of one region, from that region's flares after its last image."""
+    """One label per sequence of instances of one region, from that region's flares after its last instance."""
 
     def __init__(
         self,

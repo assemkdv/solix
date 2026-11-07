@@ -46,11 +46,11 @@ class MaxRelativeFluxReducer:
 
     rxfi = peak X-ray flux / background X-ray flux, read from the catalog's
     rxfi column. Events without a
-    value are skipped; 0.0 if no event has one. Single images only.
+    value are skipped; 0.0 if no event has one. Single instances only.
     """
 
     requires_catalog_column = "rxfi"
-    single_image_only = True
+    single_instance_only = True
 
     def reduce(self, events: list[FlareEvent]) -> float:
         return max((e.rxfi for e in events if e.rxfi is not None), default=0.0)
@@ -60,11 +60,11 @@ class SumRelativeFluxReducer:
     """Sum of the relative X-ray flux increase (rxfi) of all events.
 
     Same rxfi values as MaxRelativeFluxReducer. Events without a value are
-    skipped; 0.0 if no event has one. Single images only.
+    skipped; 0.0 if no event has one. Single instances only.
     """
 
     requires_catalog_column = "rxfi"
-    single_image_only = True
+    single_instance_only = True
 
     def reduce(self, events: list[FlareEvent]) -> float:
         return float(sum(e.rxfi for e in events if e.rxfi is not None))

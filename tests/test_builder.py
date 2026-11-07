@@ -41,7 +41,7 @@ def test_build_missing_timestamp_column_raises(tmp_path):
     assert str(index_path) in message
 
 
-def test_build_completely_empty_image_index_raises(tmp_path):
+def test_build_completely_empty_index_raises(tmp_path):
     index_path = tmp_path / "index.csv"
     index_path.write_text("")
     catalog_path = _write_valid_catalog(tmp_path)
@@ -76,7 +76,7 @@ def test_build_produces_expected_timestamp_and_label_columns(tmp_path):
     assert result["label"].tolist() == [1, 0]
 
 
-def test_build_preserves_image_timestamp_order(tmp_path):
+def test_build_preserves_instance_timestamp_order(tmp_path):
     catalog_path = _write_two_flare_catalog(tmp_path)
     index_path = tmp_path / "index.csv"
     # Deliberately out of chronological order.
@@ -111,7 +111,7 @@ def test_build_works_with_max_flux_labels(tmp_path):
     assert result["label"].tolist() == [5e-5, 3e-6]
 
 
-# ── Active-region single-image labeling tests ───────────────────────────
+# ── Active-region single-instance labeling tests ───────────────────────────
 
 
 def test_active_region_works_with_max_flux_labels(tmp_path):
@@ -135,7 +135,7 @@ def test_active_region_works_with_max_flux_labels(tmp_path):
     assert result["label"].tolist() == [5.1e-5]
 
 
-def test_active_region_image_side_values_normalize_to_match_catalog(tmp_path):
+def test_active_region_instance_side_values_normalize_to_match_catalog(tmp_path):
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
         "start_time,peak_time,end_time,class,active_region\n"
@@ -158,7 +158,7 @@ def test_active_region_image_side_values_normalize_to_match_catalog(tmp_path):
     assert result["label"].tolist()[0] == 1
 
 
-def test_active_region_missing_image_side_value_matches_nothing(tmp_path):
+def test_active_region_missing_instance_side_value_matches_nothing(tmp_path):
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
         "start_time,peak_time,end_time,class,active_region\n"
@@ -175,8 +175,8 @@ def test_active_region_missing_image_side_value_matches_nothing(tmp_path):
     with pytest.warns(UserWarning, match="missing active_region"):
         result = builder.build(index_path, catalog_path)
 
-    # First image has a real matching region -> catches the X1.0 flare ->
-    # label 1. Second image's active_region is missing -> must not silently
+    # First instance has a real matching region -> catches the X1.0 flare ->
+    # label 1. Second instance's active_region is missing -> must not silently
     # match anything, even though the same strong flare for region 3559 is
     # still inside its window too.
     assert result["label"].tolist() == [1, 0]

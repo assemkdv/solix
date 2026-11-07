@@ -7,14 +7,14 @@ is made by a reducer and a labeler, passed to a dataset class as
 ```python
 import flare_indexer as fidx
 
-builder = fidx.FullDiskSingleImage(
+builder = fidx.FullDiskSingleInstance(
     "24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"),
 )
 ```
 
 ## One window, every label
 
-In `examples/data/`, the 24-hour window of the image at
+In `examples/data/`, the 24-hour window of the instance at
 2024-03-01 00:00 holds three flares:
 
 | Flare | Start | Peak flux (W/m²) | RXF |
@@ -23,7 +23,7 @@ In `examples/data/`, the 24-hour window of the image at
 | M1.4 | 03-01 13:20 | 1.4e-5 | 50.58 |
 | M2.7 | 03-01 23:52 | 2.7e-5 | 86.20 |
 
-This is the label each reducer and labeler give that image:
+This is the label each reducer and labeler give that instance:
 
 | Label | Reducer | Labeler | Value |
 |---|---|---|---|
@@ -78,7 +78,7 @@ class StrongFlareCount:
     def reduce(self, flares):
         return sum(f.goes_class[0] in "MX" for f in flares)
 
-builder = fidx.FullDiskSingleImage(
+builder = fidx.FullDiskSingleInstance(
     "24h", reducer=StrongFlareCount(), labeler=fidx.RegressionLabeler(),
 )
 ```
@@ -87,7 +87,7 @@ builder = fidx.FullDiskSingleImage(
 
 A flare's RXF is its peak X-ray flux divided by the background X-ray flux
 of the 24 hours before it starts. The RXF labels read it from the
-catalog's `rxfi` column and are for single images only.
+catalog's `rxfi` column and are for single instances only.
 
 If the catalog has no `rxfi` column, `add_relative_flux` computes it once
 from GOES 1–8 Å X-ray flux, a CSV with the columns `time, flux` and one

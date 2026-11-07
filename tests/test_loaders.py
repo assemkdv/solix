@@ -1,19 +1,19 @@
 import pandas as pd
 import pytest
 
-from flare_indexer.loaders import ImageIndexReport, adapt_goes_catalog, build_image_index_from_filenames
+from flare_indexer.loaders import HMIIndexReport, adapt_goes_catalog, build_index_from_hmi_filenames
 
-# ── build_image_index_from_filenames ────────────────────────────────────
+# ── build_index_from_hmi_filenames ────────────────────────────────────
 
 
-def test_build_image_index_from_filename_list():
+def test_build_index_from_filename_list():
     paths = [
         "/data/hmi/2010/12/21/HMI.m2010.12.21_21.00.00.jpg",
         "/data/hmi/2010/12/21/HMI.m2010.12.21_20.00.00.jpg",
         "/data/hmi/2010/12/22/HMI.m2010.12.22_00.30.15.jpg",
     ]
 
-    result = build_image_index_from_filenames(paths)
+    result = build_index_from_hmi_filenames(paths)
 
     assert list(result.columns) == ["timestamp", "image_path"]
     assert pd.api.types.is_datetime64_any_dtype(result["timestamp"])
@@ -30,49 +30,49 @@ def test_build_image_index_from_filename_list():
     )
 
 
-def test_build_image_index_varying_directory_depth():
+def test_build_index_varying_directory_depth():
     # Directory depth must not matter -- only the basename is parsed.
     paths = [
         "HMI.m2010.01.01_00.00.00.jpg",
         "/a/b/c/d/e/HMI.m2010.01.02_00.00.00.jpg",
     ]
-    result = build_image_index_from_filenames(paths)
+    result = build_index_from_hmi_filenames(paths)
     assert len(result) == 2
 
 
-def test_build_image_index_malformed_filename_raises():
+def test_build_index_malformed_filename_raises():
     paths = [
         "/data/hmi/2010/12/21/HMI.m2010.12.21_21.00.00.jpg",
         "/data/hmi/not_a_valid_filename.jpg",
     ]
 
     with pytest.raises(ValueError) as excinfo:
-        build_image_index_from_filenames(paths)
+        build_index_from_hmi_filenames(paths)
 
     assert "not_a_valid_filename.jpg" in str(excinfo.value)
 
 
-def test_build_image_index_from_headerless_paths_file(tmp_path):
+def test_build_index_from_headerless_paths_file(tmp_path):
     paths_file = tmp_path / "paths.txt"
     paths_file.write_text(
         "/data/HMI.m2010.12.21_21.00.00.jpg\n"
         "/data/HMI.m2010.12.21_20.00.00.jpg\n"
     )
 
-    result = build_image_index_from_filenames(paths_file)
+    result = build_index_from_hmi_filenames(paths_file)
 
     assert len(result) == 2
     assert result["timestamp"].is_monotonic_increasing
 
 
-def test_build_image_index_strips_utf8_bom(tmp_path):
+def test_build_index_strips_utf8_bom(tmp_path):
     paths_file = tmp_path / "paths.txt"
     # Raw bytes, so the BOM is attached to the first path (some exported lists have one).
     paths_file.write_bytes(
         "﻿/data/HMI.m2010.12.21_21.00.00.jpg\n/data/HMI.m2010.12.21_20.00.00.jpg\n".encode("utf-8")
     )
 
-    result = build_image_index_from_filenames(paths_file)
+    result = build_index_from_hmi_filenames(paths_file)
 
     assert len(result) == 2
     # The BOM must not leak into the basename match or the preserved path.
@@ -80,14 +80,14 @@ def test_build_image_index_strips_utf8_bom(tmp_path):
     assert result["image_path"].iloc[1] == "/data/HMI.m2010.12.21_21.00.00.jpg"
 
 
-def test_build_image_index_unsorted_paths_become_sorted():
+def test_build_index_unsorted_paths_become_sorted():
     paths = [
         "HMI.m2010.12.21_23.00.00.jpg",
         "HMI.m2010.12.21_00.00.00.jpg",
         "HMI.m2010.12.21_12.00.00.jpg",
     ]
 
-    result = build_image_index_from_filenames(paths)
+    result = build_index_from_hmi_filenames(paths)
 
     assert result["timestamp"].tolist() == [
         pd.Timestamp("2010-12-21 00:00:00"),
@@ -96,11 +96,11 @@ def test_build_image_index_unsorted_paths_become_sorted():
     ]
 
 
-def test_build_image_index_writes_output_csv(tmp_path):
+def test_build_index_writes_output_csv(tmp_path):
     paths = ["/data/HMI.m2010.12.21_21.00.00.jpg"]
-    output_path = tmp_path / "image_index.csv"
+    output_path = tmp_path / "index.csv"
 
-    result = build_image_index_from_filenames(paths, output_path=output_path)
+    result = build_index_from_hmi_filenames(paths, output_path=output_path)
 
     assert output_path.exists()
     on_disk = pd.read_csv(output_path)
@@ -112,17 +112,17 @@ def test_build_image_index_writes_output_csv(tmp_path):
 # ── strict vs. tolerant malformed-row handling ──────────────────────────
 
 
-def test_build_image_index_strict_invalid_date_in_correctly_shaped_filename_raises():
+def test_build_index_strict_invalid_date_in_correctly_shaped_filename_raises():
     # Shape matches (2-digit groups) but month=13 is not a real calendar month.
     paths = ["HMI.m2010.13.21_21.00.00.jpg"]
 
     with pytest.raises(ValueError) as excinfo:
-        build_image_index_from_filenames(paths)
+        build_index_from_hmi_filenames(paths)
 
     assert "HMI.m2010.13.21_21.00.00.jpg" in str(excinfo.value)
 
 
-def test_build_image_index_tolerant_excludes_and_reports_malformed_rows():
+def test_build_index_tolerant_excludes_and_reports_malformed_rows():
     paths = [
         "/data/HMI.m2010.12.21_21.00.00.jpg",
         "/data/notes/README.csv",  # not an image
@@ -130,10 +130,10 @@ def test_build_image_index_tolerant_excludes_and_reports_malformed_rows():
         "/data/HMI.m2010.12.21_20.00.00.jpg",
     ]
 
-    df, report = build_image_index_from_filenames(paths, strict=False, return_report=True)
+    df, report = build_index_from_hmi_filenames(paths, strict=False, return_report=True)
 
     assert len(df) == 2
-    assert isinstance(report, ImageIndexReport)
+    assert isinstance(report, HMIIndexReport)
     assert report.total_input_rows == 4
     assert report.valid_image_rows_before_dedup == 2
     assert report.excluded_row_count == 2
@@ -152,31 +152,31 @@ _DUPLICATE_PATHS = [
 ]
 
 
-def test_build_image_index_duplicate_policy_error_raises():
+def test_build_index_duplicate_policy_error_raises():
     with pytest.raises(ValueError) as excinfo:
-        build_image_index_from_filenames(_DUPLICATE_PATHS)  # default duplicate_policy="error"
+        build_index_from_hmi_filenames(_DUPLICATE_PATHS)  # default duplicate_policy="error"
 
     assert "duplicate" in str(excinfo.value).lower()
 
 
-def test_build_image_index_duplicate_policy_first_keeps_first_encountered():
-    result = build_image_index_from_filenames(_DUPLICATE_PATHS, duplicate_policy="first")
+def test_build_index_duplicate_policy_first_keeps_first_encountered():
+    result = build_index_from_hmi_filenames(_DUPLICATE_PATHS, duplicate_policy="first")
 
     assert len(result) == 2
     kept = result.loc[result["timestamp"] == pd.Timestamp("2010-12-21 20:00:00"), "image_path"].iloc[0]
     assert kept == "HMI.m2010.12.21_20.00.00.jpg"
 
 
-def test_build_image_index_duplicate_policy_last_keeps_last_encountered():
-    result = build_image_index_from_filenames(_DUPLICATE_PATHS, duplicate_policy="last")
+def test_build_index_duplicate_policy_last_keeps_last_encountered():
+    result = build_index_from_hmi_filenames(_DUPLICATE_PATHS, duplicate_policy="last")
 
     assert len(result) == 2
     kept = result.loc[result["timestamp"] == pd.Timestamp("2010-12-21 20:00:00"), "image_path"].iloc[0]
     assert kept == "/other/dir/HMI.m2010.12.21_20.00.00.jpg"
 
 
-def test_build_image_index_duplicate_policy_report_fields():
-    df, report = build_image_index_from_filenames(
+def test_build_index_duplicate_policy_report_fields():
+    df, report = build_index_from_hmi_filenames(
         _DUPLICATE_PATHS, duplicate_policy="first", return_report=True
     )
 
@@ -186,9 +186,9 @@ def test_build_image_index_duplicate_policy_report_fields():
     assert len(report.duplicate_rows) == 2  # both rows sharing the duplicated timestamp
 
 
-def test_build_image_index_invalid_duplicate_policy_raises():
+def test_build_index_invalid_duplicate_policy_raises():
     with pytest.raises(ValueError) as excinfo:
-        build_image_index_from_filenames(["HMI.m2010.12.21_20.00.00.jpg"], duplicate_policy="skip")
+        build_index_from_hmi_filenames(["HMI.m2010.12.21_20.00.00.jpg"], duplicate_policy="skip")
 
     assert "duplicate_policy" in str(excinfo.value)
 
@@ -397,8 +397,8 @@ def test_a_list_of_paths_follows_the_file_rules(tmp_path):
     listed = ["", "  ", " HMI.m2010.12.21_21.00.00.jpg "]
     text = tmp_path / "paths.txt"
     text.write_text("\n".join(listed) + "\n")
-    from_list, report = build_image_index_from_filenames(listed, return_report=True)
-    from_file = build_image_index_from_filenames(text)
+    from_list, report = build_index_from_hmi_filenames(listed, return_report=True)
+    from_file = build_index_from_hmi_filenames(text)
     pd.testing.assert_frame_equal(from_list, from_file)
     assert report.total_input_rows == 1 and report.excluded_row_count == 0
 

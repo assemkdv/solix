@@ -71,7 +71,7 @@ def test_invalid_counts(value, error, labeler):
 @pytest.mark.parametrize('mode', ['single', 'time'])
 @pytest.mark.parametrize('labeler', [f.ClassCountLabeler, f.ClassPresenceLabeler])
 def test_builder_all_modes(tmp_path, target, mode, labeler):
-    index = tmp_path / 'images.csv'
+    index = tmp_path / 'instances.csv'
     catalog = tmp_path / 'catalog.csv'
     pd.DataFrame({'timestamp': ['2024-01-01 00:00', '2024-01-01 01:00'],
                   'active_region': [100, 100]}).to_csv(index, index=False)
@@ -90,7 +90,7 @@ def test_builder_all_modes(tmp_path, target, mode, labeler):
 
 
 def test_minimum_pipeline_builder(tmp_path):
-    index, catalog = tmp_path / 'images.csv', tmp_path / 'catalog.csv'
+    index, catalog = tmp_path / 'instances.csv', tmp_path / 'catalog.csv'
     pd.DataFrame({'timestamp': ['2024-01-01']}).to_csv(index, index=False)
     pd.DataFrame({'start_time': ['2024-01-01 01:00'] * 2,
                   'peak_time': ['2024-01-01 01:05'] * 2, 'end_time': ['2024-01-01 01:10'] * 2,

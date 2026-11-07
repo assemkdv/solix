@@ -10,7 +10,7 @@ from flare_indexer import MaxFluxReducer, BinaryThresholdLabeler, RegressionLabe
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 CATALOG_PATH = FIXTURES_DIR / "catalog.csv"
-IMAGE_INDEX_PATH = FIXTURES_DIR / "image_index.csv"
+INDEX_PATH = FIXTURES_DIR / "index.csv"
 
 # tests/fixtures/catalog.csv has four flares (start times, which is what matching uses):
 #   C3.0 starts 2024-02-01T11:50:00  (flux=3e-6)
@@ -18,7 +18,7 @@ IMAGE_INDEX_PATH = FIXTURES_DIR / "image_index.csv"
 #   C1.0 starts 2024-02-05T05:50:00  (flux=1e-6)
 #   M4.0 starts 2024-02-05T17:50:00  (flux=4e-5)
 #
-# tests/fixtures/image_index.csv has three timestamps, each with a
+# tests/fixtures/index.csv has three timestamps, each with a
 # prediction_window of 24 hours:
 #   2024-02-01T00:00:00 -> window [2024-02-01T00:00, 2024-02-02T00:00)
 #       Only C3.0 is inside. X1.0 starts exactly at the window end and must
@@ -31,7 +31,7 @@ IMAGE_INDEX_PATH = FIXTURES_DIR / "image_index.csv"
 
 def test_end_to_end_binary_labels():
     builder = DatasetBuilder(prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"))
-    result = builder.build(IMAGE_INDEX_PATH, CATALOG_PATH)
+    result = builder.build(INDEX_PATH, CATALOG_PATH)
 
     assert list(result.columns) == ["timestamp", "label"]
     assert result["timestamp"].tolist() == [
@@ -44,7 +44,7 @@ def test_end_to_end_binary_labels():
 
 def test_end_to_end_max_flux_labels():
     builder = DatasetBuilder(prediction_window=24, reducer=MaxFluxReducer(), labeler=RegressionLabeler())
-    result = builder.build(IMAGE_INDEX_PATH, CATALOG_PATH)
+    result = builder.build(INDEX_PATH, CATALOG_PATH)
 
     # Row 1: max is C3.0's 3e-6 — X1.0's 1e-4 must be excluded since its
     # start lands exactly on the window boundary. If the boundary were
@@ -57,7 +57,7 @@ def test_end_to_end_max_flux_labels():
 def test_end_to_end_sequences_against_fixture_catalog(tmp_path):
     # Uses the same tests/fixtures/catalog.csv as
     # the tests above, but drives it through sequence labeling rather than
-    # single-image labeling.
+    # single-instance labeling.
     index_path = tmp_path / "sequence_index.csv"
     pd.DataFrame({
         "timestamp": pd.to_datetime([
@@ -75,7 +75,7 @@ def test_end_to_end_sequences_against_fixture_catalog(tmp_path):
     )
     result = builder.build(index_path, CATALOG_PATH)
 
-    assert list(result.columns) == ["sequence_start", "sequence_end", "timestamps", "n_images", "label"]
+    assert list(result.columns) == ["sequence_start", "sequence_end", "timestamps", "n_instances", "label"]
     assert result["sequence_end"].tolist() == [
         pd.Timestamp("2024-02-01T09:49:00"),
         pd.Timestamp("2024-02-01T10:49:00"),
@@ -145,7 +145,7 @@ def test_end_to_end_active_region_sequences_against_fixture_catalog(tmp_path):
     result = builder.build(index_path, CATALOG_PATH)
 
     assert list(result.columns) == [
-        "sequence_start", "sequence_end", "timestamps", "n_images", "active_region", "label"
+        "sequence_start", "sequence_end", "timestamps", "n_instances", "active_region", "label"
     ]
     assert result["sequence_end"].tolist() == [
         pd.Timestamp("2024-02-01T11:49:00"),

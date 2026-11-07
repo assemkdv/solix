@@ -5,9 +5,9 @@ Question answered for every image: "Does an M-class or stronger flare start
 in [t, t + 24h), where t is the image's own observation time?"
 
 Steps
-1. Image index: built from examples/real_data/image_manifest.csv, which
+1. Index: built from examples/real_data/image_manifest.csv, which
    fetch_real_data.py wrote from each downloaded file's header (DATE_OBS).
-2. Labels: flare_indexer.FullDiskSingleImage with every labeling choice explicit.
+2. Labels: flare_indexer.FullDiskSingleInstance with every labeling choice explicit.
 3. Loading: FlareDataset, a torch Dataset that gives one (image, label)
    per row of the label table, and a DataLoader that yields image batches
    shaped [B, C, H, W] = [B, 1, 256, 256].
@@ -73,18 +73,18 @@ def main(argv=None):
     real.require_optional_dependencies()
 
     args.output.mkdir(parents=True, exist_ok=True)
-    index_path = args.output / "06_image_index.csv"
+    index_path = args.output / "06_index.csv"
     labels_path = args.output / "06_image_labels.csv"
 
-    # 1. Image index from actual observation times.
+    # 1. Index from actual observation times.
     index = real.build_image_index(index_path)
     provenance = real.check_catalog_coverage(index["timestamp"], PREDICTION_WINDOW)
-    print(f"Image index: {len(index)} images -> {index_path}")
+    print(f"Index: {len(index)} images -> {index_path}")
     print(f"Catalog: {provenance['catalog_rows']} flares, queried {provenance['query_start']} .. "
           f"{provenance['query_end']}; covers every [t, t+{PREDICTION_WINDOW}) window")
 
     # 2. Labels.
-    builder = fidx.FullDiskSingleImage(
+    builder = fidx.FullDiskSingleInstance(
         prediction_window=PREDICTION_WINDOW,
         reducer=fidx.MaxFluxReducer(),               # the strongest flare in the window
         labeler=fidx.BinaryThresholdLabeler("M"),    # 1 if any flare >= M1.0 in the window

@@ -271,7 +271,7 @@ def test_patch_labels_count_only_each_regions_own_flares(tmp_path):
         manifest = pd.read_csv(real.SHARP_MANIFEST)
         pd.DataFrame({"timestamp": manifest["timestamp"], "active_region": manifest["noaa_ar"],
                       "image_path": manifest["image_path"]}).to_csv(index_path, index=False)
-    labels = fidx.ActiveRegionSingleImage("24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M")).build(index_path, real.CATALOG)
+    labels = fidx.ActiveRegionSingleInstance("24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M")).build(index_path, real.CATALOG)
     got = {(t, r): label for t, r, label in zip(labels["timestamp"], labels["active_region"], labels["label"])}
     assert {key: value for key, value in got.items() if value} == EXPECTED_PATCH_LABELS
     assert len(got) == 16

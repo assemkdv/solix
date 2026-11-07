@@ -6,8 +6,8 @@ from .labelers import LabelAssigner, BinaryThresholdLabeler, RegressionLabeler, 
 from .labelers import ClassCountLabeler, ClassPresenceLabeler, NumericThresholdLabeler
 from .pipeline import PipelineResult, DatasetBuildingPipeline
 from .builder import SequenceBuildReport
-from .datasets import FullDiskSingleImage, FullDiskSequence, ActiveRegionSingleImage, ActiveRegionSequence
-from .loaders import build_image_index_from_filenames, adapt_goes_catalog, add_relative_flux, ImageIndexReport
+from .datasets import FullDiskSingleInstance, FullDiskSequence, ActiveRegionSingleInstance, ActiveRegionSequence
+from .loaders import build_index_from_hmi_filenames, adapt_goes_catalog, add_relative_flux, HMIIndexReport
 
 __all__ = [
     "FluxConverter",
@@ -31,13 +31,13 @@ __all__ = [
     "MulticlassLabeler",
     "PipelineResult",
     "DatasetBuildingPipeline",
-    "FullDiskSingleImage",
+    "FullDiskSingleInstance",
     "FullDiskSequence",
-    "ActiveRegionSingleImage",
+    "ActiveRegionSingleInstance",
     "ActiveRegionSequence",
     "SequenceBuildReport",
-    "build_image_index_from_filenames",
+    "build_index_from_hmi_filenames",
     "adapt_goes_catalog",
     "add_relative_flux",
-    "ImageIndexReport",
+    "HMIIndexReport",
 ]

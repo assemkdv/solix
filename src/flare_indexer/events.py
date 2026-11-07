@@ -212,7 +212,7 @@ def _parse_full_timestamp_column(df: pd.DataFrame, column: str, path, what: str 
 
 
 # Column names a user may map their own columns to, per input file.
-IMAGE_INDEX_COLUMNS = ("timestamp", "active_region")
+INDEX_COLUMNS = ("timestamp", "active_region")
 CATALOG_COLUMNS = ("start_time", "peak_time", "end_time", "class", "active_region", "rxfi")
 XRAY_FLUX_COLUMNS = ("time", "flux")
 
@@ -299,7 +299,7 @@ def _validate_time_order(df: pd.DataFrame, path) -> None:
 class EventMatcher:
     """
     Loads a flare catalog and finds the flares in the prediction window of
-    an image time.
+    an instance time.
 
     The catalog is a CSV with the columns start_time, peak_time, end_time,
     class, active_region (optionally fl_lon, fl_lat, rxfi); every time cell
@@ -356,7 +356,7 @@ class EventMatcher:
         """
         The catalog's start times, sorted, and their row positions. Built
         once and reused by every query(), so labeling tens of thousands of
-        images does not re-sort the catalog each time.
+        instances does not re-sort the catalog each time.
         """
         # getattr, not an attribute set in __init__: tests build an
         # EventMatcher with __new__() and set _catalog directly.
@@ -368,7 +368,7 @@ class EventMatcher:
 
     def query(
         self,
-        image_time: pd.Timestamp,
+        reference_time: pd.Timestamp,
         prediction_window,
         active_region: str | None = None,
     ) -> list[FlareEvent]:
@@ -376,14 +376,14 @@ class EventMatcher:
         Returns all flares whose start time falls inside the prediction
         window.
 
-        The window is [image_time, image_time + prediction_window): it
-        includes image_time itself and excludes the window end, so a 24 h
-        window means "less than 24 hours after the image".
+        The window is [reference_time, reference_time + prediction_window): it
+        includes reference_time itself and excludes the window end, so a 24 h
+        window means "less than 24 hours after the instance".
 
         prediction_window is either a number of hours (e.g. 24) or a
         pandas-compatible duration (e.g. "23h59min59s", pd.Timedelta).
 
-        Example: image taken at 10:00, window = 24 hours
+        Example: instance at 10:00, window = 24 hours
         → returns all flares with start_time in [10:00, 10:00 next day)
 
         If active_region is given, only flares attributed to that exact
@@ -395,16 +395,16 @@ class EventMatcher:
         active_region is None (the default), matching is full-disk: any
         flare in the window counts.
 
-        image_time must be a pandas Timestamp (not NaT). A Timestamp with
+        reference_time must be a pandas Timestamp (not NaT). A Timestamp with
         a UTC offset is converted to UTC before matching; a naive one is
         assumed to be on the catalog's time scale.
         """
-        if isinstance(image_time, (datetime.datetime, np.datetime64)) and not isinstance(image_time, pd.Timestamp):
-            image_time = pd.Timestamp(image_time)
-        if not isinstance(image_time, pd.Timestamp) or pd.isna(image_time):
+        if isinstance(reference_time, (datetime.datetime, np.datetime64)) and not isinstance(reference_time, pd.Timestamp):
+            reference_time = pd.Timestamp(reference_time)
+        if not isinstance(reference_time, pd.Timestamp) or pd.isna(reference_time):
             raise ValueError(
-                f"image_time must be a pandas Timestamp (not missing/NaT), got {image_time!r} "
-                f"({type(image_time).__name__})."
+                f"reference_time must be a pandas Timestamp (not missing/NaT), got {reference_time!r} "
+                f"({type(reference_time).__name__})."
             )
         if active_region is not None:
             normalized_query_ar = _normalize_active_region(active_region)
@@ -415,15 +415,15 @@ class EventMatcher:
                 )
             active_region = normalized_query_ar
 
-        image_time = _to_naive_utc(image_time)
-        window_end = image_time + _parse_prediction_window(prediction_window)
+        reference_time = _to_naive_utc(reference_time)
+        window_end = reference_time + _parse_prediction_window(prediction_window)
 
         sorted_values, sort_positions = self._sorted_starts()
-        image_time_np = np.datetime64(image_time)
+        reference_time_np = np.datetime64(reference_time)
         window_end_np = np.datetime64(window_end)
 
-        # [image_time, window_end): include image_time, exclude window_end.
-        lo = np.searchsorted(sorted_values, image_time_np, side="left")
+        # [reference_time, window_end): include reference_time, exclude window_end.
+        lo = np.searchsorted(sorted_values, reference_time_np, side="left")
         hi = np.searchsorted(sorted_values, window_end_np, side="left")
 
         candidate_positions = sort_positions[lo:hi]

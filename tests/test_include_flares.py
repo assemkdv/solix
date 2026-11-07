@@ -36,7 +36,7 @@ def test_default_output_is_unchanged(tmp_path):
     assert list(result.columns) == ["timestamp", "label"]
 
 
-def test_single_image_full_disk(tmp_path):
+def test_single_instance_full_disk(tmp_path):
     index, catalog = _files(tmp_path, ["2024-01-01 00:00:00", "2024-01-01 05:00:00", "2024-01-01 10:00:00"])
     result = DatasetBuilder("6h", reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), include_flares=True).build(index, catalog)
     assert list(result.columns) == ["timestamp", "label", "flares"]
@@ -45,14 +45,14 @@ def test_single_image_full_disk(tmp_path):
 
 
 def test_window_edges_follow_the_label(tmp_path):
-    # Image at 03:10: the C2.0 starting at t counts; a 2h30 window ends at 05:40, which is excluded.
+    # Instance at 03:10: the C2.0 starting at t counts; a 2h30 window ends at 05:40, which is excluded.
     index, catalog = _files(tmp_path, ["2024-01-01 03:10:00"])
     result = DatasetBuilder("2h30min", reducer=MaxFluxReducer(), labeler=RegressionLabeler(), include_flares=True).build(index, catalog)
     assert result["flares"].tolist() == [["C2.0"]]
     assert result["label"].tolist() == [2e-6]
 
 
-def test_single_image_active_region_lists_only_that_region(tmp_path):
+def test_single_instance_active_region_lists_only_that_region(tmp_path):
     index, catalog = _files(tmp_path, ["2024-01-01 00:00:00"] * 2, regions=["13324", "13325"])
     result = DatasetBuilder(
         "12h", reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), target="active_region", include_flares=True, include_metadata=True,

@@ -12,7 +12,7 @@ from flare_indexer.reducers import MaxFluxReducer
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 CATALOG_PATH = FIXTURES_DIR / "catalog.csv"
-IMAGE_INDEX_PATH = FIXTURES_DIR / "image_index.csv"
+INDEX_PATH = FIXTURES_DIR / "index.csv"
 
 
 def _flare(goes_class: str, peak="2024-01-01 00:30", start="2024-01-01 00:20", active_region=None) -> FlareEvent:
@@ -294,7 +294,7 @@ def test_full_disk_time_based_sequences_work_with_pipeline(tmp_path):
     )
     result, report = builder.build(index_path, empty_catalog, return_report=True)
 
-    assert list(result.columns) == ["sequence_start", "sequence_end", "timestamps", "n_images", "label"]
+    assert list(result.columns) == ["sequence_start", "sequence_end", "timestamps", "n_instances", "label"]
     assert len(result) == 2
     assert report.emitted_sequences == 2
 
@@ -323,7 +323,7 @@ def test_sequence_build_report_does_not_depend_on_the_labeler(tmp_path):
     assert binary_report == flux_report
 
 
-def test_active_region_single_image_works_with_pipeline(tmp_path):
+def test_active_region_single_instance_works_with_pipeline(tmp_path):
     index_path = tmp_path / "ar_index.csv"
     pd.DataFrame({
         "timestamp": pd.to_datetime(["2024-02-01T00:00:00", "2024-02-05T00:00:00", "2024-02-05T00:00:00"]),
@@ -383,7 +383,7 @@ def test_extra_columns_preserved_with_pipeline(tmp_path):
 def test_builder_labels_equal_pipeline_run_one(labeler):
     built = DatasetBuilder(
         prediction_window=24, reducer=MaxFluxReducer(), labeler=labeler,
-    ).build(IMAGE_INDEX_PATH, CATALOG_PATH)
+    ).build(INDEX_PATH, CATALOG_PATH)
 
     pipeline = DatasetBuildingPipeline(reducer=MaxFluxReducer(), labeler=labeler)
     matcher = EventMatcher(CATALOG_PATH)

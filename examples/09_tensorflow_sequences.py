@@ -15,7 +15,7 @@ why: images 0.1 s off the grid, a missing hour, and an image at
 09:00:34.9); both are labeled 0. Missing grid images are never replaced.
 
 Steps
-1. Image index from the manifest (same as examples 6, 7 and 8).
+1. Index from the manifest (same as examples 6, 7 and 8).
 2. Sequences and labels: flare_indexer.FullDiskSequence on a time grid.
 3. CSV round trip of the list-valued columns (timestamps, image_path).
 4. Loading: FlareSequenceDataset, a keras.utils.PyDataset that gives one
@@ -98,14 +98,14 @@ def main(argv=None):
     real.require_optional_dependencies()
 
     args.output.mkdir(parents=True, exist_ok=True)
-    index_path = args.output / "09_image_index.csv"
+    index_path = args.output / "09_index.csv"
     sequences_path = args.output / "09_sequence_labels.csv"
 
-    # 1. Image index from actual, full-precision observation times.
+    # 1. Index from actual, full-precision observation times.
     index = real.build_image_index(index_path)
     provenance = real.check_catalog_coverage(index["timestamp"], PREDICTION_WINDOW)
     print(f"TensorFlow {tf.__version__}")
-    print(f"Image index: {len(index)} images -> {index_path}")
+    print(f"Index: {len(index)} images -> {index_path}")
     print(f"Catalog: {provenance['catalog_rows']} flares, queried {provenance['query_start']} .. "
           f"{provenance['query_end']}; covers every [t, t+{PREDICTION_WINDOW}) window")
 
@@ -131,7 +131,7 @@ def main(argv=None):
     reloaded = real.load_sequences(sequences_path)
     pd.testing.assert_frame_equal(reloaded, sequences, check_dtype=False)
     print(f"\nSequences -> {sequences_path} (reloaded and compared: identical)")
-    print(sequences[["sequence_start", "sequence_end", "n_images", "label"]].to_string(index=False))
+    print(sequences[["sequence_start", "sequence_end", "n_instances", "label"]].to_string(index=False))
 
     # 4. Dataset.
     dataset = FlareSequenceDataset(reloaded, real.REAL_DATA, CADENCE, batch_size=BATCH_SIZE)

@@ -7,10 +7,10 @@ observation time?" Two patches observed at the same time can get
 different labels, because only each region's own flares count.
 
 Steps
-1. Image index: built from examples/real_data/sharp_manifest.csv, which
+1. Index: built from examples/real_data/sharp_manifest.csv, which
    fetch_sharp_patches.py wrote from each patch's own header (DATE-OBS and
    NOAA_AR).
-2. Labels: flare_indexer.ActiveRegionSingleImage.
+2. Labels: flare_indexer.ActiveRegionSingleInstance.
 3. Loading: FlareDataset, a torch Dataset that gives one (patch, label) per
    row of the label table, and a DataLoader that yields batches shaped
    [B, C, H, W] = [B, 1, 128, 128].
@@ -79,16 +79,16 @@ def main(argv=None):
     index_path = args.output / "10_patch_index.csv"
     labels_path = args.output / "10_patch_labels.csv"
 
-    # 1. Image index from the patches' own headers.
+    # 1. Index from the patches' own headers.
     index = real.build_patch_index(index_path)
     provenance = real.check_catalog_coverage(index["timestamp"], PREDICTION_WINDOW)
     regions = sorted(int(r) for r in index["active_region"].unique())
-    print(f"Image index: {len(index)} patches of regions {regions} -> {index_path}")
+    print(f"Index: {len(index)} patches of regions {regions} -> {index_path}")
     print(f"Catalog: {provenance['catalog_rows']} flares, queried {provenance['query_start']} .. "
           f"{provenance['query_end']}; covers every [t, t+{PREDICTION_WINDOW}) window")
 
     # 2. Labels: only each patch's own region's flares count.
-    builder = fidx.ActiveRegionSingleImage(
+    builder = fidx.ActiveRegionSingleInstance(
         prediction_window=PREDICTION_WINDOW,
         reducer=fidx.MaxFluxReducer(),               # the strongest flare in the window
         labeler=fidx.BinaryThresholdLabeler("M"),    # 1 if a flare >= M1.0 from this region starts in the window

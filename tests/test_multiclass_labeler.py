@@ -174,7 +174,7 @@ def _builder(pipeline=None, **kwargs):
 
 @pytest.fixture
 def full_disk_index(tmp_path):
-    path = tmp_path / "images.csv"
+    path = tmp_path / "instances.csv"
     pd.DataFrame({
         "timestamp": pd.date_range("2024-01-01 00:00", periods=8, freq="12h"),
         "image_path": [f"img{i}.jpg" for i in range(8)],
@@ -182,7 +182,7 @@ def full_disk_index(tmp_path):
     return path
 
 
-def test_single_image_full_disk(catalog, full_disk_index):
+def test_single_instance_full_disk(catalog, full_disk_index):
     labels = _builder(_multiclass_pipeline(), include_metadata=True).build(full_disk_index, catalog)
     # Windows [t, t+12h): day 1 00h holds C3.0 and M10.0 -> X; day 2 00h holds B2.0 and A4.0 -> B.
     assert labels["label"].tolist() == ["X", "NF", "B", "NF", "C", "NF", "X", "NF"]
@@ -200,7 +200,7 @@ def test_multiclass_agrees_with_binary_and_regression_on_the_same_windows(catalo
     assert [int(c in ("M", "X")) for c in multiclass] == binary.tolist()
     assert [labeler.assign(f) for f in regression] == multiclass.tolist()
 
-def test_time_based_sequences_use_the_final_image(catalog, full_disk_index):
+def test_time_based_sequences_use_the_final_instance(catalog, full_disk_index):
     sequences, report = _builder(
         _multiclass_pipeline(), cadence="12h", observation_window="24h", sliding_window="12h",
     ).build(full_disk_index, catalog, return_report=True)
@@ -212,7 +212,7 @@ def test_time_based_sequences_use_the_final_image(catalog, full_disk_index):
 
 @pytest.fixture
 def ar_index(tmp_path):
-    path = tmp_path / "ar_images.csv"
+    path = tmp_path / "ar_index.csv"
     times = pd.to_datetime(["2024-01-01 00:00", "2024-01-02 00:00", "2024-01-03 00:00", "2024-01-04 00:00"])
     pd.DataFrame({
         "timestamp": times.repeat(2),
@@ -222,7 +222,7 @@ def ar_index(tmp_path):
     return path
 
 
-def test_active_region_single_image_isolates_regions(catalog, ar_index):
+def test_active_region_single_instance_isolates_regions(catalog, ar_index):
     labels = _builder(_multiclass_pipeline(), target="active_region", include_metadata=True).build(ar_index, catalog)
     got = {(str(t.date()), r): label for t, r, label in zip(labels["timestamp"], labels["active_region"], labels["label"])}
     assert got == {

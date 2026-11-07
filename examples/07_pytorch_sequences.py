@@ -20,7 +20,7 @@ With this data only 2 of 8 candidate sequences are complete, and both are
 labeled 0.
 
 Steps
-1. Image index from the manifest (same as example 6).
+1. Index from the manifest (same as example 6).
 2. Sequences and labels: flare_indexer.FullDiskSequence on a time grid.
 3. CSV round trip: the list-valued columns (timestamps, image_path) are
    written as JSON lists and parsed back, and the reloaded table must equal
@@ -94,13 +94,13 @@ def main(argv=None):
     real.require_optional_dependencies()
 
     args.output.mkdir(parents=True, exist_ok=True)
-    index_path = args.output / "07_image_index.csv"
+    index_path = args.output / "07_index.csv"
     sequences_path = args.output / "07_sequence_labels.csv"
 
-    # 1. Image index from actual observation times.
+    # 1. Index from actual observation times.
     index = real.build_image_index(index_path)
     provenance = real.check_catalog_coverage(index["timestamp"], PREDICTION_WINDOW)
-    print(f"Image index: {len(index)} images -> {index_path}")
+    print(f"Index: {len(index)} images -> {index_path}")
     print(index["timestamp"].astype(str).to_string(index=False, header=False))
     print(f"Catalog: {provenance['catalog_rows']} flares, queried {provenance['query_start']} .. "
           f"{provenance['query_end']}; covers every [t, t+{PREDICTION_WINDOW}) window")
@@ -128,7 +128,7 @@ def main(argv=None):
     pd.testing.assert_frame_equal(reloaded, sequences, check_dtype=False)
     print(f"\nSequences -> {sequences_path} (reloaded and compared: identical)")
     with pd.option_context("display.width", 200, "display.max_colwidth", 200):
-        print(sequences[["sequence_start", "sequence_end", "n_images", "label"]].to_string(index=False))
+        print(sequences[["sequence_start", "sequence_end", "n_instances", "label"]].to_string(index=False))
 
     # 4. Dataset and DataLoader.
     dataset = FlareSequenceDataset(reloaded, real.REAL_DATA, CADENCE)

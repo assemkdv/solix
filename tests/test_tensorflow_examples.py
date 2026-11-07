@@ -72,7 +72,7 @@ def test_channels_first_is_converted_to_channels_last():
 
 def test_sequence_checks_reject_bad_rows_before_decoding():
     t = pd.to_datetime(["2017-09-03 00:59:49.9", "2017-09-03 01:59:49.9", "2017-09-03 02:59:49.9"])
-    good = dict(timestamps=list(t), image_path=["a", "b", "c"], n_images=3, sequence_end=t[-1])
+    good = dict(timestamps=list(t), image_path=["a", "b", "c"], n_instances=3, sequence_end=t[-1])
     cadence = pd.Timedelta("1h")
 
     def row(**changes):
@@ -228,7 +228,7 @@ def test_tensorflow_and_pytorch_active_region_loaders_yield_the_same_patches(tmp
 
     index_path = tmp_path / "patch_index.csv"
     real.build_patch_index(index_path)
-    labels = fidx.ActiveRegionSingleImage("24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"), include_metadata=True) \
+    labels = fidx.ActiveRegionSingleInstance("24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"), include_metadata=True) \
         .build(index_path, real.CATALOG)
     torch_dataset = torch_example.FlareDataset(labels, real.REAL_DATA)
     tf_dataset = tf_example.FlareDataset(labels, real.REAL_DATA, batch_size=4)

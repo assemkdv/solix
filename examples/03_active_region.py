@@ -1,13 +1,13 @@
 """
 Example 3 -- active-region (AR) labels.
 
-With ActiveRegionSingleImage and ActiveRegionSequence, a patch only gets
-flares from its own NOAA active region. This example prints three parts:
+With ActiveRegionSingleInstance and ActiveRegionSequence, an instance only
+gets flares from its own NOAA active region. This example prints three parts:
 
 1) two regions observed at the same time get different labels, and two
-   warnings: a patch with an unknown region is labeled 0, and catalog
+   warnings: an instance with an unknown region is labeled 0, and catalog
    flares with no region can never be matched;
-2) missing_active_region="drop" leaves the unknown patch out, and "error"
+2) missing_active_region="drop" leaves the unknown instance out, and "error"
    stops instead;
 3) sequences are built separately for each region.
 
@@ -20,13 +20,13 @@ from pathlib import Path
 import flare_indexer as fidx
 
 DATA = Path(__file__).parent / "data"
-INDEX = DATA / "active_region_image_index.csv"
+INDEX = DATA / "active_region_index.csv"
 CATALOG = DATA / "flare_catalog.csv"
 OUTPUT = Path(__file__).parent / "output"
 
 
 def build(**kwargs):
-    return fidx.ActiveRegionSingleImage(
+    return fidx.ActiveRegionSingleInstance(
         prediction_window=24, reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"),
         include_metadata=True, **kwargs,
     ).build(INDEX, CATALOG)
@@ -44,7 +44,7 @@ def main():
     for w in caught:
         print(f"  - {w.message}")
 
-    print("\n2) missing_active_region='drop' leaves the unknown patch out:")
+    print("\n2) missing_active_region='drop' leaves the unknown instance out:")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         dropped = build(missing_active_region="drop")
@@ -60,7 +60,7 @@ def main():
         print(f"  ValueError: {str(exc)[:110]}...")
 
     print("\n3) Sequences are built per region: two regions share timestamps, and the")
-    print("   unknown patch never joins a region's sequence (it is dropped here).")
+    print("   unknown instance never joins a region's sequence (it is dropped here).")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         sequences, report = fidx.ActiveRegionSequence(
@@ -70,7 +70,7 @@ def main():
         ).build(INDEX, CATALOG, return_report=True)
     print(sequences[["sequence_start", "sequence_end", "active_region", "label"]].head(8).to_string(index=False))
     print(f"   ... {len(sequences)} sequences from {report.region_count} regions, "
-          f"{report.skipped_sequences} skipped for missing images")
+          f"{report.skipped_sequences} skipped for missing instances")
 
 
 if __name__ == "__main__":

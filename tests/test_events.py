@@ -15,7 +15,7 @@ def test_query_normalizes_missing_active_region_to_none():
     })
 
     results = matcher.query(
-        image_time=pd.Timestamp("2024-01-01 00:00"),
+        reference_time=pd.Timestamp("2024-01-01 00:00"),
         prediction_window=1,
     )
 
@@ -35,7 +35,7 @@ def test_query_preserves_non_empty_active_region():
     })
 
     results = matcher.query(
-        image_time=pd.Timestamp("2024-01-01 00:00"),
+        reference_time=pd.Timestamp("2024-01-01 00:00"),
         prediction_window=1,
     )
 
@@ -91,7 +91,7 @@ def test_query_active_region_same_region_flare_included():
     })
 
     results = matcher.query(
-        image_time=pd.Timestamp("2024-01-01 00:00"),
+        reference_time=pd.Timestamp("2024-01-01 00:00"),
         prediction_window=1,
         active_region="3559",
     )
@@ -110,7 +110,7 @@ def test_query_active_region_different_region_flare_ignored():
     })
 
     results = matcher.query(
-        image_time=pd.Timestamp("2024-01-01 00:00"),
+        reference_time=pd.Timestamp("2024-01-01 00:00"),
         prediction_window=1,
         active_region="3559",
     )
@@ -128,7 +128,7 @@ def test_query_active_region_stronger_flare_from_other_region_ignored():
     })
 
     results = matcher.query(
-        image_time=pd.Timestamp("2024-01-01 00:00"),
+        reference_time=pd.Timestamp("2024-01-01 00:00"),
         prediction_window=1,
         active_region="3559",
     )
@@ -147,7 +147,7 @@ def test_query_active_region_missing_catalog_active_region_does_not_match():
     })
 
     results = matcher.query(
-        image_time=pd.Timestamp("2024-01-01 00:00"),
+        reference_time=pd.Timestamp("2024-01-01 00:00"),
         prediction_window=1,
         active_region="3559",
     )
@@ -367,7 +367,7 @@ def test_query_returns_flares_within_window():
 
     # Query with a 1-hour prediction window starting at midnight
     results = matcher.query(
-        image_time=pd.Timestamp("2024-01-01 00:00"),
+        reference_time=pd.Timestamp("2024-01-01 00:00"),
         prediction_window=1,
     )
 

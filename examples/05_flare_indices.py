@@ -1,7 +1,7 @@
 """
 Example 5 -- the four flare indices of Hong, Ji, Pandey, Aydin (DaWaK 2023).
 
-For the flares in the prediction window of each image:
+For the flares in the prediction window of each instance:
 
     GC max   strongest GOES class (peak flux)
     GC sum   sum(C_i) + 10 * sum(M_j) + 100 * sum(X_k)  (A and B add 0)
@@ -10,7 +10,7 @@ For the flares in the prediction window of each image:
 
 RXF = a flare's peak flux / the background X-ray flux of the 24 hours
 before it. add_relative_flux computes it once from 1-minute X-ray flux
-and writes it into the catalog. The RXF indices label single images only.
+and writes it into the catalog. The RXF indices label single instances only.
 
 Run:  python examples/05_flare_indices.py
 """
@@ -53,14 +53,14 @@ def main():
 
     table = None
     for name, index_reducer in INDICES.items():
-        labels = fidx.FullDiskSingleImage(
+        labels = fidx.FullDiskSingleInstance(
             prediction_window="24h",
             reducer=index_reducer, labeler=fidx.RegressionLabeler(),
-        ).build(DATA / "full_disk_image_index.csv", OUTPUT / "05_flare_catalog_rxfi.csv")
+        ).build(DATA / "full_disk_index.csv", OUTPUT / "05_flare_catalog_rxfi.csv")
         table = labels[["timestamp"]].copy() if table is None else table
         table[name] = labels["label"]
     table["rxf_max_ge_10"] = (table["rxf_max"] >= 10).astype(int)
-    print("\nfull-disk images, window [t, t+24h), every 12th shown:")
+    print("\nfull-disk instances, window [t, t+24h), every 12th shown:")
     print(table.iloc[::12].to_string(index=False, float_format="%.3g"))
 
 

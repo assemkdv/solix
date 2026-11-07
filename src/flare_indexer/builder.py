@@ -8,7 +8,7 @@ from pathlib import Path
 from .events import (
     EventMatcher, _none_for_missing, _normalize_active_region, _parse_prediction_window, _parse_time_text_column,
     _reject_unitless_duration_text, _rename_columns, _to_naive_utc,
-    IMAGE_INDEX_COLUMNS,
+    INDEX_COLUMNS,
 )
 
 
@@ -25,7 +25,7 @@ class SequenceBuildReport:
     Validation/bookkeeping report returned by FullDiskSequence /
     ActiveRegionSequence .build(return_report=True).
 
-    inferred_source_cadence : the most common gap between the image
+    inferred_source_cadence : the most common gap between the
         index's timestamps.
     requested_cadence, observation_window, sliding_window : the
         (parsed, pd.Timedelta) values this build used.
@@ -41,7 +41,7 @@ class SequenceBuildReport:
         specific timestamps that were missing and caused a skip.
     skipped_sequence_regions : ActiveRegionSequence only -- the region
         of each entry in skipped_sequence_starts (None for the group of
-        images without a region); empty for full-disk builds.
+        instances without a region); empty for full-disk builds.
     region_count : ActiveRegionSequence only -- how many region groups
         sequences were built for (the missing-region group counts as one);
         None for full-disk builds.
@@ -103,31 +103,31 @@ def _parse_timestamp_param(value, name: str) -> pd.Timestamp:
     return _to_naive_utc(timestamp)
 
 
-def _parse_image_timestamps(column: pd.Series, path: Path) -> pd.Series:
+def _parse_index_timestamps(column: pd.Series, path: Path) -> pd.Series:
     """
-    Parse the image index's timestamp column. A numeric column, an
+    Parse the index's timestamp column. A numeric column, an
     unparseable cell or a blank cell raises ValueError. UTC offsets are
     converted to UTC and dropped, as in the catalog.
     """
-    parsed = _parse_time_text_column(column, "timestamp", "Image index", path)
+    parsed = _parse_time_text_column(column, "timestamp", "Index", path)
     missing = parsed.isna()
     if missing.any():
         rows = [int(i) + 1 for i in np.flatnonzero(missing.to_numpy())]
         shown = ", ".join(str(r) for r in rows[:10]) + (", ..." if len(rows) > 10 else "")
         raise ValueError(
-            f"Image index at {path} has {len(rows)} blank/missing timestamp(s) "
+            f"Index at {path} has {len(rows)} blank/missing timestamp(s) "
             f"(data row(s) {shown}; row 1 is the first row after the header). "
-            "Fill or remove those rows; samples are never built from an image without a time."
+            "Fill or remove those rows; samples are never built from an instance without a time."
         )
     return parsed
 
 
 def _infer_source_cadence(timestamps: pd.Series) -> pd.Timedelta:
-    """The most common positive gap between the index's unique timestamps (robust to missing images)."""
+    """The most common positive gap between the index's unique timestamps (robust to missing instances)."""
     unique_sorted = pd.Series(timestamps.unique()).sort_values().reset_index(drop=True)
     if len(unique_sorted) < 2:
         raise ValueError(
-            "Cannot infer source cadence: the image index has fewer than 2 unique "
+            "Cannot infer source cadence: the index has fewer than 2 unique "
             "timestamps, so no consecutive difference can be measured."
         )
     diffs = unique_sorted.diff().dropna()
@@ -138,11 +138,11 @@ def _infer_source_cadence(timestamps: pd.Series) -> pd.Timedelta:
 
 
 def _validate_sliding_window(sliding_window: pd.Timedelta, inferred: pd.Timedelta) -> None:
-    """The step between sequence starts may be smaller than cadence, but must land on image times."""
+    """The step between sequence starts may be smaller than cadence, but must land on instance times."""
     if sliding_window % inferred != pd.Timedelta(0):
         raise ValueError(
             f"sliding_window {sliding_window} is not an exact multiple of the inferred source cadence "
-            f"{inferred}, so sequences would start between images."
+            f"{inferred}, so sequences would start between instances."
         )
 
 
@@ -150,7 +150,7 @@ def _validate_requested_cadence(requested: pd.Timedelta, inferred: pd.Timedelta)
     if requested < inferred:
         raise ValueError(
             f"cadence {requested} is smaller than the inferred source cadence {inferred}; "
-            "cannot request a cadence finer than the image index actually provides."
+            "cannot request a cadence finer than the index actually provides."
         )
     if requested % inferred != pd.Timedelta(0):
         raise ValueError(
@@ -160,33 +160,33 @@ def _validate_requested_cadence(requested: pd.Timedelta, inferred: pd.Timedelta)
 
 class DatasetBuilder:
     """
-    The engine behind the four dataset classes in datasets.py: maps image
+    The engine behind the four dataset classes in datasets.py: maps instance
     timestamps to flare labels with a reducer and a labeler.
 
     Parameters
     ----------
     prediction_window : hours (number) or a duration with a unit ("24h").
         Flares that start in [t, t + prediction_window) count, where t is
-        the image time or, for a sequence, the time of its last image.
+        the instance time or, for a sequence, the time of its last instance.
     reducer : turns the flares of one window into one value; any object
         with reduce(flares), e.g. MaxFluxReducer().
     labeler : turns that value into the label; any object with
         assign(value), e.g. BinaryThresholdLabeler("M").
     target : "full_disk" (all flares count) or "active_region" (only the
-        flares of the image's own region; the index needs active_region).
+        flares of the instance's own region; the index needs active_region).
     missing_active_region : "negative", "drop" or "error", for
-        active-region images without a region.
-    include_metadata : single images only; keep the other index columns.
+        active-region instances without a region.
+    include_metadata : single instances only; keep the other index columns.
     include_flares : add a "flares" column listing each window's classes.
     verbose : print a short summary of each build.
     start, cadence, observation_window, sliding_window : observation_window
         or sliding_window makes sequences, and then cadence,
         observation_window and sliding_window are required; each sequence
-        holds observation_window / cadence images. cadence (and start)
-        alone keep only the single images at start, start + cadence, ....
+        holds observation_window / cadence instances. cadence (and start)
+        alone keep only the single instances at start, start + cadence, ....
         cadence and sliding_window must be multiples of the index's own
         cadence (the most common gap between its timestamps); sliding_window
-        may be smaller than cadence. start must be an image time.
+        may be smaller than cadence. start must be an instance time.
         Active-region sequences are built per region.
     """
 
@@ -226,12 +226,12 @@ class DatasetBuilder:
             raise ValueError(f"target must be one of {sorted(self.VALID_TARGETS)}, got {target!r}")
 
         # observation_window or sliding_window makes sequences; cadence (and
-        # start) alone thin out single images to a time grid.
+        # start) alone thin out single instances to a time grid.
         sequence_given = observation_window is not None or sliding_window is not None
 
-        if getattr(reducer, "single_image_only", False) and sequence_given:
+        if getattr(reducer, "single_instance_only", False) and sequence_given:
             raise ValueError(
-                f"{type(reducer).__name__} labels single images only; "
+                f"{type(reducer).__name__} labels single instances only; "
                 "it cannot be used with sequence parameters."
             )
 
@@ -251,12 +251,12 @@ class DatasetBuilder:
             raise ValueError(f"verbose must be True or False, got {verbose!r}")
         self.verbose = verbose
         self.time_based = sequence_given
-        self.image_cadence = None
+        self.instance_cadence = None
 
         if not self.time_based and (cadence is not None or start is not None):
             if cadence is None:
                 raise ValueError("start needs a cadence: it is the first point of the cadence grid.")
-            self.image_cadence = _parse_duration(cadence, "cadence")
+            self.instance_cadence = _parse_duration(cadence, "cadence")
             self.start = _parse_timestamp_param(start, "start") if start is not None else None
 
         if self.time_based:
@@ -285,40 +285,40 @@ class DatasetBuilder:
                     f"of cadence ({cadence})."
                 )
 
-            self.number_of_images = round(self.observation_window / self.cadence)
+            self.number_of_instances = round(self.observation_window / self.cadence)
 
     def build(
-        self, image_index_path: str | Path, event_catalog_path: str | Path, return_report: bool = False,
+        self, index_path: str | Path, event_catalog_path: str | Path, return_report: bool = False,
         *, index_columns=None, catalog_columns=None,
     ) -> pd.DataFrame:
         """
         Build a labeled dataset.
 
-        Single images (no sequence parameters): returns a DataFrame with
+        Single instances (no sequence parameters): returns a DataFrame with
         columns (timestamp, label) -- or, for active regions,
-        (timestamp, active_region, label). An image index with a header row but
+        (timestamp, active_region, label). An index with a header row but
         zero data rows is valid and produces an empty result with the same
         columns.
 
         Sequences (see the class docstring): returns one row per sequence
-        with columns (sequence_start, sequence_end, timestamps, n_images,
+        with columns (sequence_start, sequence_end, timestamps, n_instances,
         label) -- or, for active regions, (sequence_start,
-        sequence_end, timestamps, n_images, active_region, label) -- plus
-        one list-column per other image-index column (e.g. an image path),
-        holding that column's values for each image in the sequence.
+        sequence_end, timestamps, n_instances, active_region, label) -- plus
+        one list-column per other index column (e.g. a file path),
+        holding that column's values for each instance in the sequence.
         Sequences are built on an exact timestamp grid (candidate_start +
-        i * cadence), which also allows downsampling a finer-cadence image
+        i * cadence), which also allows downsampling a finer-cadence
         index. A candidate whose grid is missing any timestamp is skipped,
-        not interpolated or substituted. An image-index column whose name
+        not interpolated or substituted. An index column whose name
         equals an output column (e.g. "label") raises ValueError instead of
         overwriting it.
 
         return_report=True is only supported for sequences, where it
         returns (DataFrame, SequenceBuildReport) instead of just the
-        DataFrame; passing it for single images raises ValueError.
+        DataFrame; passing it for single instances raises ValueError.
 
-        A completely empty image index (no header) raises ValueError, as
-        does an image index missing the required timestamp column.
+        A completely empty index (no header) raises ValueError, as
+        does an index missing the required timestamp column.
 
         index_columns and catalog_columns let the files use their own
         column names: {your column name: package column name}, e.g.
@@ -337,31 +337,31 @@ class DatasetBuilder:
                 "(when observation_window and sliding_window are given)."
             )
 
-        image_index_path = Path(image_index_path)
+        index_path = Path(index_path)
 
         try:
-            index_df = pd.read_csv(image_index_path)
+            index_df = pd.read_csv(index_path)
         except pd.errors.EmptyDataError:
             raise ValueError(
-                f"Image index at {image_index_path} is empty: no header row / columns found."
+                f"Index at {index_path} is empty: no header row / columns found."
             ) from None
         index_df = _rename_columns(
-            index_df, index_columns, IMAGE_INDEX_COLUMNS, image_index_path, "Image index", "index_columns",
+            index_df, index_columns, INDEX_COLUMNS, index_path, "Index", "index_columns",
         )
 
         if "timestamp" not in index_df.columns:
             raise ValueError(
-                f"Image index at {image_index_path} is missing required column: timestamp"
+                f"Index at {index_path} is missing required column: timestamp"
             )
 
         if self.target == "active_region" and "active_region" not in index_df.columns:
             raise ValueError(
-                f"Image index at {image_index_path} is missing required column: "
+                f"Index at {index_path} is missing required column: "
                 "active_region (required for active-region labels)"
             )
 
         index_df = index_df.reset_index(drop=True)
-        index_df["timestamp"] = _parse_image_timestamps(index_df["timestamp"], image_index_path)
+        index_df["timestamp"] = _parse_index_timestamps(index_df["timestamp"], index_path)
 
         matcher = EventMatcher(event_catalog_path, columns=catalog_columns)
         self._check_required_catalog_column(matcher, event_catalog_path)
@@ -370,21 +370,21 @@ class DatasetBuilder:
             self._warn_catalog_missing_active_region(matcher, event_catalog_path)
 
         if self.verbose:
-            self._print_inputs(index_df, image_index_path, matcher, event_catalog_path)
+            self._print_inputs(index_df, index_path, matcher, event_catalog_path)
 
-        if self.image_cadence is not None:
-            index_df = self._images_on_cadence_grid(index_df, image_index_path)
+        if self.instance_cadence is not None:
+            index_df = self._instances_on_cadence_grid(index_df, index_path)
 
         report = None
         if self.time_based:
             if self.target == "active_region":
-                result, report = self._build_time_based_sequences_active_region(index_df, matcher, image_index_path)
+                result, report = self._build_time_based_sequences_active_region(index_df, matcher, index_path)
             else:
-                result, report = self._build_time_based_sequences(index_df, matcher, image_index_path)
+                result, report = self._build_time_based_sequences(index_df, matcher, index_path)
         elif self.target == "active_region":
-            result = self._build_single_image_active_region(index_df, matcher, image_index_path)
+            result = self._build_single_instance_active_region(index_df, matcher, index_path)
         else:
-            result = self._build_single_image(index_df, matcher, image_index_path)
+            result = self._build_single_instance(index_df, matcher, index_path)
 
         if self.verbose:
             self._print_result(result, report)
@@ -393,32 +393,32 @@ class DatasetBuilder:
     # ── verbose summary ─────────────────────────────────────────────────
 
     def _print_inputs(self, index_df: pd.DataFrame, index_path: Path, matcher: EventMatcher, catalog_path) -> None:
-        images = f"{len(index_df):,} images"
+        instances = f"{len(index_df):,} instances"
         if self.target == "active_region":
             regions = index_df["active_region"].map(_normalize_active_region).dropna().nunique()
-            images += f", {regions:,} regions"
-        print(f"Image index: {images} ({index_path})")
+            instances += f", {regions:,} regions"
+        print(f"Index: {instances} ({index_path})")
         print(f"Flare catalog: {len(matcher._catalog):,} flares ({catalog_path})")
 
         target = "full disk" if self.target == "full_disk" else "active region"
         if self.time_based:
-            mode = (f"sequences of {self.number_of_images} images {_format_duration(self.cadence)} apart, "
+            mode = (f"sequences of {self.number_of_instances} instances {_format_duration(self.cadence)} apart, "
                     f"new sequence every {_format_duration(self.sliding_window)}")
-        elif self.image_cadence is not None:
-            mode = f"single images every {_format_duration(self.image_cadence)}"
+        elif self.instance_cadence is not None:
+            mode = f"single instances every {_format_duration(self.instance_cadence)}"
         else:
-            mode = "single images"
+            mode = "single instances"
         print(f"Settings: window [t, t + {_format_duration(self._window)}) on start_time, {target}, {mode}")
 
     def _print_result(self, result: pd.DataFrame, report) -> None:
         unit = "sequences" if self.time_based else "rows"
         line = f"Result: {len(result):,} {unit}"
         if report is not None and report.skipped_sequences:
-            line += f" ({report.skipped_sequences:,} skipped: missing images)"
+            line += f" ({report.skipped_sequences:,} skipped: missing instances)"
         summary = _label_summary(result["label"])
         print(line + (f"; {summary}" if summary else ""))
 
-    def _build_single_image(self, index_df: pd.DataFrame, matcher: EventMatcher, path: Path) -> pd.DataFrame:
+    def _build_single_instance(self, index_df: pd.DataFrame, matcher: EventMatcher, path: Path) -> pd.DataFrame:
         if self.include_metadata:
             extra_columns = _extra_columns(index_df, ("timestamp",), tuple(self._label_columns()), path)
         records = []
@@ -436,7 +436,7 @@ class DatasetBuilder:
                 result[col] = index_df[col].to_numpy()
         return result
 
-    def _build_single_image_active_region(
+    def _build_single_instance_active_region(
         self, index_df: pd.DataFrame, matcher: EventMatcher, path: Path,
     ) -> pd.DataFrame:
         if self.include_metadata:
@@ -451,7 +451,7 @@ class DatasetBuilder:
         for position, (ts, raw_active_region) in enumerate(zip(index_df["timestamp"], index_df["active_region"])):
             active_region = _normalize_active_region(raw_active_region)
             if active_region is None:
-                # Missing image-side active_region must not silently match
+                # Missing instance-side active_region must not silently match
                 # anything -- skip the query entirely rather than falling
                 # back to full-disk matching. What happens to the row is
                 # governed by missing_active_region.
@@ -466,7 +466,7 @@ class DatasetBuilder:
                 record[col] = index_df[col].iloc[position]
             records.append(record)
 
-        self._report_missing_active_regions(missing_rows, "image(s)")
+        self._report_missing_active_regions(missing_rows, "instance(s)")
 
         if not records:
             return pd.DataFrame(columns=columns)
@@ -542,7 +542,7 @@ class DatasetBuilder:
         if missing:
             warnings.warn(
                 f"{missing} of {len(catalog)} flare(s) in the catalog at {path} have no start_time. "
-                "They can never match any image, so a window that contains one of them is labeled "
+                "They can never match any instance, so a window that contains one of them is labeled "
                 "as if it were absent.",
                 UserWarning,
                 stacklevel=3,
@@ -554,7 +554,7 @@ class DatasetBuilder:
         if missing:
             warnings.warn(
                 f"{missing} of {len(catalog)} flare(s) in the catalog at {path} have no "
-                "active_region. In active-region labels they can never match any image, "
+                "active_region. In active-region labels they can never match any instance, "
                 "so a region that produced one of them may be labeled negative.",
                 UserWarning,
                 stacklevel=3,
@@ -567,14 +567,14 @@ class DatasetBuilder:
             more = ", ..." if duplicated.nunique() > 10 else ""
             within = f" within {group}" if group else ""
             raise ValueError(
-                f"Image index at {path} contains duplicate timestamp(s){within}: {dupe_list}{more}"
+                f"Index at {path} contains duplicate timestamp(s){within}: {dupe_list}{more}"
             )
 
-    # ── Active-region sequences: one group of images per region ──────────
+    # ── Active-region sequences: one group of instances per region ──────────
 
     def _region_groups(self, index_df: pd.DataFrame, path: Path) -> list[tuple[str | None, pd.DataFrame]]:
         """
-        Split the image index into one group per normalized active region,
+        Split the index into one group per normalized active region,
         in order of first appearance. Rows without a region never join a
         region's group; missing_active_region decides what happens to them:
         "error" raises, "drop" leaves them out, "negative" puts them in one
@@ -588,7 +588,7 @@ class DatasetBuilder:
                 f"data row {i + 1} ({index_df['timestamp'].loc[i]})" for i in index_df.index[missing][:5]
             )
             raise ValueError(
-                f"{int(missing.sum())} image(s) in {path} have a missing active_region "
+                f"{int(missing.sum())} instance(s) in {path} have a missing active_region "
                 f"(e.g. {examples}{', ...' if missing.sum() > 5 else ''}). They cannot be assigned "
                 "to any region's sequence. Fill in active_region, or pass "
                 "missing_active_region='drop' or 'negative'."
@@ -609,8 +609,8 @@ class DatasetBuilder:
         if not missing_rows:
             return
         warnings.warn(
-            f"{missing_rows} image(s) have a missing active_region. They are not part of any "
-            f"region's sequence; {missing_sequences} sequence(s) built only from such images were "
+            f"{missing_rows} instance(s) have a missing active_region. They are not part of any "
+            f"region's sequence; {missing_sequences} sequence(s) built only from such instances were "
             "labeled as if no flare occurred. Such labels are unknown, not confirmed negatives. "
             "Pass missing_active_region='drop' to leave them out, or 'error' to stop.",
             UserWarning,
@@ -632,13 +632,13 @@ class DatasetBuilder:
     def _grid_candidates(self, ts_to_position: dict, first_start: pd.Timestamp, max_ts: pd.Timestamp):
         """
         Walk candidate starts first_start, first_start + sliding_window, ...
-        while the last required image (start + observation_window - cadence)
+        while the last required instance (start + observation_window - cadence)
         is not after max_ts. Returns (emitted, total, skipped_starts,
         missing_timestamps): emitted is a list of (window_timestamps,
         row_positions) for candidates with every grid time present;
         skipped samples are capped at _MAX_SEQUENCE_REPORT_SAMPLES.
         """
-        offsets = [i * self.cadence for i in range(self.number_of_images)]
+        offsets = [i * self.cadence for i in range(self.number_of_instances)]
 
         emitted = []
         total_candidates = 0
@@ -671,28 +671,28 @@ class DatasetBuilder:
 
         return emitted, total_candidates, skipped_starts, missing_timestamps
 
-    def _images_on_cadence_grid(self, index_df: pd.DataFrame, path: Path) -> pd.DataFrame:
+    def _instances_on_cadence_grid(self, index_df: pd.DataFrame, path: Path) -> pd.DataFrame:
         """
-        Single images with a cadence: keep only the images at start,
+        Single instances with a cadence: keep only the instances at start,
         start + cadence, start + 2 * cadence, ... (start defaults to the
-        earliest image; all regions share one grid). The cadence must be a
-        multiple of the image index's own cadence, as for sequences.
+        earliest instance; all regions share one grid). The cadence must be a
+        multiple of the index's own cadence, as for sequences.
         """
         timestamps = index_df["timestamp"]
-        if timestamps.nunique() >= 2:   # one image (or none) has no cadence to check against
-            _validate_requested_cadence(self.image_cadence, _infer_source_cadence(timestamps))
+        if timestamps.nunique() >= 2:   # one instance (or none) has no cadence to check against
+            _validate_requested_cadence(self.instance_cadence, _infer_source_cadence(timestamps))
         grid_start = self._validated_start(timestamps, path)
         offset = timestamps - grid_start
-        on_grid = (offset >= pd.Timedelta(0)) & (offset % self.image_cadence == pd.Timedelta(0))
-        return index_df[on_grid]   # the index keeps each image's row in the file, for messages
+        on_grid = (offset >= pd.Timedelta(0)) & (offset % self.instance_cadence == pd.Timedelta(0))
+        return index_df[on_grid]   # the index keeps each instance's row in the file, for messages
 
     def _validated_start(self, timestamps: pd.Series, path: Path) -> pd.Timestamp:
         if self.start is None:
             return timestamps.min()
         if not (timestamps == self.start).any():
             raise ValueError(
-                f"start={self.start} has no exact matching image timestamp in "
-                f"the image index at {path}."
+                f"start={self.start} has no exact matching instance timestamp in "
+                f"the index at {path}."
             )
         return self.start
 
@@ -736,7 +736,7 @@ class DatasetBuilder:
     ) -> tuple[pd.DataFrame, SequenceBuildReport]:
         extra_columns = _extra_columns(index_df, ("timestamp",), self._sequence_reserved(), path)
         candidates, report = self._time_based_candidates(index_df, path)
-        columns = ["sequence_start", "sequence_end", "timestamps", "n_images"] + self._label_columns() + extra_columns
+        columns = ["sequence_start", "sequence_end", "timestamps", "n_instances"] + self._label_columns() + extra_columns
 
         records = []
         for window_timestamps, positions in candidates:
@@ -746,7 +746,7 @@ class DatasetBuilder:
                 "sequence_start": window_timestamps[0],
                 "sequence_end": sequence_end,
                 "timestamps": list(window_timestamps),
-                "n_images": len(window_timestamps),
+                "n_instances": len(window_timestamps),
                 **self._label_fields(flares),
             }
             for col in extra_columns:
@@ -762,20 +762,20 @@ class DatasetBuilder:
     ) -> tuple[pd.DataFrame, SequenceBuildReport]:
         """
         One timestamp grid per region. The source cadence is inferred from
-        all image timestamps (the instrument cadence), and an explicit
-        `start` must be an image time somewhere in the index. Each region's
-        grid begins at its first image time, or -- when `start` is given --
+        all instance timestamps (the instrument cadence), and an explicit
+        `start` must be an instance time somewhere in the index. Each region's
+        grid begins at its first instance time, or -- when `start` is given --
         at the first grid point start + k * sliding_window (k >= 0) that is
-        not before the region's first image, so all regions share one grid.
+        not before the region's first instance, so all regions share one grid.
         """
         extra_columns = _extra_columns(index_df, ("timestamp", "active_region"), self._sequence_reserved(), path)
-        columns = ["sequence_start", "sequence_end", "timestamps", "n_images", "active_region"] + self._label_columns() + extra_columns
+        columns = ["sequence_start", "sequence_end", "timestamps", "n_instances", "active_region"] + self._label_columns() + extra_columns
 
         groups = self._region_groups(index_df, path)
         for region, rows in groups:
             if region is None and rows["timestamp"].duplicated().any():
                 raise ValueError(
-                    f"Image index at {path} has several images without an active_region at the same time "
+                    f"Index at {path} has several instances without an active_region at the same time "
                     f"(e.g. {rows['timestamp'][rows['timestamp'].duplicated()].iloc[0]}). They cannot form one "
                     "sequence; pass missing_active_region='drop' to leave them out, or fill in active_region."
                 )
@@ -813,7 +813,7 @@ class DatasetBuilder:
                     "sequence_start": window_timestamps[0],
                     "sequence_end": window_timestamps[-1],
                     "timestamps": list(window_timestamps),
-                    "n_images": len(window_timestamps),
+                    "n_instances": len(window_timestamps),
                     "active_region": region,
                     **self._label_fields(flares),
                 }
@@ -840,7 +840,7 @@ class DatasetBuilder:
         return _sequence_frame(records, columns), report
 
 
-_SEQUENCE_OUTPUT_COLUMNS = ("sequence_start", "sequence_end", "timestamps", "n_images", "label")
+_SEQUENCE_OUTPUT_COLUMNS = ("sequence_start", "sequence_end", "timestamps", "n_instances", "label")
 
 
 def _format_duration(value: pd.Timedelta) -> str:
@@ -869,7 +869,7 @@ def _label_summary(labels: pd.Series) -> str:
 
 def _extra_columns(index_df: pd.DataFrame, excluded: tuple, reserved: tuple, path: Path) -> list:
     """
-    Image-index columns copied into the output, refusing names that would
+    Index columns copied into the output, refusing names that would
     overwrite a column the builder itself produces (e.g. an index column
     called "label").
     """
@@ -877,7 +877,7 @@ def _extra_columns(index_df: pd.DataFrame, excluded: tuple, reserved: tuple, pat
     clashes = [c for c in extra if c in reserved]
     if clashes:
         raise ValueError(
-            f"Image index at {path} has column(s) {clashes} that would overwrite output column(s) of "
+            f"Index at {path} has column(s) {clashes} that would overwrite output column(s) of "
             "the same name. Rename them before building."
         )
     return extra

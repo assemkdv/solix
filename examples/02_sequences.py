@@ -1,13 +1,13 @@
 """
-Example 2 -- labeling sequences of full-disk images.
+Example 2 -- labeling sequences of full-disk instances.
 
-A sequence is a set of images on an exact time grid: `cadence` is the time
-between images, `observation_window` the time one sequence covers, and
-`sliding_window` the step to the next sequence. A sequence is labeled
-from its LAST image, and a sequence with a missing image is skipped,
+A sequence is a set of instances on an exact time grid: `cadence` is the
+time between instances, `observation_window` the time one sequence covers,
+and `sliding_window` the step to the next sequence. A sequence is labeled
+from its LAST instance, and a sequence with a missing instance is skipped,
 never filled in.
 
-The sample image index has a gap (2024-03-02 05:00 and 06:00 are missing).
+The sample index has a gap (2024-03-02 05:00 and 06:00 are missing).
 
 Run:  python examples/02_sequences.py
 """
@@ -19,13 +19,13 @@ import pandas as pd
 import flare_indexer as fidx
 
 DATA = Path(__file__).parent / "data"
-INDEX = DATA / "full_disk_image_index.csv"
+INDEX = DATA / "full_disk_index.csv"
 CATALOG = DATA / "flare_catalog.csv"
-COLUMNS = ["sequence_start", "sequence_end", "n_images", "label"]
+COLUMNS = ["sequence_start", "sequence_end", "n_instances", "label"]
 
 
 def main():
-    print("6 images every 2h (12h observation window), new sequence every 6h")
+    print("6 instances every 2h (12h observation window), new sequence every 6h")
     sequences, report = fidx.FullDiskSequence(
         "24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"),
         cadence="2h", observation_window="12h", sliding_window="6h",
@@ -36,9 +36,9 @@ def main():
     print(f"candidates: {report.total_candidate_sequences}, emitted: {report.emitted_sequences}, "
           f"skipped: {report.skipped_sequences}")
     print(f"skipped starts: {[str(t) for t in report.skipped_sequence_starts]}")
-    print(f"first missing image per skip: {[str(t) for t in report.missing_timestamps]}")
+    print(f"first missing instance per skip: {[str(t) for t in report.missing_timestamps]}")
 
-    print("\nEach sequence also keeps the per-image paths, e.g. the first one:")
+    print("\nEach sequence also keeps the per-instance paths, e.g. the first one:")
     print(sequences["image_path"].iloc[0])
 
 

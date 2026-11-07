@@ -80,7 +80,7 @@ def test_raw_and_thresholded_labels(tmp_path):
     assert binary["label"].tolist() == [1, 0, 0]
 
 
-def test_window_includes_image_time(tmp_path):
+def test_window_includes_instance_time(tmp_path):
     index_path, catalog_path = _files(tmp_path, times=("2024-01-01 05:00:00",))
     with pytest.warns(UserWarning):
         result = _build(index_path, catalog_path, SumRelativeFluxReducer())
@@ -114,7 +114,7 @@ def test_invalid_rxfi_is_refused(tmp_path, bad):
 
 @pytest.mark.parametrize("reducer", [MaxRelativeFluxReducer(), SumRelativeFluxReducer()])
 def test_sequences_are_refused(reducer):
-    with pytest.raises(ValueError, match="single images only"):
+    with pytest.raises(ValueError, match="single instances only"):
         DatasetBuilder(prediction_window="24h", reducer=reducer, labeler=RegressionLabeler(),
                        cadence="1h", observation_window="3h", sliding_window="1h")
 

@@ -5,9 +5,9 @@ The TensorFlow counterpart of example 10: same patches, same catalog, same
 labeling settings, same label checks. Only the loader differs.
 
 Steps
-1. Image index from examples/real_data/sharp_manifest.csv (timestamps are
+1. Index from examples/real_data/sharp_manifest.csv (timestamps are
    DATE-OBS and regions NOAA_AR, both read from each patch's header).
-2. Labels: flare_indexer.ActiveRegionSingleImage.
+2. Labels: flare_indexer.ActiveRegionSingleInstance.
 3. Loading: FlareDataset, a keras.utils.PyDataset. Keras asks it for whole
    batches, so each item is (patches, labels) for one batch, with patches
    in TensorFlow's channel-last layout [B, H, W, C] = [B, 128, 128, 1]. It
@@ -83,17 +83,17 @@ def main(argv=None):
     index_path = args.output / "11_patch_index.csv"
     labels_path = args.output / "11_patch_labels.csv"
 
-    # 1. Image index from the patches' own headers.
+    # 1. Index from the patches' own headers.
     index = real.build_patch_index(index_path)
     provenance = real.check_catalog_coverage(index["timestamp"], PREDICTION_WINDOW)
     regions = sorted(int(r) for r in index["active_region"].unique())
     print(f"TensorFlow {tf.__version__}")
-    print(f"Image index: {len(index)} patches of regions {regions} -> {index_path}")
+    print(f"Index: {len(index)} patches of regions {regions} -> {index_path}")
     print(f"Catalog: {provenance['catalog_rows']} flares, queried {provenance['query_start']} .. "
           f"{provenance['query_end']}; covers every [t, t+{PREDICTION_WINDOW}) window")
 
     # 2. Labels: only each patch's own region's flares count.
-    builder = fidx.ActiveRegionSingleImage(
+    builder = fidx.ActiveRegionSingleInstance(
         prediction_window=PREDICTION_WINDOW,
         reducer=fidx.MaxFluxReducer(),               # the strongest flare in the window
         labeler=fidx.BinaryThresholdLabeler("M"),    # 1 if a flare >= M1.0 from this region starts in the window

@@ -1,5 +1,5 @@
 """
-FullDiskSingleImage, FullDiskSequence, ActiveRegionSingleImage and
+FullDiskSingleInstance, FullDiskSequence, ActiveRegionSingleInstance and
 ActiveRegionSequence: each gives exactly the table of the matching engine
 settings, and accepts only the settings of its own case.
 """
@@ -13,8 +13,8 @@ import flare_indexer as f
 from flare_indexer.builder import DatasetBuilder
 
 DATA = Path(__file__).resolve().parent.parent / "examples" / "data"
-FULL_DISK = DATA / "full_disk_image_index.csv"
-ACTIVE_REGION = DATA / "active_region_image_index.csv"
+FULL_DISK = DATA / "full_disk_index.csv"
+ACTIVE_REGION = DATA / "active_region_index.csv"
 CATALOG = DATA / "flare_catalog.csv"
 GRID = dict(cadence="1h", observation_window="3h", sliding_window="1h")
 AR_GRID = dict(cadence="6h", observation_window="12h", sliding_window="6h")
@@ -25,15 +25,15 @@ pytestmark = [
 ]
 
 CASES = [
-    (f.FullDiskSingleImage, {}, dict(target="full_disk"), FULL_DISK),
-    (f.FullDiskSingleImage, dict(include_metadata=True),
+    (f.FullDiskSingleInstance, {}, dict(target="full_disk"), FULL_DISK),
+    (f.FullDiskSingleInstance, dict(include_metadata=True),
      dict(target="full_disk", include_metadata=True), FULL_DISK),
     (f.FullDiskSequence, GRID, dict(target="full_disk", **GRID), FULL_DISK),
     (f.FullDiskSequence, dict(GRID, start="2024-03-01 02:00:00"),
      dict(target="full_disk", start="2024-03-01 02:00:00", **GRID), FULL_DISK),
-    (f.ActiveRegionSingleImage, dict(include_metadata=True),
+    (f.ActiveRegionSingleInstance, dict(include_metadata=True),
      dict(target="active_region", include_metadata=True), ACTIVE_REGION),
-    (f.ActiveRegionSingleImage, dict(missing_active_region="drop"),
+    (f.ActiveRegionSingleInstance, dict(missing_active_region="drop"),
      dict(target="active_region", missing_active_region="drop"), ACTIVE_REGION),
     (f.ActiveRegionSequence, AR_GRID, dict(target="active_region", **AR_GRID), ACTIVE_REGION),
 ]
@@ -60,7 +60,7 @@ def test_sequence_classes_return_the_report():
 
 
 def test_options_reach_the_engine():
-    labels = f.FullDiskSingleImage("24h", reducer=f.MaxFluxReducer(), labeler=f.BinaryThresholdLabeler("M"), include_flares=True).build(FULL_DISK, CATALOG)
+    labels = f.FullDiskSingleInstance("24h", reducer=f.MaxFluxReducer(), labeler=f.BinaryThresholdLabeler("M"), include_flares=True).build(FULL_DISK, CATALOG)
     assert list(labels.columns) == ["timestamp", "label", "flares"]
     sequences = f.ActiveRegionSequence("24h", reducer=f.MaxFluxReducer(), labeler=f.RegressionLabeler(), include_flares=True, **AR_GRID).build(
         ACTIVE_REGION, CATALOG)
@@ -68,12 +68,12 @@ def test_options_reach_the_engine():
 
 
 @pytest.mark.parametrize("cls, kwargs", [
-    (f.FullDiskSingleImage, dict(observation_window="3h")),
-    (f.FullDiskSingleImage, dict(target="active_region")),
-    (f.FullDiskSingleImage, dict(missing_active_region="drop")),
+    (f.FullDiskSingleInstance, dict(observation_window="3h")),
+    (f.FullDiskSingleInstance, dict(target="active_region")),
+    (f.FullDiskSingleInstance, dict(missing_active_region="drop")),
     (f.FullDiskSequence, dict(GRID, target="active_region")),
     (f.FullDiskSequence, dict(GRID, include_metadata=True)),
-    (f.ActiveRegionSingleImage, dict(observation_window="3h")),
+    (f.ActiveRegionSingleInstance, dict(observation_window="3h")),
     (f.ActiveRegionSequence, dict(AR_GRID, target="full_disk")),
 ])
 def test_settings_of_another_case_are_refused(cls, kwargs):
@@ -88,15 +88,15 @@ def test_sequence_classes_require_the_grid(cls):
 
 
 @pytest.mark.parametrize("cls, grid", [(f.FullDiskSequence, GRID), (f.ActiveRegionSequence, AR_GRID)])
-def test_relative_flux_labels_stay_single_image_only(cls, grid):
+def test_relative_flux_labels_stay_single_instance_only(cls, grid):
     labeling = dict(reducer=f.MaxRelativeFluxReducer(), labeler=f.RegressionLabeler())
-    with pytest.raises(ValueError, match="single images only"):
+    with pytest.raises(ValueError, match="single instances only"):
         cls("24h", **labeling, **grid)
-    f.FullDiskSingleImage("24h", **labeling)
-    f.ActiveRegionSingleImage("24h", **labeling)
+    f.FullDiskSingleInstance("24h", **labeling)
+    f.ActiveRegionSingleInstance("24h", **labeling)
 
 
 @pytest.mark.parametrize("setting", ["include_metadata", "include_flares", "verbose"])
 def test_on_off_settings_must_be_true_or_false(setting):
     with pytest.raises(ValueError, match=f"{setting} must be True or False"):
-        f.FullDiskSingleImage("24h", reducer=f.MaxFluxReducer(), labeler=f.BinaryThresholdLabeler("M"), **{setting: "yes"})
+        f.FullDiskSingleInstance("24h", reducer=f.MaxFluxReducer(), labeler=f.BinaryThresholdLabeler("M"), **{setting: "yes"})

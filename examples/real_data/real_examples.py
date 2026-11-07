@@ -1,6 +1,6 @@
 """
 Helpers shared by the real-image examples (06, 07, 10 with PyTorch; 08,
-09, 11 with TensorFlow): turning the download manifests into image indexes,
+09, 11 with TensorFlow): turning the download manifests into indexes,
 checking catalog coverage, saving sequence tables with list-valued columns,
 and an independent label check that does not use flare_indexer.
 """
@@ -49,7 +49,7 @@ def require_optional_dependencies(images: str = "jp2"):
 
 def build_image_index(output_path: Path) -> pd.DataFrame:
     """
-    Write the image index flare_indexer reads: one row per available image,
+    Write the index flare_indexer reads: one row per available image,
     timestamp = full-precision DATE_OBS from the image's own header
     (recorded in the manifest, never rounded), image_path = path relative to examples/real_data.
     Requests recorded as missing are left out. Exits if a file is absent or
@@ -82,7 +82,7 @@ def build_image_index(output_path: Path) -> pd.DataFrame:
 
 def build_patch_index(output_path: Path) -> pd.DataFrame:
     """
-    Write the active-region image index: one row per SHARP patch, with
+    Write the active-region index: one row per SHARP patch, with
     timestamp = DATE-OBS (UTC) from the patch's header, active_region = the
     NOAA number from the header, image_path relative to examples/real_data.
     Exits if a patch is absent or no longer matches its recorded SHA-256.
@@ -194,7 +194,7 @@ def load_sequences(path: Path) -> pd.DataFrame:
 def check_sequence(row, cadence) -> None:
     """Raise if a sequence row's images are not `cadence` apart or do not end at sequence_end."""
     timestamps, paths, cadence = row["timestamps"], row["image_path"], pd.Timedelta(cadence)
-    if len(timestamps) != len(paths) or len(paths) != row["n_images"]:
+    if len(timestamps) != len(paths) or len(paths) != row["n_instances"]:
         raise ValueError(f"sequence ending {row['sequence_end']}: {len(timestamps)} timestamps, {len(paths)} paths")
     if any(later - earlier != cadence for earlier, later in zip(timestamps, timestamps[1:])):
         raise ValueError(f"sequence ending {row['sequence_end']}: images are not {cadence} apart: {timestamps}")

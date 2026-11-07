@@ -24,15 +24,15 @@ def test_public_names_are_accessible():
         "MulticlassLabeler",
         "PipelineResult",
         "DatasetBuildingPipeline",
-        "FullDiskSingleImage",
+        "FullDiskSingleInstance",
         "FullDiskSequence",
-        "ActiveRegionSingleImage",
+        "ActiveRegionSingleInstance",
         "ActiveRegionSequence",
         "SequenceBuildReport",
-        "build_image_index_from_filenames",
+        "build_index_from_hmi_filenames",
         "adapt_goes_catalog",
         "add_relative_flux",
-        "ImageIndexReport",
+        "HMIIndexReport",
     }
 
     assert set(fidx.__all__) == expected
@@ -45,5 +45,5 @@ def test_engine_is_not_public():
 
 
 def test_top_level_classes_are_usable():
-    builder = fidx.FullDiskSingleImage(prediction_window=24, reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"))
+    builder = fidx.FullDiskSingleInstance(prediction_window=24, reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"))
     assert builder.prediction_window == 24

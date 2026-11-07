@@ -15,7 +15,7 @@ def _write(path, text):
 
 @pytest.fixture
 def boundary_catalog(tmp_path):
-    # M1.0 starts exactly 24h after the 2024-01-01T00:00 image.
+    # M1.0 starts exactly 24h after the 2024-01-01T00:00 instance.
     return _write(
         tmp_path / "catalog.csv",
         "start_time,peak_time,end_time,class,active_region\n"
@@ -80,7 +80,7 @@ def test_invalid_prediction_window_raises(window):
 @pytest.mark.filterwarnings("ignore:.*flare\\(s\\) in the catalog:UserWarning")
 def test_missing_active_region_default_labels_negative_and_warns(multi_region_index, ar_catalog):
     builder = DatasetBuilder(prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), target="active_region")
-    with pytest.warns(UserWarning, match="1 image\\(s\\) have a missing active_region"):
+    with pytest.warns(UserWarning, match="1 instance\\(s\\) have a missing active_region"):
         result = builder.build(multi_region_index, ar_catalog)
     assert result["label"].tolist() == [1, 0, 0]
 
@@ -91,7 +91,7 @@ def test_missing_active_region_drop_removes_rows(multi_region_index, ar_catalog)
         missing_active_region="drop", include_metadata=True,
     )
     with warnings.catch_warnings():
-        warnings.simplefilter("error")  # no missing-image warning in drop mode
+        warnings.simplefilter("error")  # no missing-instance warning in drop mode
         warnings.filterwarnings("ignore", message=".*in the catalog.*")
         result = builder.build(multi_region_index, ar_catalog)
     assert result["image_path"].tolist() == ["a0.jpg", "b0.jpg"]
@@ -142,13 +142,13 @@ def _ar_sequence_index(tmp_path):
 @pytest.mark.filterwarnings("ignore:.*flare\\(s\\) in the catalog:UserWarning")
 def test_missing_active_region_policies_for_sequences(tmp_path, ar_catalog):
     # Region 100 has 00, 01, 03 (02 has no region), so on a 1-hour grid only
-    # (00, 01) is a complete sequence of region 100; the 02 image without a
+    # (00, 01) is a complete sequence of region 100; the 02 instance without a
     # region never fills region 100's gap.
     index_path = _ar_sequence_index(tmp_path)
     kwargs = dict(prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), target="active_region",
                   cadence="1h", observation_window="2h", sliding_window="1h")
 
-    with pytest.warns(UserWarning, match="0 sequence\\(s\\) built only from such images"):
+    with pytest.warns(UserWarning, match="0 sequence\\(s\\) built only from such instances"):
         default = DatasetBuilder(**kwargs).build(index_path, ar_catalog)
     assert default["active_region"].tolist() == ["100"]
     assert [ts[-1].hour for ts in default["timestamps"]] == [1]
@@ -160,7 +160,7 @@ def test_missing_active_region_policies_for_sequences(tmp_path, ar_catalog):
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        with pytest.raises(ValueError, match="1 image\\(s\\) .* have a missing active_region"):
+        with pytest.raises(ValueError, match="1 instance\\(s\\) .* have a missing active_region"):
             DatasetBuilder(missing_active_region="error", **kwargs).build(index_path, ar_catalog)
 
 
@@ -180,7 +180,7 @@ def test_missing_active_region_group_is_labeled_negative(tmp_path, ar_catalog):
     assert len(result) == 1
     assert pd.isna(result.iloc[0]["active_region"])
     assert result.iloc[0]["label"] == 0  # the M2.0 of region 100 is never matched
-    assert any("1 sequence(s) built only from such images" in str(w.message) for w in caught)
+    assert any("1 sequence(s) built only from such instances" in str(w.message) for w in caught)
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -190,7 +190,7 @@ def test_missing_active_region_group_is_labeled_negative(tmp_path, ar_catalog):
 # ── include_metadata ─────────────────────────────────────────────────────
 
 
-def test_include_metadata_full_disk_single_image(tmp_path, ar_catalog):
+def test_include_metadata_full_disk_single_instance(tmp_path, ar_catalog):
     index_path = _write(
         tmp_path / "index.csv",
         "timestamp,image_path\n2024-01-01 00:00:00,a.jpg\n2024-01-03 00:00:00,b.jpg\n",
@@ -224,7 +224,7 @@ def test_active_region_column_is_kept_without_include_metadata(multi_region_inde
             prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), target="active_region",
         ).build(multi_region_index, ar_catalog)
     assert list(result.columns) == ["timestamp", "active_region", "label"]
-    # Three patches share one timestamp; the region column tells them apart.
+    # Three instances share one timestamp; the region column tells them apart.
     regions = result["active_region"].tolist()
     assert regions[:2] == ["100", "200"] and pd.isna(regions[2])
 
@@ -293,7 +293,7 @@ def _region_files(tmp_path, regions):
 
 
 @pytest.mark.filterwarnings("ignore:.*missing active_region:UserWarning")
-@pytest.mark.parametrize("sequences", [False, True], ids=["single images", "sequences"])
+@pytest.mark.parametrize("sequences", [False, True], ids=["single instances", "sequences"])
 def test_a_missing_region_is_none_on_every_pandas_version(tmp_path, sequences):
     index, catalog = _region_files(tmp_path, [100, None, 100])
     settings = dict(cadence="1h", observation_window="1h", sliding_window="1h") if sequences else {}

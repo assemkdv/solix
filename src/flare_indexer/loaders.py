@@ -43,9 +43,9 @@ _MAX_REPORT_SAMPLES = 200
 
 
 @dataclass
-class ImageIndexReport:
+class HMIIndexReport:
     """
-    Validation report for build_image_index_from_filenames().
+    Validation report for build_index_from_hmi_filenames().
 
     total_input_rows : how many non-blank lines/paths were given.
     valid_image_rows_before_dedup : how many parsed as valid HMI image
@@ -82,7 +82,7 @@ def _read_paths_file(path: Path) -> list[str]:
         return [line.strip() for line in f if line.strip()]
 
 
-def build_image_index_from_filenames(
+def build_index_from_hmi_filenames(
     paths: Union[str, Path, Iterable[str]],
     output_path: Union[str, Path, None] = None,
     strict: bool = True,
@@ -90,7 +90,7 @@ def build_image_index_from_filenames(
     return_report: bool = False,
 ):
     """
-    Build an image index (the timestamp CSV the dataset classes read) from HMI image file paths.
+    Build an index (the timestamp CSV the dataset classes read) from HMI image file paths.
 
     `paths` is either an iterable of file paths, or a path to a headerless
     single-column text/CSV file listing one path per line (a UTF-8 BOM at
@@ -112,7 +112,7 @@ def build_image_index_from_filenames(
     Returns a DataFrame with a `timestamp` column (pandas datetime, sorted
     ascending) and an
     `image_path` column preserving the original path. If return_report is
-    True, instead returns (DataFrame, ImageIndexReport).
+    True, instead returns (DataFrame, HMIIndexReport).
     """
     for name, value in (("strict", strict), ("return_report", return_report)):
         if not isinstance(value, bool):
@@ -189,7 +189,7 @@ def build_image_index_from_filenames(
     if not return_report:
         return df
 
-    report = ImageIndexReport(
+    report = HMIIndexReport(
         total_input_rows=total_input_rows,
         valid_image_rows_before_dedup=valid_image_rows_before_dedup,
         excluded_row_count=len(excluded_rows),

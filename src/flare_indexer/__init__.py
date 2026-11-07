@@ -4,7 +4,6 @@ from .reducers import EventReducer, MaxFluxReducer, MinFluxReducer, MeanFluxRedu
 from .reducers import MaxRelativeFluxReducer, SumRelativeFluxReducer
 from .labelers import LabelAssigner, BinaryThresholdLabeler, RegressionLabeler, MulticlassLabeler
 from .labelers import ClassCountLabeler, ClassPresenceLabeler, NumericThresholdLabeler
-from .strategies import BinaryThresholdStrategy, MaxFlareStrategy
 from .pipeline import PipelineResult, DatasetBuildingPipeline
 from .builder import SequenceBuildReport
 from .datasets import FullDiskSingleImage, FullDiskSequence, ActiveRegionSingleImage, ActiveRegionSequence
@@ -30,8 +29,6 @@ __all__ = [
     "NumericThresholdLabeler",
     "RegressionLabeler",
     "MulticlassLabeler",
-    "BinaryThresholdStrategy",
-    "MaxFlareStrategy",
     "PipelineResult",
     "DatasetBuildingPipeline",
     "FullDiskSingleImage",

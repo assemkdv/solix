@@ -22,8 +22,6 @@ def test_public_names_are_accessible():
         "NumericThresholdLabeler",
         "RegressionLabeler",
         "MulticlassLabeler",
-        "BinaryThresholdStrategy",
-        "MaxFlareStrategy",
         "PipelineResult",
         "DatasetBuildingPipeline",
         "FullDiskSingleImage",
@@ -47,8 +45,5 @@ def test_engine_is_not_public():
 
 
 def test_top_level_classes_are_usable():
-    strategy = fidx.BinaryThresholdStrategy()
-    assert strategy.threshold == "M"
-
-    builder = fidx.FullDiskSingleImage(prediction_window=24, strategy=fidx.BinaryThresholdStrategy())
+    builder = fidx.FullDiskSingleImage(prediction_window=24, reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"))
     assert builder.prediction_window == 24

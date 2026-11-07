@@ -5,7 +5,8 @@ import pytest
 
 from flare_indexer.builder import DatasetBuilder
 from flare_indexer.events import EventMatcher
-from flare_indexer.strategies import BinaryThresholdStrategy, MaxFlareStrategy
+from flare_indexer import MaxFluxReducer, BinaryThresholdLabeler, RegressionLabeler
+
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 CATALOG_PATH = FIXTURES_DIR / "catalog.csv"
@@ -28,8 +29,8 @@ IMAGE_INDEX_PATH = FIXTURES_DIR / "image_index.csv"
 #       No flares fall inside; the window is empty.
 
 
-def test_end_to_end_binary_threshold_strategy():
-    builder = DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy())
+def test_end_to_end_binary_labels():
+    builder = DatasetBuilder(prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"))
     result = builder.build(IMAGE_INDEX_PATH, CATALOG_PATH)
 
     assert list(result.columns) == ["timestamp", "label"]
@@ -41,8 +42,8 @@ def test_end_to_end_binary_threshold_strategy():
     assert result["label"].tolist() == [0, 1, 0]
 
 
-def test_end_to_end_max_flare_strategy():
-    builder = DatasetBuilder(prediction_window=24, strategy=MaxFlareStrategy())
+def test_end_to_end_max_flux_labels():
+    builder = DatasetBuilder(prediction_window=24, reducer=MaxFluxReducer(), labeler=RegressionLabeler())
     result = builder.build(IMAGE_INDEX_PATH, CATALOG_PATH)
 
     # Row 1: max is C3.0's 3e-6 — X1.0's 1e-4 must be excluded since its
@@ -69,7 +70,7 @@ def test_end_to_end_sequences_against_fixture_catalog(tmp_path):
 
     builder = DatasetBuilder(
         prediction_window=1,
-        strategy=BinaryThresholdStrategy(),
+        reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
         cadence="1h", observation_window="2h", sliding_window="1h",
     )
     result = builder.build(index_path, CATALOG_PATH)
@@ -87,7 +88,7 @@ def test_end_to_end_sequences_against_fixture_catalog(tmp_path):
 
     max_result = DatasetBuilder(
         prediction_window=1,
-        strategy=MaxFlareStrategy(),
+        reducer=MaxFluxReducer(), labeler=RegressionLabeler(),
         cadence="1h", observation_window="2h", sliding_window="1h",
     ).build(index_path, CATALOG_PATH)
     assert max_result["label"].tolist() == [0.0, 0.0, 3e-6]
@@ -109,7 +110,7 @@ def test_end_to_end_active_region_against_fixture_catalog(tmp_path):
 
     builder = DatasetBuilder(
         prediction_window=24,
-        strategy=BinaryThresholdStrategy(threshold="C"),
+        reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("C"),
         target="active_region",
     )
     result = builder.build(index_path, CATALOG_PATH)
@@ -137,7 +138,7 @@ def test_end_to_end_active_region_sequences_against_fixture_catalog(tmp_path):
 
     builder = DatasetBuilder(
         prediction_window=1,
-        strategy=BinaryThresholdStrategy(threshold="C"),
+        reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("C"),
         target="active_region",
         cadence="30min", observation_window="90min", sliding_window="90min",
     )
@@ -192,7 +193,7 @@ def test_end_to_end_synthetic_same_day_catalog(tmp_path):
     #   2030-01-10 00:00: M2.0 (starts 09:40) -> 1, max flux 2e-5
     #   2030-01-12 00:00: only C3.0 (starts 12:00), below M -> 0, max flux 3e-6
     #   2030-01-13 00:00: nothing -> 0, 0.0
-    binary = DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy("M")) \
+    binary = DatasetBuilder(prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M")) \
         .build(index_path, SYNTHETIC_SAME_DAY_CATALOG_PATH)
     assert list(binary.columns) == ["timestamp", "label"]
     assert binary["timestamp"].tolist() == [
@@ -202,7 +203,7 @@ def test_end_to_end_synthetic_same_day_catalog(tmp_path):
     ]
     assert binary["label"].tolist() == [1, 0, 0]
 
-    flux = DatasetBuilder(prediction_window=24, strategy=MaxFlareStrategy()) \
+    flux = DatasetBuilder(prediction_window=24, reducer=MaxFluxReducer(), labeler=RegressionLabeler()) \
         .build(index_path, SYNTHETIC_SAME_DAY_CATALOG_PATH)
     assert flux["label"].tolist() == pytest.approx([2e-5, 3e-6, 0.0])
 
@@ -222,7 +223,7 @@ def test_end_to_end_midnight_crossing_event(tmp_path):
     #   2030-01-11 00:00: starts 01-11 23:50, inside (although it peaks the next day)
     #   2030-01-12 00:00: started before t
     #   2030-01-13 00:00: nothing
-    result = DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy("M")) \
+    result = DatasetBuilder(prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M")) \
         .build(index_path, SYNTHETIC_FULL_TIMESTAMP_CATALOG_PATH)
     assert result["timestamp"].tolist() == [
         pd.Timestamp("2030-01-11T00:00:00"),

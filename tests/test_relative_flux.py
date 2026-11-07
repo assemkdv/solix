@@ -8,7 +8,6 @@ import pandas as pd
 import pytest
 
 from flare_indexer import (
-    DatasetBuildingPipeline,
     EventMatcher,
     FlareEvent,
     MaxRelativeFluxReducer,
@@ -42,8 +41,9 @@ def _files(tmp_path, catalog=CATALOG, times=("2024-01-01 00:00:00", "2024-01-01 
 
 
 def _build(index_path, catalog_path, reducer, labeler=None, **kwargs):
-    pipeline = DatasetBuildingPipeline(reducer, labeler or RegressionLabeler())
-    return DatasetBuilder(prediction_window="24h", strategy=pipeline, **kwargs).build(index_path, catalog_path)
+    return DatasetBuilder(
+        prediction_window="24h", reducer=reducer, labeler=labeler or RegressionLabeler(), **kwargs,
+    ).build(index_path, catalog_path)
 
 
 @pytest.mark.parametrize("reducer, values, expected", [
@@ -115,14 +115,13 @@ def test_invalid_rxfi_is_refused(tmp_path, bad):
 @pytest.mark.parametrize("reducer", [MaxRelativeFluxReducer(), SumRelativeFluxReducer()])
 def test_sequences_are_refused(reducer):
     with pytest.raises(ValueError, match="single images only"):
-        DatasetBuilder(prediction_window="24h", strategy=DatasetBuildingPipeline(reducer, RegressionLabeler()),
+        DatasetBuilder(prediction_window="24h", reducer=reducer, labeler=RegressionLabeler(),
                        cadence="1h", observation_window="3h", sliding_window="1h")
 
 
 def test_other_labels_ignore_rxfi_column(tmp_path):
     index_path, catalog_path = _files(tmp_path)
-    from flare_indexer import BinaryThresholdStrategy
-    result = DatasetBuilder(prediction_window="24h", strategy=BinaryThresholdStrategy("M")).build(index_path, catalog_path)
+    result = DatasetBuilder(prediction_window="24h", reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M")).build(index_path, catalog_path)
     assert result["label"].tolist() == [1, 0, 0]
 
 
@@ -141,6 +140,7 @@ def test_adapt_goes_catalog_carries_rxfi(tmp_path):
 # ── add_relative_flux: background flux and rxfi from 1-minute X-ray flux ──
 
 from flare_indexer import add_relative_flux  # noqa: E402
+from flare_indexer import MaxFluxReducer, BinaryThresholdLabeler
 
 FLARE = "2024-01-02 00:00:00,2024-01-02 00:05:00,2024-01-02 00:10:00,{cls},100\n"
 HEADER = "start_time,peak_time,end_time,class,active_region\n"

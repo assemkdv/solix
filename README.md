@@ -24,7 +24,7 @@ ready for a machine-learning data loader.
 5. [The four dataset classes](#the-four-dataset-classes)
 6. [Parameters](#parameters)
 7. [The prediction window](#the-prediction-window)
-8. [Labels: strategies, reducers and labelers](#labels-strategies-reducers-and-labelers)
+8. [Labels: reducers and labelers](#labels-reducers-and-labelers)
 9. [Output](#output)
 10. [Preparing real data](#preparing-real-data)
 11. [Errors and warnings](#errors-and-warnings)
@@ -47,9 +47,8 @@ ready for a machine-learning data loader.
    2. makes the samples, single images or sequences;
    3. for each sample, `EventMatcher` finds the flares that start in the
       window `[t, t + w)`;
-   4. the strategy turns those flares into a label: a **reducer** makes
-      one value from the flares, and a **labeler** makes the label from
-      the value.
+   4. a **reducer** makes one value from those flares, and a
+      **labeler** makes the label from the value.
 3. **Output.** A pandas DataFrame with one row per sample.
 
 ---
@@ -83,7 +82,8 @@ import flare_indexer as fidx
 
 dataset = fidx.FullDiskSingleImage(
     prediction_window="24h",                     # flares that start in [t, t + 24h)
-    strategy=fidx.BinaryThresholdStrategy("M"),  # 1 if any of them is M1.0 or stronger
+    reducer=fidx.MaxFluxReducer(),               # the strongest of them
+    labeler=fidx.BinaryThresholdLabeler("M"),    # 1 if it is M1.0 or stronger, else 0
 )
 labels = dataset.build("examples/data/full_disk_image_index.csv",
                        "examples/data/flare_catalog.csv")
@@ -190,7 +190,7 @@ separately for each region.
 | Parameter | Single images | Sequences | Default | Meaning |
 |---|---|---|---|---|
 | `prediction_window` | required | required | | length of the window, e.g. `"24h"`, `"12h"`, or a number of hours |
-| `strategy` | required | required | | how flares become a label (see below) |
+| `reducer`, `labeler` | required | required | | how flares become a label (see below) |
 | `cadence` | optional | required | `None` | time between images; for single images, keeps one image per cadence |
 | `start` | optional | optional | earliest image | first point of the cadence grid; must be an image time |
 | `observation_window` | | required | | time one sequence covers; a multiple of `cadence` |
@@ -231,21 +231,21 @@ counts if it **starts** in
 
 ---
 
-## Labels: strategies, reducers and labelers
+## Labels: reducers and labelers
 
-The `strategy` parameter decides how the flares of a window become a
-label. A label is made in two steps:
+The `reducer` and `labeler` parameters decide how the flares of a window
+become a label. A label is made in two steps:
 
 ```text
 flares in the window  ──reducer──>  one value  ──labeler──>  label
 ```
 
-### Ready-made strategies
+### The two most common labels
 
-| Strategy | Reducer + labeler | Label |
+| Reducer | Labeler | Label |
 |---|---|---|
-| `BinaryThresholdStrategy("M")` | MaxFlux + BinaryThreshold | 1 if the strongest flare is ≥ M1.0, else 0 |
-| `MaxFlareStrategy()` | MaxFlux + Regression | peak flux of the strongest flare (W/m²), 0.0 if none |
+| `MaxFluxReducer()` | `BinaryThresholdLabeler("M")` | 1 if the strongest flare is ≥ M1.0, else 0 |
+| `MaxFluxReducer()` | `RegressionLabeler()` | peak flux of the strongest flare (W/m²), 0.0 if none |
 
 The threshold can be a letter (`"C"`, `"M"`, `"X"`) or a full class
 (`"M5.0"`).
@@ -253,7 +253,8 @@ The threshold can be a letter (`"C"`, `"M"`, `"X"`) or a full class
 ### Any reducer with any labeler
 
 ```python
-strategy = fidx.DatasetBuildingPipeline(
+dataset = fidx.FullDiskSingleImage(
+    "24h",
     reducer=fidx.CumulativeClassIndexReducer(),
     labeler=fidx.NumericThresholdLabeler(10),
 )
@@ -285,22 +286,25 @@ images only.
 | `ClassCountLabeler()` | counts per class | `ClassCountReducer` |
 | `ClassPresenceLabeler()` | 0/1 per class | `ClassCountReducer` |
 
-### Your own strategy
+### Your own reducer or labeler
 
-Any object with a `label(flares)` method works as a strategy. In the same
-way, any object with a `reduce(flares)` method works as a reducer, and any
+Any object with a `reduce(flares)` method works as a reducer, and any
 object with an `assign(value)` method works as a labeler.
 
 ```python
 class StrongestClassLetter:
-    def label(self, flares):
+    def reduce(self, flares):
         if not flares:
             return "none"
         flux = fidx.FluxConverter()
         strongest = max(flares, key=lambda f: flux.to_flux(f.goes_class))
         return strongest.goes_class[0]
 
-dataset = fidx.FullDiskSingleImage("24h", StrongestClassLetter())
+class AsIs:
+    def assign(self, value):
+        return value
+
+dataset = fidx.FullDiskSingleImage("24h", reducer=StrongestClassLetter(), labeler=AsIs())
 ```
 
 ### GOES classes
@@ -348,7 +352,7 @@ SequenceBuildReport)`. The report counts the candidate, emitted and skipped
 sequences and lists the missing times that caused the skips.
 
 ```python
-dataset = fidx.FullDiskSequence("24h", fidx.MaxFlareStrategy(),
+dataset = fidx.FullDiskSequence("24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.RegressionLabeler(),
                                 cadence="1h", observation_window="3h", sliding_window="1h")
 labels, report = dataset.build("examples/data/full_disk_image_index.csv",
                                "examples/data/flare_catalog.csv", return_report=True)
@@ -437,14 +441,13 @@ flare-indexer/
 │   ├── goes_class.py           GOES class ↔ flux (FluxConverter) and class validation
 │   ├── reducers.py             the seven reducers
 │   ├── labelers.py             the six labelers
-│   ├── strategies.py           BinaryThresholdStrategy, MaxFlareStrategy
-│   ├── pipeline.py             DatasetBuildingPipeline: any reducer + labeler
+│   ├── pipeline.py             DatasetBuildingPipeline: run reducer + labeler step by step
 │   └── loaders.py              helpers that prepare the input files from raw data
 ├── examples/
 │   ├── 01_… to 11_….py         runnable examples (see above)
 │   ├── data/                   synthetic image indexes, flare catalog and X-ray flux
 │   └── real_data/              download scripts, image readers, manifests, real flare catalog
-├── tests/                      711 automated tests, one file per topic
+├── tests/                      automated tests, one file per topic
 ├── docs/
 │   ├── DATASETS.md             inputs, prediction window, classes, parameters, real data
 │   ├── LABELS.md               every label with an example, custom labels, rxfi

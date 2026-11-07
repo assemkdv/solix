@@ -50,8 +50,8 @@ counts if it starts at `t` or later and before `t + w`. `w` is
 `prediction_window`, e.g. `"24h"`, `"12h"` or a number of hours (`24`).
 
 In `examples/data/`, the image at 04:00 counts the C3.2 flare that starts at
-exactly 04:00 (here with `MaxFlareStrategy()`, whose label is the strongest
-flare's peak flux, and `include_flares=True`):
+exactly 04:00 (here with `MaxFluxReducer()` and `RegressionLabeler()`, whose
+label is the strongest flare's peak flux, and `include_flares=True`):
 
 ```text
           timestamp    label             flares
@@ -71,8 +71,8 @@ even if it peaks after the window ends.
 | `ActiveRegionSingleImage` | patch | the patch's own region only |
 | `ActiveRegionSequence` | sequence of patches of one region | that region only |
 
-Every class takes `prediction_window` and `strategy` first, then its own
-settings by name:
+Every class takes `prediction_window` first and `reducer` and `labeler` by
+name (see [LABELS.md](LABELS.md)), then its own settings by name:
 
 | Setting | Single image | Sequence | Default |
 |---|---|---|---|
@@ -87,7 +87,9 @@ settings by name:
 ## Single images
 
 ```python
-builder = fidx.FullDiskSingleImage("24h", fidx.BinaryThresholdStrategy("M"))
+builder = fidx.FullDiskSingleImage(
+    "24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"),
+)
 labels = builder.build("image_index.csv", "flare_catalog.csv")
 ```
 
@@ -102,7 +104,7 @@ the images.
 
 ```python
 builder = fidx.FullDiskSequence(
-    "24h", fidx.BinaryThresholdStrategy("M"),
+    "24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"),
     cadence="1h",              # time between images in a sequence
     observation_window="3h",   # time one sequence covers: 3 images
     sliding_window="1h",       # a new sequence starts every hour
@@ -134,7 +136,9 @@ sequences = builder.build("image_index.csv", "flare_catalog.csv")
 ## Active regions
 
 ```python
-builder = fidx.ActiveRegionSingleImage("24h", fidx.BinaryThresholdStrategy("M"))
+builder = fidx.ActiveRegionSingleImage(
+    "24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"),
+)
 labels = builder.build("active_region_image_index.csv", "flare_catalog.csv")
 ```
 

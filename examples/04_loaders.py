@@ -41,7 +41,7 @@ def main():
     print(catalog.to_string(index=False))
 
     labels = fidx.FullDiskSingleImage(
-        prediction_window=24, strategy=fidx.BinaryThresholdStrategy("M"),
+        prediction_window=24, reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"),
         include_metadata=True,
     ).build(OUTPUT / "04_image_index.csv", OUTPUT / "04_flare_catalog.csv")
     print("\nLabels for the converted inputs")

@@ -161,14 +161,17 @@ def _validate_requested_cadence(requested: pd.Timedelta, inferred: pd.Timedelta)
 class DatasetBuilder:
     """
     The engine behind the four dataset classes in datasets.py: maps image
-    timestamps to flare labels with a strategy.
+    timestamps to flare labels with a reducer and a labeler.
 
     Parameters
     ----------
     prediction_window : hours (number) or a duration with a unit ("24h").
         Flares that start in [t, t + prediction_window) count, where t is
         the image time or, for a sequence, the time of its last image.
-    strategy : any object with label(flares).
+    reducer : turns the flares of one window into one value; any object
+        with reduce(flares), e.g. MaxFluxReducer().
+    labeler : turns that value into the label; any object with
+        assign(value), e.g. BinaryThresholdLabeler("M").
     target : "full_disk" (all flares count) or "active_region" (only the
         flares of the image's own region; the index needs active_region).
     missing_active_region : "negative", "drop" or "error", for
@@ -192,7 +195,9 @@ class DatasetBuilder:
     def __init__(
         self,
         prediction_window,
-        strategy,
+        *,
+        reducer,
+        labeler,
         target="full_disk",
         start=None,
         cadence=None,
@@ -204,11 +209,13 @@ class DatasetBuilder:
         verbose=False,
     ):
         parsed_prediction_window = _parse_prediction_window(prediction_window)
-        if not callable(getattr(strategy, "label", None)):
+        if not callable(getattr(reducer, "reduce", None)):
             raise TypeError(
-                f"strategy={strategy!r} must have a label(flares) method, like BinaryThresholdStrategy('M'). "
-                "To use a reducer and a labeler, pass them together: "
-                "DatasetBuildingPipeline(MaxFluxReducer(), BinaryThresholdLabeler('M'))."
+                f"reducer={reducer!r} must have a reduce(flares) method, like MaxFluxReducer()."
+            )
+        if not callable(getattr(labeler, "assign", None)):
+            raise TypeError(
+                f"labeler={labeler!r} must have an assign(value) method, like BinaryThresholdLabeler('M')."
             )
         if missing_active_region not in VALID_MISSING_ACTIVE_REGION_POLICIES:
             raise ValueError(
@@ -222,7 +229,6 @@ class DatasetBuilder:
         # start) alone thin out single images to a time grid.
         sequence_given = observation_window is not None or sliding_window is not None
 
-        reducer = getattr(strategy, "reducer", None)
         if getattr(reducer, "single_image_only", False) and sequence_given:
             raise ValueError(
                 f"{type(reducer).__name__} labels single images only; "
@@ -231,7 +237,8 @@ class DatasetBuilder:
 
         self.prediction_window = prediction_window
         self._window = parsed_prediction_window
-        self.strategy = strategy
+        self.reducer = reducer
+        self.labeler = labeler
         self.target = target
         self.missing_active_region = missing_active_region
         if not isinstance(include_metadata, bool):
@@ -492,14 +499,14 @@ class DatasetBuilder:
         silently reduce to 0, so the build stops instead; blank cells are
         counted in a warning.
         """
-        column = getattr(getattr(self.strategy, "reducer", None), "requires_catalog_column", None)
+        column = getattr(self.reducer, "requires_catalog_column", None)
         if column is None:
             return
         catalog = matcher._catalog
         if column not in catalog.columns:
             raise ValueError(
                 f"Flare catalog at {path} has no '{column}' column, which "
-                f"{type(self.strategy.reducer).__name__} needs."
+                f"{type(self.reducer).__name__} needs."
             )
         missing = int(catalog[column].isna().sum())
         if missing:
@@ -512,7 +519,8 @@ class DatasetBuilder:
 
     def _label_fields(self, flares: list) -> dict:
         """The label of one window, plus its flare list when include_flares is on."""
-        fields = {"label": self.strategy.label(flares)}
+        # A copy, so a reducer can never change the list the window found.
+        fields = {"label": self.labeler.assign(self.reducer.reduce(list(flares)))}
         if self.include_flares:
             fields["flares"] = [flare.goes_class for flare in flares]
         return fields

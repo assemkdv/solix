@@ -1,15 +1,10 @@
 import pandas as pd
 import pytest
 
-from flare_indexer import (
-    BinaryThresholdStrategy,
-    EventMatcher,
-    FluxConverter,
-    InvalidGOESClassError,
-    adapt_goes_catalog,
-)
+from flare_indexer import EventMatcher, FluxConverter, InvalidGOESClassError, adapt_goes_catalog
 from flare_indexer.goes_class import parse_goes_class
 from flare_indexer.builder import DatasetBuilder
+from flare_indexer import MaxFluxReducer, BinaryThresholdLabeler
 
 
 @pytest.mark.parametrize("value, expected", [
@@ -56,7 +51,7 @@ def test_invalid_class_outside_any_window_is_still_rejected(tmp_path):
     index = tmp_path / "index.csv"
     index.write_text("timestamp\n2024-01-01 00:00:00\n")
     with pytest.raises(InvalidGOESClassError, match="'bad'"):
-        DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy()).build(index, catalog)
+        DatasetBuilder(prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M")).build(index, catalog)
 
 
 def test_adapt_goes_catalog_validates_classes(tmp_path):
@@ -78,4 +73,4 @@ def test_valid_catalog_unchanged(tmp_path):
     )
     flares = EventMatcher(path).query(pd.Timestamp("2024-01-01 00:00"), 24)
     assert [f.goes_class for f in flares] == ["m2.0"]
-    assert BinaryThresholdStrategy().label(flares) == 1
+    assert BinaryThresholdLabeler("M").assign(MaxFluxReducer().reduce(flares)) == 1

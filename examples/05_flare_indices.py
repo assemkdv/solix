@@ -55,7 +55,7 @@ def main():
     for name, index_reducer in INDICES.items():
         labels = fidx.FullDiskSingleImage(
             prediction_window="24h",
-            strategy=fidx.DatasetBuildingPipeline(index_reducer, fidx.RegressionLabeler()),
+            reducer=index_reducer, labeler=fidx.RegressionLabeler(),
         ).build(DATA / "full_disk_image_index.csv", OUTPUT / "05_flare_catalog_rxfi.csv")
         table = labels[["timestamp"]].copy() if table is None else table
         table[name] = labels["label"]

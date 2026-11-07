@@ -27,7 +27,7 @@ COLUMNS = ["sequence_start", "sequence_end", "n_images", "label"]
 def main():
     print("6 images every 2h (12h observation window), new sequence every 6h")
     sequences, report = fidx.FullDiskSequence(
-        "24h", fidx.BinaryThresholdStrategy("M"),
+        "24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"),
         cadence="2h", observation_window="12h", sliding_window="6h",
     ).build(INDEX, CATALOG, return_report=True)
     with pd.option_context("display.width", 120):

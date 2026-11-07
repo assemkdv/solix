@@ -149,7 +149,7 @@ def test_tensorflow_and_pytorch_loaders_yield_the_same_samples(tmp_path):
 
     index_path = tmp_path / "index.csv"
     real.build_image_index(index_path)
-    options = dict(prediction_window="24h", strategy=fidx.BinaryThresholdStrategy("M"), target="full_disk")
+    options = dict(prediction_window="24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"), target="full_disk")
     labels = DatasetBuilder(include_metadata=True, **options).build(index_path, real.CATALOG)
     sequences = DatasetBuilder(cadence="1h", observation_window="3h", sliding_window="1h", **options) \
         .build(index_path, real.CATALOG)
@@ -183,7 +183,7 @@ def test_tensorflow_datasets_train_with_model_fit(tmp_path):
 
     index_path = tmp_path / "index.csv"
     real.build_image_index(index_path)
-    options = dict(prediction_window="24h", strategy=fidx.BinaryThresholdStrategy("M"), target="full_disk")
+    options = dict(prediction_window="24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"), target="full_disk")
     labels = DatasetBuilder(include_metadata=True, **options).build(index_path, real.CATALOG)
     sequences = DatasetBuilder(cadence="1h", observation_window="3h", sliding_window="1h", **options) \
         .build(index_path, real.CATALOG)
@@ -228,7 +228,7 @@ def test_tensorflow_and_pytorch_active_region_loaders_yield_the_same_patches(tmp
 
     index_path = tmp_path / "patch_index.csv"
     real.build_patch_index(index_path)
-    labels = fidx.ActiveRegionSingleImage("24h", fidx.BinaryThresholdStrategy("M"), include_metadata=True) \
+    labels = fidx.ActiveRegionSingleImage("24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"), include_metadata=True) \
         .build(index_path, real.CATALOG)
     torch_dataset = torch_example.FlareDataset(labels, real.REAL_DATA)
     tf_dataset = tf_example.FlareDataset(labels, real.REAL_DATA, batch_size=4)

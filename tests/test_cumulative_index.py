@@ -176,10 +176,14 @@ def test_pipeline_label_from_events():
     raw = DatasetBuildingPipeline(CumulativeClassIndexReducer(), RegressionLabeler())
     binary = DatasetBuildingPipeline(CumulativeClassIndexReducer(), NumericThresholdLabeler(10))
     events = _events(PAPER_CLASSES)
-    assert raw.label(events) == PAPER_INDEX
-    assert binary.label(events) == 1
-    assert raw.label([]) == 0.0
-    assert binary.label([]) == 0
+
+    def label(pipeline, events):
+        return pipeline.assign_label(pipeline.reduce_events(events))
+
+    assert label(raw, events) == PAPER_INDEX
+    assert label(binary, events) == 1
+    assert label(raw, []) == 0.0
+    assert label(binary, []) == 0
 
 
 def test_pipeline_run_one_with_fixture_catalog():
@@ -206,11 +210,11 @@ def test_pipeline_run_one_with_fixture_catalog():
 def test_dataset_builder_single_images_raw_and_binary():
     raw = DatasetBuilder(
         prediction_window="24h",
-        strategy=DatasetBuildingPipeline(CumulativeClassIndexReducer(), RegressionLabeler()),
+        reducer=CumulativeClassIndexReducer(), labeler=RegressionLabeler(),
     ).build(FIXTURES_DIR / "image_index.csv", FIXTURES_DIR / "catalog.csv")
     binary = DatasetBuilder(
         prediction_window="24h",
-        strategy=DatasetBuildingPipeline(CumulativeClassIndexReducer(), NumericThresholdLabeler(10)),
+        reducer=CumulativeClassIndexReducer(), labeler=NumericThresholdLabeler(10),
     ).build(FIXTURES_DIR / "image_index.csv", FIXTURES_DIR / "catalog.csv")
     # 2024-02-01: C3.0 -> 3.0; 2024-02-05: C1.0 + M4.0 -> 41.0; 2024-02-10: empty -> 0.0
     assert raw["label"].tolist() == [3.0, 41.0, 0.0]

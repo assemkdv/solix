@@ -9,7 +9,6 @@ from flare_indexer.goes_class import InvalidGOESClassError
 from flare_indexer.labelers import BinaryThresholdLabeler, RegressionLabeler
 from flare_indexer.pipeline import DatasetBuildingPipeline, PipelineResult
 from flare_indexer.reducers import MaxFluxReducer
-from flare_indexer.strategies import BinaryThresholdStrategy, MaxFlareStrategy
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 CATALOG_PATH = FIXTURES_DIR / "catalog.csv"
@@ -76,7 +75,7 @@ def test_custom_duck_typed_reducer_and_labeler_work():
     assert pipeline.reduce_events([_flare("M1.0"), _flare("M2.0")]) == 2
     assert pipeline.assign_label(2) == "many"
     assert pipeline.assign_label(1) == "few"
-    assert pipeline.label([_flare("M1.0")]) == "few"
+    assert pipeline.assign_label(pipeline.reduce_events([_flare("M1.0")])) == "few"
 
 
 # ── extract_events ─────────────────────────────────────────────────────
@@ -242,15 +241,6 @@ def test_extract_events_returns_fresh_list_not_shared_with_matcher():
     assert len(events_b) == 1  # unaffected by mutating the earlier result
 
 
-# ── label() ───────────────────────────────────────────────────────────────
-
-
-def test_pipeline_label_method_matches_manual_reduce_then_assign():
-    pipeline = _default_pipeline()
-    events = [_flare("C4.0"), _flare("M2.3")]
-    assert pipeline.label(events) == pipeline.assign_label(pipeline.reduce_events(events))
-
-
 # ── Exception propagation ─────────────────────────────────────────────────
 
 
@@ -286,7 +276,7 @@ def test_invalid_goes_class_from_event_matcher_propagates_through_pipeline():
         pipeline.run_one(matcher, pd.Timestamp("2024-01-01 00:00"), prediction_window=1)
 
 
-# ── DatasetBuilder with a pipeline ────────────────────────────────────────
+# ── DatasetBuilder with the same reducer and labeler ────────────────────────────────────────
 
 
 def test_full_disk_time_based_sequences_work_with_pipeline(tmp_path):
@@ -299,7 +289,7 @@ def test_full_disk_time_based_sequences_work_with_pipeline(tmp_path):
 
     pipeline = _default_pipeline()
     builder = DatasetBuilder(
-        prediction_window=24, strategy=pipeline,
+        prediction_window=24, reducer=pipeline.reducer, labeler=pipeline.labeler,
         cadence="1h", observation_window="6h", sliding_window="3h",
     )
     result, report = builder.build(index_path, empty_catalog, return_report=True)
@@ -309,10 +299,10 @@ def test_full_disk_time_based_sequences_work_with_pipeline(tmp_path):
     assert report.emitted_sequences == 2
 
 
-def test_sequence_build_report_unaffected_by_strategy_vs_pipeline(tmp_path):
+def test_sequence_build_report_does_not_depend_on_the_labeler(tmp_path):
     # SequenceBuildReport is computed from candidate-timestamp generation
-    # alone, independent of labeling -- confirm it's identical whether the
-    # strategy is BinaryThresholdStrategy or the equivalent pipeline.
+    # alone, independent of labeling -- confirm it's identical for a binary
+    # and a flux labeler.
     index_path = tmp_path / "index.csv"
     pd.DataFrame({
         "timestamp": pd.date_range("2024-01-01T00:00:00", periods=10, freq="1h"),
@@ -320,17 +310,17 @@ def test_sequence_build_report_unaffected_by_strategy_vs_pipeline(tmp_path):
     empty_catalog = tmp_path / "catalog.csv"
     empty_catalog.write_text("start_time,peak_time,end_time,class,active_region\n")
 
-    _, strategy_report = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(),
+    _, binary_report = DatasetBuilder(
+        prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
         cadence="1h", observation_window="6h", sliding_window="3h",
     ).build(index_path, empty_catalog, return_report=True)
 
-    _, pipeline_report = DatasetBuilder(
-        prediction_window=24, strategy=_default_pipeline(),
+    _, flux_report = DatasetBuilder(
+        prediction_window=24, reducer=MaxFluxReducer(), labeler=RegressionLabeler(),
         cadence="1h", observation_window="6h", sliding_window="3h",
     ).build(index_path, empty_catalog, return_report=True)
 
-    assert strategy_report == pipeline_report
+    assert binary_report == flux_report
 
 
 def test_active_region_single_image_works_with_pipeline(tmp_path):
@@ -341,7 +331,7 @@ def test_active_region_single_image_works_with_pipeline(tmp_path):
     }).to_csv(index_path, index=False)
 
     pipeline = DatasetBuildingPipeline(reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("C"))
-    builder = DatasetBuilder(prediction_window=24, strategy=pipeline, target="active_region")
+    builder = DatasetBuilder(prediction_window=24, reducer=pipeline.reducer, labeler=pipeline.labeler, target="active_region")
     result = builder.build(index_path, CATALOG_PATH)
 
     assert list(result.columns) == ["timestamp", "active_region", "label"]
@@ -360,7 +350,7 @@ def test_active_region_sequences_work_with_pipeline(tmp_path):
 
     pipeline = DatasetBuildingPipeline(reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("C"))
     builder = DatasetBuilder(
-        prediction_window=1, strategy=pipeline, target="active_region",
+        prediction_window=1, reducer=pipeline.reducer, labeler=pipeline.labeler, target="active_region",
         cadence="30min", observation_window="90min", sliding_window="90min",
     )
     result = builder.build(index_path, CATALOG_PATH)
@@ -379,37 +369,24 @@ def test_extra_columns_preserved_with_pipeline(tmp_path):
     }).to_csv(index_path, index=False)
 
     pipeline = _default_pipeline()
-    builder = DatasetBuilder(prediction_window=1, strategy=pipeline, cadence="1h", observation_window="2h", sliding_window="1h")
+    builder = DatasetBuilder(prediction_window=1, reducer=pipeline.reducer, labeler=pipeline.labeler, cadence="1h", observation_window="2h", sliding_window="1h")
     result = builder.build(index_path, CATALOG_PATH)
 
     assert "image_path" in result.columns
     assert result.iloc[0]["image_path"] == ["a.jpg", "b.jpg"]
 
 
-# ── End-to-end equivalence (strategy vs. pipeline) ────────────────────────
+# ── End-to-end equivalence (builder vs. pipeline.run_one) ────────────────
 
 
-def test_binary_threshold_strategy_equivalent_to_pipeline():
-    strategy_result = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(threshold="M"),
+@pytest.mark.parametrize("labeler", [BinaryThresholdLabeler("M"), RegressionLabeler()], ids=["binary", "flux"])
+def test_builder_labels_equal_pipeline_run_one(labeler):
+    built = DatasetBuilder(
+        prediction_window=24, reducer=MaxFluxReducer(), labeler=labeler,
     ).build(IMAGE_INDEX_PATH, CATALOG_PATH)
 
-    pipeline = DatasetBuildingPipeline(reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"))
-    pipeline_result = DatasetBuilder(
-        prediction_window=24, strategy=pipeline,
-    ).build(IMAGE_INDEX_PATH, CATALOG_PATH)
+    pipeline = DatasetBuildingPipeline(reducer=MaxFluxReducer(), labeler=labeler)
+    matcher = EventMatcher(CATALOG_PATH)
+    expected = [pipeline.run_one(matcher, t, prediction_window=24).label for t in built["timestamp"]]
 
-    pd.testing.assert_frame_equal(strategy_result, pipeline_result)
-
-
-def test_max_flare_strategy_equivalent_to_pipeline():
-    strategy_result = DatasetBuilder(
-        prediction_window=24, strategy=MaxFlareStrategy(),
-    ).build(IMAGE_INDEX_PATH, CATALOG_PATH)
-
-    pipeline = DatasetBuildingPipeline(reducer=MaxFluxReducer(), labeler=RegressionLabeler())
-    pipeline_result = DatasetBuilder(
-        prediction_window=24, strategy=pipeline,
-    ).build(IMAGE_INDEX_PATH, CATALOG_PATH)
-
-    pd.testing.assert_frame_equal(strategy_result, pipeline_result)
+    assert built["label"].tolist() == expected

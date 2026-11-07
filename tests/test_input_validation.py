@@ -11,7 +11,6 @@ import pytest
 
 from flare_indexer import (
     BinaryThresholdLabeler,
-    BinaryThresholdStrategy,
     EventMatcher,
     MaxFluxReducer,
     adapt_goes_catalog,
@@ -48,7 +47,7 @@ def test_unitless_duration_text_is_rejected(text):
     with pytest.raises(ValueError, match="has no unit"):
         _parse_prediction_window(text)
     with pytest.raises(ValueError, match="has no unit"):
-        DatasetBuilder(text, BinaryThresholdStrategy())
+        DatasetBuilder(text, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"))
 
 
 def test_numbers_still_mean_hours_and_unit_text_still_works():
@@ -65,13 +64,13 @@ def test_numbers_still_mean_hours_and_unit_text_still_works():
 def test_unitless_time_based_duration_text_is_rejected(name):
     params = {"cadence": "1h", "observation_window": "2h", "sliding_window": "1h", name: "3600"}
     with pytest.raises(ValueError, match=f"{name} '3600' has no unit"):
-        DatasetBuilder(24, BinaryThresholdStrategy(), **params)
+        DatasetBuilder(24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), **params)
 
 
 def test_text_window_with_unit_gives_the_numeric_result(tmp_path, catalog):
     index = _write(tmp_path, "index.csv", "timestamp\n2024-01-01 09:00:00\n")
-    assert _labels(DatasetBuilder(24, BinaryThresholdStrategy()), index, catalog) == [1]
-    assert _labels(DatasetBuilder("24h", BinaryThresholdStrategy()), index, catalog) == [1]
+    assert _labels(DatasetBuilder(24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M")), index, catalog) == [1]
+    assert _labels(DatasetBuilder("24h", reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M")), index, catalog) == [1]
 
 
 # --- 2. numeric time columns ------------------------------------------------
@@ -94,7 +93,7 @@ def test_numeric_catalog_time_column_is_rejected_with_context(tmp_path, value):
 def test_numeric_image_timestamp_column_is_rejected_with_context(tmp_path, catalog):
     index = _write(tmp_path, "index.csv", "timestamp\n20240101000000\n1704067200\n")
     with pytest.raises(ValueError, match=r"Image index at .*column 'timestamp', data row 1: the value 20240101000000"):
-        DatasetBuilder(24, BinaryThresholdStrategy()).build(index, catalog)
+        DatasetBuilder(24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M")).build(index, catalog)
 
 
 def test_numeric_goes_catalog_time_is_rejected_by_the_adapter(tmp_path):
@@ -147,7 +146,7 @@ def test_text_typed_image_region_column_matches_the_catalog(tmp_path, catalog):
         tmp_path, "index.csv",
         "timestamp,active_region\n" + "".join(f"2024-01-01 09:00:00,{r}\n" for r in rows),
     )
-    builder = DatasetBuilder(24, BinaryThresholdStrategy(), target="active_region", include_metadata=True)
+    builder = DatasetBuilder(24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), target="active_region", include_metadata=True)
     out = builder.build(index, catalog)
     assert out["label"].tolist() == [1, 1, 1, 0, 1]
     assert out["active_region"].tolist() == ["100", "100", "100", "AR100", "100"]
@@ -161,7 +160,7 @@ def test_text_typed_catalog_region_column_matches_an_integer_image_region(tmp_pa
         + "2024-01-02 10:00:00,2024-01-02 10:10:00,2024-01-02 10:30:00,C1.0,AR5\n",
     )
     index = _write(tmp_path, "index.csv", "timestamp,active_region\n2024-01-01 09:00:00,100\n")
-    builder = DatasetBuilder(24, BinaryThresholdStrategy(), target="active_region")
+    builder = DatasetBuilder(24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), target="active_region")
     assert _labels(builder, index, catalog) == [1]
 
 
@@ -181,7 +180,7 @@ def test_query_rejects_a_blank_region_instead_of_matching_the_full_disk(catalog)
 
 def test_whitespace_only_image_region_counts_as_missing(tmp_path, catalog):
     index = _write(tmp_path, "index.csv", 'timestamp,active_region\n2024-01-01 09:00:00,"   "\n2024-01-01 09:00:00,AR1\n')
-    builder = DatasetBuilder(24, BinaryThresholdStrategy(), target="active_region", missing_active_region="error")
+    builder = DatasetBuilder(24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), target="active_region", missing_active_region="error")
     with pytest.raises(ValueError, match="missing active_region"):
         builder.build(index, catalog)
 
@@ -190,8 +189,8 @@ def test_whitespace_only_image_region_counts_as_missing(tmp_path, catalog):
 
 def _builders_for_every_mode(**common):
     return [
-        DatasetBuilder(24, BinaryThresholdStrategy(), **common),
-        DatasetBuilder(24, BinaryThresholdStrategy(), cadence="1h", observation_window="2h", sliding_window="1h", **common),
+        DatasetBuilder(24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), **common),
+        DatasetBuilder(24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), cadence="1h", observation_window="2h", sliding_window="1h", **common),
     ]
 
 
@@ -215,12 +214,12 @@ def test_blank_image_timestamp_is_rejected_in_active_region_modes(tmp_path, cata
 def test_unparseable_image_timestamp_names_the_index_file(tmp_path, catalog):
     index = _write(tmp_path, "index.csv", "timestamp\n2024-01-01 00:00:00\nnot a date\n")
     with pytest.raises(ValueError, match=r"Image index at .*index\.csv has an unparseable value in column 'timestamp'"):
-        DatasetBuilder(24, BinaryThresholdStrategy()).build(index, catalog)
+        DatasetBuilder(24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M")).build(index, catalog)
 
 
 def test_header_only_image_index_still_builds_an_empty_result(tmp_path, catalog):
     index = _write(tmp_path, "index.csv", "timestamp\n")
-    out = DatasetBuilder(24, BinaryThresholdStrategy()).build(index, catalog)
+    out = DatasetBuilder(24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M")).build(index, catalog)
     assert out.empty and list(out.columns) == ["timestamp", "label"]
 
 
@@ -267,7 +266,7 @@ def test_image_index_with_offsets_is_converted_to_utc_without_warnings(tmp_path,
     index = _write(tmp_path, "index.csv", "timestamp\n2024-01-01T14:00:00+05:00\n2024-01-02T14:00:00+05:00\n")
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        out = DatasetBuilder(24, BinaryThresholdStrategy()).build(index, catalog)
+        out = DatasetBuilder(24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M")).build(index, catalog)
     assert out["timestamp"].tolist() == [pd.Timestamp("2024-01-01 09:00:00"), pd.Timestamp("2024-01-02 09:00:00")]
     assert out["label"].tolist() == [1, 0]
 
@@ -287,7 +286,7 @@ def test_query_with_an_offset_aware_image_time(catalog):
 def test_time_based_start_with_an_offset_is_converted_to_utc(tmp_path, catalog):
     index = _write(tmp_path, "index.csv", "timestamp\n2024-01-01 00:00:00\n2024-01-01 01:00:00\n2024-01-01 02:00:00\n")
     builder = DatasetBuilder(
-        24, BinaryThresholdStrategy(),
+        24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
         start="2024-01-01T05:00:00+05:00", cadence="1h", observation_window="2h", sliding_window="1h",
     )
     assert builder.start == pd.Timestamp("2024-01-01 00:00:00")
@@ -316,7 +315,7 @@ def test_mixed_naive_and_offset_cells_in_one_column_are_rejected_clearly(tmp_pat
     # The same rule for the image index and the adapter input.
     index = _write(tmp_path, "index.csv", "timestamp\n2024-01-01 09:00:00\n2024-01-01T09:00:00+05:00\n")
     with pytest.raises(ValueError, match=r"Image index at .*column 'timestamp' mixes times without a UTC offset"):
-        DatasetBuilder(24, BinaryThresholdStrategy()).build(index, catalog)
+        DatasetBuilder(24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M")).build(index, catalog)
     goes = _write(
         tmp_path, "goes.csv",
         GOES_HEADER
@@ -393,9 +392,9 @@ def test_offset_normalization_is_not_a_time_scale_correction():
 def test_prediction_window_number_means_hours_in_builder_and_query(tmp_path, catalog):
     index = _write(tmp_path, "index.csv", "timestamp\n2024-01-01 09:00:00\n")
     # The flare starts at 10:00: a 1-hour window [09:00, 10:00) misses it, a 2-hour one has it.
-    assert _labels(DatasetBuilder(1, BinaryThresholdStrategy()), index, catalog) == [0]
-    assert _labels(DatasetBuilder(2, BinaryThresholdStrategy()), index, catalog) == [1]
-    assert _labels(DatasetBuilder("2h", BinaryThresholdStrategy()), index, catalog) == [1]
+    assert _labels(DatasetBuilder(1, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M")), index, catalog) == [0]
+    assert _labels(DatasetBuilder(2, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M")), index, catalog) == [1]
+    assert _labels(DatasetBuilder("2h", reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M")), index, catalog) == [1]
     matcher = EventMatcher(catalog)
     assert matcher.query(T0, 1) == []
     assert len(matcher.query(T0, 2)) == 1
@@ -407,12 +406,12 @@ def test_prediction_window_number_means_hours_in_builder_and_query(tmp_path, cat
 def test_time_based_durations_reject_bare_numbers(name, number):
     params = {"cadence": "1h", "observation_window": "2h", "sliding_window": "1h", name: number}
     with pytest.raises(ValueError, match=f"{name} must be a duration with a unit .* got the bare number"):
-        DatasetBuilder(24, BinaryThresholdStrategy(), **params)
+        DatasetBuilder(24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), **params)
 
 
 def test_time_based_durations_accept_text_and_timedelta_forms():
     builder = DatasetBuilder(
-        24, BinaryThresholdStrategy(),
+        24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
         cadence="60min", observation_window=pd.Timedelta(hours=2),
         sliding_window=np.timedelta64(1, "h"),
     )
@@ -421,7 +420,7 @@ def test_time_based_durations_accept_text_and_timedelta_forms():
     assert builder.sliding_window == pd.Timedelta(hours=1)
     assert builder.number_of_images == 2
     builder = DatasetBuilder(
-        24, BinaryThresholdStrategy(),
+        24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
         cadence=datetime.timedelta(hours=1), observation_window="2h", sliding_window="1h",
     )
     assert builder.cadence == pd.Timedelta(hours=1)
@@ -451,7 +450,7 @@ def test_catalog_flare_with_blank_start_time_never_matches_and_build_warns(tmp_p
     assert matcher.query(T0, 24) == []
 
     with pytest.warns(UserWarning, match="1 of 2 flare\\(s\\) in the catalog at .* have no start_time"):
-        out = DatasetBuilder(24, BinaryThresholdStrategy()).build(index, path)
+        out = DatasetBuilder(24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M")).build(index, path)
     assert out["label"].tolist() == [0]
 
 
@@ -460,7 +459,7 @@ def test_blank_end_time_does_not_affect_matching_or_warn(tmp_path):
     index = _write(tmp_path, "index.csv", "timestamp\n2024-01-01 09:00:00\n")
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        out = DatasetBuilder(24, BinaryThresholdStrategy()).build(index, path)
+        out = DatasetBuilder(24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M")).build(index, path)
     assert out["label"].tolist() == [1]
 
 
@@ -514,10 +513,23 @@ def test_binary_labeler_rejects_non_finite_values(value):
         BinaryThresholdLabeler("M").assign(value)
 
 
-@pytest.mark.parametrize("strategy", [BinaryThresholdLabeler("M"), MaxFluxReducer(), "M", None])
-def test_a_strategy_without_label_is_rejected_clearly(strategy):
-    with pytest.raises(TypeError, match="must have a label\\(flares\\) method.*DatasetBuildingPipeline"):
-        DatasetBuilder(prediction_window=24, strategy=strategy)
+@pytest.mark.parametrize("reducer", [BinaryThresholdLabeler("M"), "max", None])
+def test_a_reducer_without_reduce_is_rejected_clearly(reducer):
+    with pytest.raises(TypeError, match="reducer=.* must have a reduce\\(flares\\) method"):
+        DatasetBuilder(prediction_window=24, reducer=reducer, labeler=BinaryThresholdLabeler("M"))
+
+
+@pytest.mark.parametrize("labeler", [MaxFluxReducer(), "M", None])
+def test_a_labeler_without_assign_is_rejected_clearly(labeler):
+    with pytest.raises(TypeError, match="labeler=.* must have an assign\\(value\\) method"):
+        DatasetBuilder(prediction_window=24, reducer=MaxFluxReducer(), labeler=labeler)
+
+
+def test_reducer_and_labeler_are_required_keywords():
+    with pytest.raises(TypeError):
+        DatasetBuilder(24, MaxFluxReducer(), BinaryThresholdLabeler("M"))
+    with pytest.raises(TypeError):
+        DatasetBuilder(prediction_window=24, reducer=MaxFluxReducer())
 
 
 def test_numpy_timedelta_is_a_valid_prediction_window():
@@ -529,7 +541,7 @@ def test_numpy_timedelta_is_a_valid_prediction_window():
 def test_yes_no_settings_must_be_true_or_false(tmp_path, value):
     index = _write(tmp_path, "index.csv", "timestamp\n2024-01-01 09:00:00\n2024-01-01 10:00:00\n")
     catalog = _write(tmp_path, "catalog.csv", CATALOG_HEADER + FLARE_ROW)
-    sequences = DatasetBuilder(24, BinaryThresholdStrategy(), cadence="1h", observation_window="1h", sliding_window="1h")
+    sequences = DatasetBuilder(24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), cadence="1h", observation_window="1h", sliding_window="1h")
     with pytest.raises(ValueError, match="return_report must be True or False"):
         sequences.build(index, catalog, return_report=value)
     for name in ("strict", "return_report"):

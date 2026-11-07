@@ -27,8 +27,9 @@ class DatasetBuildingPipeline:
     A label in two steps: a reducer turns the flares of a window into one
     value (reduce), and a labeler turns that value into the label (assign).
     Any objects with those methods work. extract_events, reduce_events and
-    assign_label run the steps one at a time; label(flares) runs both
-    steps, so a pipeline can be passed to a dataset class as strategy.
+    assign_label run the steps one at a time, and run_one runs all of them
+    for one reference time, so each intermediate value can be inspected.
+    The dataset classes take the same reducer and labeler directly.
     """
 
     def __init__(self, reducer, labeler):
@@ -71,8 +72,3 @@ class DatasetBuildingPipeline:
         reduced_value = self.reduce_events(events)
         label = self.assign_label(reduced_value)
         return PipelineResult(events=events, reduced_value=reduced_value, label=label)
-
-    def label(self, events: list[FlareEvent]):
-        """Reduce, then assign: the method the dataset classes call on their strategy."""
-        reduced_value = self.reduce_events(events)
-        return self.assign_label(reduced_value)

@@ -16,7 +16,7 @@ package and its tests need none of them.
 | [`11_tensorflow_active_region.py`](../11_tensorflow_active_region.py) | `FlareDataset` (`keras.utils.PyDataset`) | as 10 | `[B, 128, 128, 1]` |
 
 All examples label with a 24 h prediction window and
-`BinaryThresholdStrategy("M")`: a sample is 1 if an M- or X-class flare
+`MaxFluxReducer()` with `BinaryThresholdLabeler("M")`: a sample is 1 if an M- or X-class flare
 starts in `[t, t + 24h)`. The settings are written out in each script.
 The TensorFlow examples use the same data, decoder and label checks as the
 PyTorch ones and move the channel axis last before batching.

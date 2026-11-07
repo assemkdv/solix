@@ -108,7 +108,8 @@ def main(argv=None):
     # 2. Sequences and labels.
     builder = fidx.FullDiskSequence(
         prediction_window=PREDICTION_WINDOW,
-        strategy=fidx.BinaryThresholdStrategy("M"),  # 1 if any flare >= M1.0 in the window
+        reducer=fidx.MaxFluxReducer(),               # the strongest flare in the window
+        labeler=fidx.BinaryThresholdLabeler("M"),    # 1 if any flare >= M1.0 in the window
         cadence=CADENCE,
         observation_window=OBSERVATION_WINDOW,
         sliding_window=SLIDING_WINDOW,

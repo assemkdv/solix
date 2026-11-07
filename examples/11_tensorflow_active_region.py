@@ -95,7 +95,8 @@ def main(argv=None):
     # 2. Labels: only each patch's own region's flares count.
     builder = fidx.ActiveRegionSingleImage(
         prediction_window=PREDICTION_WINDOW,
-        strategy=fidx.BinaryThresholdStrategy("M"),  # 1 if a flare >= M1.0 from this region starts in the window
+        reducer=fidx.MaxFluxReducer(),               # the strongest flare in the window
+        labeler=fidx.BinaryThresholdLabeler("M"),    # 1 if a flare >= M1.0 from this region starts in the window
         include_metadata=True,                       # keep image_path
         include_flares=True,                         # show which flares made each label
     )

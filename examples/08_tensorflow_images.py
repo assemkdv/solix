@@ -98,7 +98,8 @@ def main(argv=None):
     # 2. Labels.
     builder = fidx.FullDiskSingleImage(
         prediction_window=PREDICTION_WINDOW,
-        strategy=fidx.BinaryThresholdStrategy("M"),  # 1 if any flare >= M1.0 in the window
+        reducer=fidx.MaxFluxReducer(),               # the strongest flare in the window
+        labeler=fidx.BinaryThresholdLabeler("M"),    # 1 if any flare >= M1.0 in the window
         include_metadata=True,                       # keep image_path
     )
     labels = builder.build(index_path, real.CATALOG)

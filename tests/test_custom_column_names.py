@@ -43,10 +43,10 @@ SEQUENCE = dict(cadence="6h", observation_window="12h", sliding_window="6h")
 
 
 @pytest.mark.parametrize("make, index", [
-    (lambda: f.FullDiskSingleImage("24h", f.BinaryThresholdStrategy("M"), include_metadata=True), FULL_DISK),
-    (lambda: f.FullDiskSequence("24h", f.MaxFlareStrategy(), **SEQUENCE), FULL_DISK),
-    (lambda: f.ActiveRegionSingleImage("24h", f.BinaryThresholdStrategy("M"), include_flares=True), ACTIVE_REGION),
-    (lambda: f.ActiveRegionSequence("24h", f.BinaryThresholdStrategy("C"), **SEQUENCE), ACTIVE_REGION),
+    (lambda: f.FullDiskSingleImage("24h", reducer=f.MaxFluxReducer(), labeler=f.BinaryThresholdLabeler("M"), include_metadata=True), FULL_DISK),
+    (lambda: f.FullDiskSequence("24h", reducer=f.MaxFluxReducer(), labeler=f.RegressionLabeler(), **SEQUENCE), FULL_DISK),
+    (lambda: f.ActiveRegionSingleImage("24h", reducer=f.MaxFluxReducer(), labeler=f.BinaryThresholdLabeler("M"), include_flares=True), ACTIVE_REGION),
+    (lambda: f.ActiveRegionSequence("24h", reducer=f.MaxFluxReducer(), labeler=f.BinaryThresholdLabeler("C"), **SEQUENCE), ACTIVE_REGION),
 ], ids=["full disk", "full disk sequence", "active region", "active region sequence"])
 def test_own_column_names_give_the_same_labels(tmp_path, renamed_catalog, make, index):
     names = INDEX_NAMES if index == ACTIVE_REGION else {"timestamp": "obs_time"}
@@ -61,19 +61,19 @@ def test_own_column_names_give_the_same_labels(tmp_path, renamed_catalog, make, 
 
 def test_other_columns_keep_their_own_names(tmp_path):
     index = _renamed(FULL_DISK, {"timestamp": "obs_time", "image_path": "file"}, tmp_path / "index.csv")
-    result = f.FullDiskSingleImage("24h", f.BinaryThresholdStrategy("M"), include_metadata=True).build(
+    result = f.FullDiskSingleImage("24h", reducer=f.MaxFluxReducer(), labeler=f.BinaryThresholdLabeler("M"), include_metadata=True).build(
         index, CATALOG, index_columns={"obs_time": "timestamp"})
     assert list(result.columns) == ["timestamp", "label", "file"]
 
 
 def test_without_the_settings_the_standard_names_are_required(renamed_catalog):
-    builder = f.FullDiskSingleImage("24h", f.BinaryThresholdStrategy("M"))
+    builder = f.FullDiskSingleImage("24h", reducer=f.MaxFluxReducer(), labeler=f.BinaryThresholdLabeler("M"))
     with pytest.raises(ValueError, match="missing required column\\(s\\): active_region, class, end_time"):
         builder.build(FULL_DISK, renamed_catalog)
 
 
 def test_a_mapping_to_the_same_name_changes_nothing():
-    builder = f.FullDiskSingleImage("24h", f.BinaryThresholdStrategy("M"))
+    builder = f.FullDiskSingleImage("24h", reducer=f.MaxFluxReducer(), labeler=f.BinaryThresholdLabeler("M"))
     pd.testing.assert_frame_equal(builder.build(FULL_DISK, CATALOG, index_columns={"timestamp": "timestamp"}),
                                   builder.build(FULL_DISK, CATALOG))
 
@@ -88,35 +88,35 @@ def test_a_mapping_to_the_same_name_changes_nothing():
 def test_index_column_mistakes_raise(tmp_path, index_columns, message):
     index = _renamed(FULL_DISK, {"timestamp": "obs_time"}, tmp_path / "index.csv")
     with pytest.raises(ValueError, match=message):
-        f.FullDiskSingleImage("24h", f.BinaryThresholdStrategy("M")).build(index, CATALOG, index_columns=index_columns)
+        f.FullDiskSingleImage("24h", reducer=f.MaxFluxReducer(), labeler=f.BinaryThresholdLabeler("M")).build(index, CATALOG, index_columns=index_columns)
 
 
 def test_an_existing_column_is_never_overwritten(tmp_path):
     index = tmp_path / "index.csv"
     pd.read_csv(FULL_DISK).assign(obs_time=lambda d: d["timestamp"]).to_csv(index, index=False)
     with pytest.raises(ValueError, match="already has a column 'timestamp'"):
-        f.FullDiskSingleImage("24h", f.BinaryThresholdStrategy("M")).build(
+        f.FullDiskSingleImage("24h", reducer=f.MaxFluxReducer(), labeler=f.BinaryThresholdLabeler("M")).build(
             index, CATALOG, index_columns={"obs_time": "timestamp"})
 
 
 def test_swapping_two_columns_is_allowed(tmp_path):
     # Renaming a away and b onto a's name does not overwrite anything.
     catalog = _renamed(CATALOG, {"start_time": "peak_time", "peak_time": "start_time"}, tmp_path / "catalog.csv")
-    builder = f.FullDiskSingleImage("24h", f.BinaryThresholdStrategy("M"))
+    builder = f.FullDiskSingleImage("24h", reducer=f.MaxFluxReducer(), labeler=f.BinaryThresholdLabeler("M"))
     result = builder.build(FULL_DISK, catalog, catalog_columns={"peak_time": "start_time", "start_time": "peak_time"})
     pd.testing.assert_frame_equal(result, builder.build(FULL_DISK, CATALOG))
 
 
 def test_catalog_column_mistake_names_the_catalog(renamed_catalog):
     with pytest.raises(ValueError, match="catalog_columns names column 'Class', but Flare catalog at .* has no such"):
-        f.FullDiskSingleImage("24h", f.BinaryThresholdStrategy("M")).build(
+        f.FullDiskSingleImage("24h", reducer=f.MaxFluxReducer(), labeler=f.BinaryThresholdLabeler("M")).build(
             FULL_DISK, renamed_catalog, catalog_columns={"Class": "class"})
 
 
 @pytest.mark.parametrize("bad", [["obs_time"], "obs_time", {"obs_time": 1}])
 def test_the_setting_must_be_a_dict_of_names(bad):
     with pytest.raises(TypeError, match="index_columns must"):
-        f.FullDiskSingleImage("24h", f.BinaryThresholdStrategy("M")).build(FULL_DISK, CATALOG, index_columns=bad)
+        f.FullDiskSingleImage("24h", reducer=f.MaxFluxReducer(), labeler=f.BinaryThresholdLabeler("M")).build(FULL_DISK, CATALOG, index_columns=bad)
 
 
 def test_add_relative_flux_with_own_column_names(tmp_path, renamed_catalog):

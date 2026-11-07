@@ -4,9 +4,8 @@ The package is layered; this test keeps it that way.
     goes_class                 (GOES class <-> flux; no package imports)
     events, labelers           (only goes_class)
     reducers                   (goes_class, events)
-    strategies                 (events, reducers, labelers)
     pipeline                   (events only; reducer and labeler are passed in as objects)
-    builder                    (events only; strategies are passed in as objects)
+    builder                    (events only; reducers and labelers are passed in as objects)
     datasets                   (builder; the four dataset classes)
     loaders                    (goes_class, events; input adapters, outside the core)
 
@@ -26,7 +25,6 @@ ALLOWED = {
     "events": {"goes_class"},
     "labelers": {"goes_class"},
     "reducers": {"goes_class", "events"},
-    "strategies": {"events", "labelers", "reducers"},
     "pipeline": {"events"},
     "builder": {"events"},
     "datasets": {"builder"},

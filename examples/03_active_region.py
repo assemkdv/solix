@@ -27,7 +27,7 @@ OUTPUT = Path(__file__).parent / "output"
 
 def build(**kwargs):
     return fidx.ActiveRegionSingleImage(
-        prediction_window=24, strategy=fidx.BinaryThresholdStrategy("M"),
+        prediction_window=24, reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"),
         include_metadata=True, **kwargs,
     ).build(INDEX, CATALOG)
 
@@ -64,7 +64,7 @@ def main():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         sequences, report = fidx.ActiveRegionSequence(
-            prediction_window=24, strategy=fidx.BinaryThresholdStrategy("M"),
+            prediction_window=24, reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"),
             missing_active_region="drop",
             cadence="6h", observation_window="12h", sliding_window="6h",
         ).build(INDEX, CATALOG, return_report=True)

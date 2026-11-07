@@ -8,8 +8,9 @@ import warnings
 import pandas as pd
 import pytest
 
-from flare_indexer import BinaryThresholdStrategy, MaxFlareStrategy
+
 from flare_indexer.builder import DatasetBuilder
+from flare_indexer import MaxFluxReducer, BinaryThresholdLabeler, RegressionLabeler
 
 
 def _write(path, text):
@@ -40,7 +41,8 @@ def _hourly_index(tmp_path, regions_by_hour, name="index.csv"):
 
 def _build(index_path, catalog_path, **kwargs):
     kwargs.setdefault("prediction_window", 24)
-    kwargs.setdefault("strategy", BinaryThresholdStrategy())
+    kwargs.setdefault("reducer", MaxFluxReducer())
+    kwargs.setdefault("labeler", BinaryThresholdLabeler("M"))
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         return DatasetBuilder(target="active_region", **kwargs).build(index_path, catalog_path)
@@ -78,7 +80,7 @@ def test_time_based_report_lists_skips_per_region(tmp_path, catalog):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         _, report = DatasetBuilder(
-            prediction_window=24, strategy=BinaryThresholdStrategy(), target="active_region", **TIME_BASED,
+            prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), target="active_region", **TIME_BASED,
         ).build(index, catalog, return_report=True)
 
     assert report.region_count == 2
@@ -136,7 +138,7 @@ def test_missing_region_rows_never_join_a_region_sequence(tmp_path, catalog):
     index = _hourly_index(tmp_path, {0: [100], 1: [100, None], 2: [100]})
     with pytest.warns(UserWarning, match="1 image\\(s\\) have a missing active_region"):
         result = DatasetBuilder(
-            prediction_window=24, strategy=BinaryThresholdStrategy(), target="active_region", **TIME_BASED,
+            prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), target="active_region", **TIME_BASED,
         ).build(index, catalog)
     assert result["active_region"].tolist() == ["100"]
     assert "p_na_01.jpg" not in result["image_path"].iloc[0]
@@ -156,9 +158,9 @@ def test_missing_region_error_policy_names_rows(tmp_path, catalog):
         _build(index, catalog, missing_active_region="error", **TIME_BASED)
 
 
-def test_max_flare_strategy_per_region(tmp_path, catalog):
+def test_max_flux_label_per_region(tmp_path, catalog):
     index = _hourly_index(tmp_path, {h: [100, 200] for h in range(3)})
-    result = _build(index, catalog, strategy=MaxFlareStrategy(), **TIME_BASED)
+    result = _build(index, catalog, reducer=MaxFluxReducer(), labeler=RegressionLabeler(), **TIME_BASED)
     assert result.set_index("active_region")["label"].to_dict() == {"100": pytest.approx(2e-5), "200": pytest.approx(5e-6)}
 
 
@@ -173,4 +175,4 @@ def test_single_region_gives_one_sequence_per_start(tmp_path, catalog):
 def test_full_disk_sequences_still_reject_duplicate_timestamps(tmp_path, catalog):
     index = _hourly_index(tmp_path, {h: [100, 200] for h in range(3)})
     with pytest.raises(ValueError, match="contains duplicate timestamp\\(s\\): "):
-        DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy(), **TIME_BASED).build(index, catalog)
+        DatasetBuilder(prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), **TIME_BASED).build(index, catalog)

@@ -2,7 +2,8 @@ import pandas as pd
 import pytest
 
 from flare_indexer.builder import DatasetBuilder, SequenceBuildReport
-from flare_indexer.strategies import BinaryThresholdStrategy, MaxFlareStrategy
+from flare_indexer import MaxFluxReducer, BinaryThresholdLabeler, RegressionLabeler
+
 
 
 def _write_index(tmp_path, timestamps, extra_columns=None, active_regions=None, name="index.csv"):
@@ -44,7 +45,7 @@ def _catalog_with_flare(tmp_path, date, start, peak, end, cls, active_region):
 def test_missing_cadence_raises():
     with pytest.raises(ValueError) as excinfo:
         DatasetBuilder(
-            prediction_window=24, strategy=BinaryThresholdStrategy(),
+            prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
             observation_window="6h", sliding_window="3h",
         )
     assert "cadence" in str(excinfo.value)
@@ -53,7 +54,7 @@ def test_missing_cadence_raises():
 def test_missing_observation_window_raises():
     with pytest.raises(ValueError) as excinfo:
         DatasetBuilder(
-            prediction_window=24, strategy=BinaryThresholdStrategy(),
+            prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
             cadence="1h", sliding_window="3h",
         )
     assert "observation_window" in str(excinfo.value)
@@ -62,7 +63,7 @@ def test_missing_observation_window_raises():
 def test_missing_sliding_window_raises():
     with pytest.raises(ValueError) as excinfo:
         DatasetBuilder(
-            prediction_window=24, strategy=BinaryThresholdStrategy(),
+            prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
             cadence="1h", observation_window="6h",
         )
     assert "sliding_window" in str(excinfo.value)
@@ -71,7 +72,7 @@ def test_missing_sliding_window_raises():
 def test_zero_duration_cadence_raises():
     with pytest.raises(ValueError) as excinfo:
         DatasetBuilder(
-            prediction_window=24, strategy=BinaryThresholdStrategy(),
+            prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
             cadence="0h", observation_window="6h", sliding_window="3h",
         )
     assert "cadence" in str(excinfo.value)
@@ -80,7 +81,7 @@ def test_zero_duration_cadence_raises():
 def test_negative_duration_observation_window_raises():
     with pytest.raises(ValueError) as excinfo:
         DatasetBuilder(
-            prediction_window=24, strategy=BinaryThresholdStrategy(),
+            prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
             cadence="1h", observation_window="-6h", sliding_window="3h",
         )
     assert "observation_window" in str(excinfo.value)
@@ -89,7 +90,7 @@ def test_negative_duration_observation_window_raises():
 def test_invalid_duration_string_raises():
     with pytest.raises(ValueError) as excinfo:
         DatasetBuilder(
-            prediction_window=24, strategy=BinaryThresholdStrategy(),
+            prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
             cadence="banana", observation_window="6h", sliding_window="3h",
         )
     assert "cadence" in str(excinfo.value)
@@ -98,7 +99,7 @@ def test_invalid_duration_string_raises():
 def test_observation_window_not_divisible_by_cadence_raises():
     with pytest.raises(ValueError) as excinfo:
         DatasetBuilder(
-            prediction_window=24, strategy=BinaryThresholdStrategy(),
+            prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
             cadence="1h", observation_window="90min", sliding_window="3h",
         )
     assert "observation_window" in str(excinfo.value)
@@ -108,7 +109,7 @@ def test_sliding_window_smaller_than_cadence(tmp_path):
     # 12-minute images, hourly sequences of 3 images, a new one every 12 minutes.
     timestamps = list(pd.date_range("2024-03-01", periods=16, freq="12min"))
     builder = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(),
+        prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
         cadence="1h", observation_window="3h", sliding_window="12min",
     )
     result = builder.build(_write_index(tmp_path, timestamps), _empty_catalog(tmp_path))
@@ -120,7 +121,7 @@ def test_sliding_window_smaller_than_cadence(tmp_path):
 def test_sliding_window_between_images_raises(tmp_path, target):
     index = _write_index(tmp_path, _hourly("2024-03-01", 12), active_regions=[13600] * 12)
     builder = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(), target=target,
+        prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), target=target,
         cadence="2h", observation_window="4h", sliding_window="90min",
     )
     with pytest.raises(ValueError, match="sliding_window 0 days 01:30:00 is not an exact multiple"):
@@ -130,7 +131,7 @@ def test_sliding_window_between_images_raises(tmp_path, target):
 def test_invalid_start_value_raises():
     with pytest.raises(ValueError) as excinfo:
         DatasetBuilder(
-            prediction_window=24, strategy=BinaryThresholdStrategy(),
+            prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
             start="not-a-date", cadence="1h", observation_window="6h", sliding_window="3h",
         )
     assert "start" in str(excinfo.value)
@@ -147,7 +148,7 @@ def test_six_images_per_sequence_and_expected_starts_ends(tmp_path):
     catalog_path = _empty_catalog(tmp_path)
 
     builder = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(),
+        prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
         cadence="1h", observation_window="6h", sliding_window="3h",
     )
     result = builder.build(index_path, catalog_path)
@@ -171,7 +172,7 @@ def test_observation_window_is_half_open_last_image_at_t_plus_5h(tmp_path):
     catalog_path = _empty_catalog(tmp_path)
 
     builder = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(),
+        prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
         cadence="1h", observation_window="6h", sliding_window="6h",
     )
     result = builder.build(index_path, catalog_path)
@@ -193,7 +194,7 @@ def test_label_uses_final_image_timestamp_not_sequence_start(tmp_path):
 
     builder = DatasetBuilder(
         prediction_window=0.1,  # 6 minutes
-        strategy=BinaryThresholdStrategy(),
+        reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
         cadence="1h", observation_window="6h", sliding_window="6h",
     )
     result = builder.build(index_path, catalog_path)
@@ -208,7 +209,7 @@ def test_insufficient_data_returns_empty_dataframe_with_correct_schema(tmp_path)
     catalog_path = _empty_catalog(tmp_path)
 
     builder = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(),
+        prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
         cadence="1h", observation_window="6h", sliding_window="3h",
     )
     result = builder.build(index_path, catalog_path)
@@ -224,7 +225,7 @@ def test_missing_required_timestamp_skips_sequence_later_one_still_emitted(tmp_p
     catalog_path = _empty_catalog(tmp_path)
 
     builder = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(),
+        prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
         cadence="1h", observation_window="6h", sliding_window="3h",
     )
     result, report = builder.build(index_path, catalog_path, return_report=True)
@@ -252,7 +253,7 @@ def test_no_interpolation_or_substitution_for_missing_timestamp(tmp_path):
     catalog_path = _empty_catalog(tmp_path)
 
     builder = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(),
+        prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
         cadence="1h", observation_window="6h", sliding_window="6h",
     )
     result = builder.build(index_path, catalog_path)
@@ -269,7 +270,7 @@ def test_downsampling_thirty_minute_source_to_hourly_cadence(tmp_path):
     catalog_path = _empty_catalog(tmp_path)
 
     builder = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(),
+        prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
         cadence="1h", observation_window="4h", sliding_window="4h",
     )
     result = builder.build(index_path, catalog_path)
@@ -293,7 +294,7 @@ def test_start_omitted_uses_earliest_timestamp(tmp_path):
     catalog_path = _empty_catalog(tmp_path)
 
     builder = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(),
+        prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
         cadence="1h", observation_window="6h", sliding_window="3h",
     )
     _, report = builder.build(index_path, catalog_path, return_report=True)
@@ -307,7 +308,7 @@ def test_explicit_start_present_excludes_earlier_images(tmp_path):
     catalog_path = _empty_catalog(tmp_path)
 
     builder = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(),
+        prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
         start="2024-01-01T02:00:00", cadence="1h", observation_window="6h", sliding_window="3h",
     )
     result, report = builder.build(index_path, catalog_path, return_report=True)
@@ -325,7 +326,7 @@ def test_start_missing_exact_timestamp_raises(tmp_path):
     catalog_path = _empty_catalog(tmp_path)
 
     builder = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(),
+        prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
         start="2024-01-01T02:30:00",  # not an exact hourly timestamp
         cadence="1h", observation_window="6h", sliding_window="3h",
     )
@@ -341,7 +342,7 @@ def test_start_before_dataset_raises(tmp_path):
     catalog_path = _empty_catalog(tmp_path)
 
     builder = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(),
+        prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
         start="2023-12-31T00:00:00", cadence="1h", observation_window="6h", sliding_window="3h",
     )
     with pytest.raises(ValueError) as excinfo:
@@ -356,7 +357,7 @@ def test_start_after_dataset_raises(tmp_path):
     catalog_path = _empty_catalog(tmp_path)
 
     builder = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(),
+        prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
         start="2024-06-01T00:00:00", cadence="1h", observation_window="6h", sliding_window="3h",
     )
     with pytest.raises(ValueError) as excinfo:
@@ -374,7 +375,7 @@ def test_hourly_source_rejects_one_minute_cadence(tmp_path):
     catalog_path = _empty_catalog(tmp_path)
 
     builder = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(),
+        prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
         cadence="1min", observation_window="6min", sliding_window="6min",
     )
     with pytest.raises(ValueError) as excinfo:
@@ -388,7 +389,7 @@ def test_hourly_source_accepts_three_hour_cadence(tmp_path):
     catalog_path = _empty_catalog(tmp_path)
 
     builder = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(),
+        prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
         cadence="3h", observation_window="6h", sliding_window="6h",
     )
     result, report = builder.build(index_path, catalog_path, return_report=True)
@@ -405,7 +406,7 @@ def test_hourly_source_rejects_ninety_minute_cadence(tmp_path):
     catalog_path = _empty_catalog(tmp_path)
 
     builder = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(),
+        prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
         cadence="90min", observation_window="90min", sliding_window="90min",
     )
     with pytest.raises(ValueError) as excinfo:
@@ -423,7 +424,7 @@ def test_occasional_gaps_do_not_corrupt_base_cadence_inference(tmp_path):
     catalog_path = _empty_catalog(tmp_path)
 
     builder = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(),
+        prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
         cadence="1h", observation_window="3h", sliding_window="3h",
     )
     result, report = builder.build(index_path, catalog_path, return_report=True)
@@ -435,7 +436,7 @@ def test_fewer_than_two_unique_timestamps_raises(tmp_path):
     catalog_path = _empty_catalog(tmp_path)
 
     builder = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(),
+        prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
         cadence="1h", observation_window="6h", sliding_window="3h",
     )
     with pytest.raises(ValueError) as excinfo:
@@ -452,7 +453,7 @@ def test_return_report_default_false_returns_dataframe_only(tmp_path):
     catalog_path = _empty_catalog(tmp_path)
 
     builder = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(),
+        prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
         cadence="1h", observation_window="6h", sliding_window="3h",
     )
     result = builder.build(index_path, catalog_path)
@@ -465,7 +466,7 @@ def test_return_report_true_returns_dataframe_and_report(tmp_path):
     catalog_path = _empty_catalog(tmp_path)
 
     builder = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(),
+        prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
         cadence="1h", observation_window="6h", sliding_window="3h",
     )
     result, report = builder.build(index_path, catalog_path, return_report=True)
@@ -481,7 +482,7 @@ def test_return_report_true_in_single_image_mode_raises(tmp_path):
     catalog_path = _empty_catalog(tmp_path)
     index_path = _write_index(tmp_path, _hourly("2024-01-01T00:00:00", 3))
 
-    builder = DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy())
+    builder = DatasetBuilder(prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"))
     with pytest.raises(ValueError) as excinfo:
         builder.build(index_path, catalog_path, return_report=True)
     assert "return_report" in str(excinfo.value)
@@ -494,14 +495,14 @@ def test_default_is_single_image_mode(tmp_path):
     index_path = _write_index(tmp_path, timestamps)
     catalog_path = _empty_catalog(tmp_path)
 
-    builder = DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy())
+    builder = DatasetBuilder(prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"))
     assert builder.time_based is False
 
     result = builder.build(index_path, catalog_path)
     assert list(result.columns) == ["timestamp", "label"]
 
 
-# ── start-time matching / window boundary / MaxFlareStrategy ──────────────
+# ── start-time matching / window boundary / max-flux labels ──────────────
 
 
 def test_time_based_flare_counts_by_start_time(tmp_path):
@@ -513,7 +514,7 @@ def test_time_based_flare_counts_by_start_time(tmp_path):
 
     builder = DatasetBuilder(
         prediction_window=0.1,  # 6 minutes: [05:00, 05:06) catches start=05:05, not peak=05:10
-        strategy=BinaryThresholdStrategy(),
+        reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
         cadence="1h", observation_window="6h", sliding_window="6h",
     )
     result = builder.build(index_path, catalog_path)
@@ -527,20 +528,20 @@ def test_time_based_window_excludes_its_end(tmp_path):
     catalog_path = _catalog_with_flare(tmp_path, "2024-01-01", "0600", "0600", "0605", "X1.0", "4456")
 
     builder = DatasetBuilder(
-        prediction_window=1, strategy=BinaryThresholdStrategy(),
+        prediction_window=1, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
         cadence="1h", observation_window="6h", sliding_window="6h",
     )
     result = builder.build(index_path, catalog_path)
     assert result.iloc[0]["label"] == 0
 
 
-def test_time_based_max_flare_strategy(tmp_path):
+def test_time_based_max_flux_labels(tmp_path):
     timestamps = _hourly("2024-01-01T00:00:00", 6)
     index_path = _write_index(tmp_path, timestamps)
     catalog_path = _catalog_with_flare(tmp_path, "2024-01-01", "0501", "0501", "0505", "M2.3", "4456")
 
     builder = DatasetBuilder(
-        prediction_window=24, strategy=MaxFlareStrategy(),
+        prediction_window=24, reducer=MaxFluxReducer(), labeler=RegressionLabeler(),
         cadence="1h", observation_window="6h", sliding_window="6h",
     )
     result = builder.build(index_path, catalog_path)
@@ -555,7 +556,7 @@ def test_time_based_preserves_extra_columns(tmp_path):
     catalog_path = _empty_catalog(tmp_path)
 
     builder = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(),
+        prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
         cadence="1h", observation_window="6h", sliding_window="6h",
     )
     result = builder.build(index_path, catalog_path)
@@ -573,7 +574,7 @@ def test_active_region_time_based_basic(tmp_path):
     catalog_path = _catalog_with_flare(tmp_path, "2024-01-01", "1301", "1301", "1305", "M1.0", "3559")
 
     builder = DatasetBuilder(
-        prediction_window=1, strategy=BinaryThresholdStrategy(), target="active_region",
+        prediction_window=1, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), target="active_region",
         cadence="1h", observation_window="6h", sliding_window="6h",
     )
     result = builder.build(index_path, catalog_path)
@@ -597,7 +598,7 @@ def test_active_region_time_based_regions_are_grouped(tmp_path):
     catalog_path = _empty_catalog(tmp_path)
 
     builder = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(), target="active_region",
+        prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), target="active_region",
         cadence="1h", observation_window="6h", sliding_window="6h",
     )
     result, report = builder.build(index_path, catalog_path, return_report=True)
@@ -616,7 +617,7 @@ def test_active_region_time_based_missing_active_region_breaks_the_region_grid(t
     catalog_path = _catalog_with_flare(tmp_path, "2024-01-01", "0500", "0500", "0505", "X1.0", "3559")
 
     builder = DatasetBuilder(
-        prediction_window=1, strategy=BinaryThresholdStrategy(), target="active_region",
+        prediction_window=1, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), target="active_region",
         cadence="1h", observation_window="6h", sliding_window="6h",
     )
     with pytest.warns(UserWarning, match="missing active_region"):
@@ -633,7 +634,7 @@ def test_active_region_time_based_with_report(tmp_path):
     catalog_path = _empty_catalog(tmp_path)
 
     builder = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(), target="active_region",
+        prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), target="active_region",
         cadence="1h", observation_window="6h", sliding_window="6h",
     )
     result, report = builder.build(index_path, catalog_path, return_report=True)

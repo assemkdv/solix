@@ -44,7 +44,7 @@ EXPECTED_SEQUENCE_ENDS = {"2017-09-03 02:59:49.900": 0, "2017-09-03 03:59:49.900
 
 def _builder(**sequence):
     return DatasetBuilder(
-        prediction_window="24h", strategy=fidx.BinaryThresholdStrategy("M"), target="full_disk",
+        prediction_window="24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"), target="full_disk",
         include_metadata=not sequence, **sequence,
     )
 
@@ -271,7 +271,7 @@ def test_patch_labels_count_only_each_regions_own_flares(tmp_path):
         manifest = pd.read_csv(real.SHARP_MANIFEST)
         pd.DataFrame({"timestamp": manifest["timestamp"], "active_region": manifest["noaa_ar"],
                       "image_path": manifest["image_path"]}).to_csv(index_path, index=False)
-    labels = fidx.ActiveRegionSingleImage("24h", fidx.BinaryThresholdStrategy("M")).build(index_path, real.CATALOG)
+    labels = fidx.ActiveRegionSingleImage("24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M")).build(index_path, real.CATALOG)
     got = {(t, r): label for t, r, label in zip(labels["timestamp"], labels["active_region"], labels["label"])}
     assert {key: value for key, value in got.items() if value} == EXPECTED_PATCH_LABELS
     assert len(got) == 16

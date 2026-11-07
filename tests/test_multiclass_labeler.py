@@ -25,6 +25,10 @@ def _multiclass_pipeline():
     return fidx.DatasetBuildingPipeline(reducer=fidx.MaxFluxReducer(), labeler=fidx.MulticlassLabeler())
 
 
+def _label(pipeline, events):
+    return pipeline.assign_label(pipeline.reduce_events(events))
+
+
 # ── assign() ─────────────────────────────────────────────────────────────
 
 def test_classes_attribute_lists_labels_in_flux_order():
@@ -37,7 +41,7 @@ def test_zero_flux_is_no_flare(value):
 
 
 def test_no_events_through_the_pipeline_is_no_flare():
-    assert _multiclass_pipeline().label([]) == "NF"
+    assert _label(_multiclass_pipeline(), []) == "NF"
 
 
 @pytest.mark.parametrize("goes_class, expected", [
@@ -96,9 +100,10 @@ def test_binary_m_threshold_agrees_with_multiclass(value):
 
 def test_binary_and_multiclass_agree_on_c10_through_the_pipeline():
     events = [_event("C10.0")]
-    assert fidx.BinaryThresholdStrategy("M").label(events) == 1
-    assert _multiclass_pipeline().label(events) == "M"
-    assert fidx.MaxFlareStrategy().label(events) == fidx.MaxFlareStrategy().label([_event("M1.0")]) == 1e-5
+    strongest = fidx.MaxFluxReducer().reduce(events)
+    assert fidx.BinaryThresholdLabeler("M").assign(strongest) == 1
+    assert _label(_multiclass_pipeline(), events) == "M"
+    assert fidx.RegressionLabeler().assign(strongest) == fidx.MaxFluxReducer().reduce([_event("M1.0")]) == 1e-5
 
 
 def test_m10_and_x1_are_both_x_numerically_not_by_text():
@@ -106,12 +111,12 @@ def test_m10_and_x1_are_both_x_numerically_not_by_text():
     assert labeler.assign(flux("M10.0")) == labeler.assign(flux("X1.0")) == "X"
     # Text ordering would put "M10.0" before "M9.0" and both before "X1.0".
     assert labeler.assign(flux("M9.0")) == "M"
-    assert _multiclass_pipeline().label([_event("M9.0"), _event("M10.0")]) == "X"
+    assert _label(_multiclass_pipeline(), [_event("M9.0"), _event("M10.0")]) == "X"
 
 
 def test_label_reflects_the_strongest_flare_not_every_class_present():
     events = [_event("C2.0")] * 10 + [_event("X1.0"), _event("B1.0")]
-    assert _multiclass_pipeline().label(events) == "X"
+    assert _label(_multiclass_pipeline(), events) == "X"
 
 
 @pytest.mark.parametrize("value", [np.float64(2.3e-5), np.float32(2.3e-5), Fraction(23, 1_000_000)])
@@ -161,9 +166,10 @@ def catalog(tmp_path):
     return path
 
 
-def _builder(strategy, **kwargs):
-    return DatasetBuilder(prediction_window="12h", strategy=strategy,
-                               **kwargs)
+def _builder(pipeline=None, **kwargs):
+    if pipeline is not None:
+        kwargs.update(reducer=pipeline.reducer, labeler=pipeline.labeler)
+    return DatasetBuilder(prediction_window="12h", **kwargs)
 
 
 @pytest.fixture
@@ -185,8 +191,8 @@ def test_single_image_full_disk(catalog, full_disk_index):
 
 def test_multiclass_agrees_with_binary_and_regression_on_the_same_windows(catalog, full_disk_index):
     multiclass = _builder(_multiclass_pipeline()).build(full_disk_index, catalog)["label"]
-    binary = _builder(fidx.BinaryThresholdStrategy("M")).build(full_disk_index, catalog)["label"]
-    regression = _builder(fidx.MaxFlareStrategy()).build(full_disk_index, catalog)["label"]
+    binary = _builder(reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M")).build(full_disk_index, catalog)["label"]
+    regression = _builder(reducer=fidx.MaxFluxReducer(), labeler=fidx.RegressionLabeler()).build(full_disk_index, catalog)["label"]
 
     # Multiclass M/X matches the binary M threshold on every window.
     assert binary.tolist() == [1, 0, 0, 0, 0, 0, 1, 0]

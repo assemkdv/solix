@@ -1,7 +1,8 @@
 import pandas as pd
 import pytest
 from flare_indexer.builder import DatasetBuilder
-from flare_indexer.strategies import BinaryThresholdStrategy, MaxFlareStrategy
+from flare_indexer import MaxFluxReducer, BinaryThresholdLabeler, RegressionLabeler
+
 
 
 def _write_valid_catalog(tmp_path):
@@ -30,7 +31,7 @@ def test_build_missing_timestamp_column_raises(tmp_path):
     index_path.write_text("not_timestamp\n2024-01-01T00:00:00\n")
     catalog_path = _write_valid_catalog(tmp_path)
 
-    builder = DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy())
+    builder = DatasetBuilder(prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"))
 
     with pytest.raises(ValueError) as excinfo:
         builder.build(index_path, catalog_path)
@@ -45,7 +46,7 @@ def test_build_completely_empty_image_index_raises(tmp_path):
     index_path.write_text("")
     catalog_path = _write_valid_catalog(tmp_path)
 
-    builder = DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy())
+    builder = DatasetBuilder(prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"))
 
     with pytest.raises(ValueError) as excinfo:
         builder.build(index_path, catalog_path)
@@ -62,7 +63,7 @@ def test_build_produces_expected_timestamp_and_label_columns(tmp_path):
         "2024-01-03T00:00:00\n"
     )
 
-    builder = DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy())
+    builder = DatasetBuilder(prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"))
     result = builder.build(index_path, catalog_path)
 
     assert list(result.columns) == ["timestamp", "label"]
@@ -85,7 +86,7 @@ def test_build_preserves_image_timestamp_order(tmp_path):
         "2024-01-01T00:00:00\n"
     )
 
-    builder = DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy())
+    builder = DatasetBuilder(prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"))
     result = builder.build(index_path, catalog_path)
 
     assert result["timestamp"].tolist() == [
@@ -95,7 +96,7 @@ def test_build_preserves_image_timestamp_order(tmp_path):
     assert result["label"].tolist() == [0, 1]
 
 
-def test_build_works_with_max_flare_strategy(tmp_path):
+def test_build_works_with_max_flux_labels(tmp_path):
     catalog_path = _write_two_flare_catalog(tmp_path)
     index_path = tmp_path / "index.csv"
     index_path.write_text(
@@ -104,7 +105,7 @@ def test_build_works_with_max_flare_strategy(tmp_path):
         "2024-01-03T00:00:00\n"
     )
 
-    builder = DatasetBuilder(prediction_window=24, strategy=MaxFlareStrategy())
+    builder = DatasetBuilder(prediction_window=24, reducer=MaxFluxReducer(), labeler=RegressionLabeler())
     result = builder.build(index_path, catalog_path)
 
     assert result["label"].tolist() == [5e-5, 3e-6]
@@ -113,7 +114,7 @@ def test_build_works_with_max_flare_strategy(tmp_path):
 # ── Active-region single-image labeling tests ───────────────────────────
 
 
-def test_active_region_works_with_max_flare_strategy(tmp_path):
+def test_active_region_works_with_max_flux_labels(tmp_path):
     catalog_path = tmp_path / "catalog.csv"
     catalog_path.write_text(
         "start_time,peak_time,end_time,class,active_region\n"
@@ -126,7 +127,7 @@ def test_active_region_works_with_max_flare_strategy(tmp_path):
         "2024-01-23T00:00:00,3559\n"
     )
 
-    builder = DatasetBuilder(prediction_window=24, strategy=MaxFlareStrategy(), target="active_region")
+    builder = DatasetBuilder(prediction_window=24, reducer=MaxFluxReducer(), labeler=RegressionLabeler(), target="active_region")
     result = builder.build(index_path, catalog_path)
 
     # The stronger X9.0 flare belongs to a different region and must be
@@ -150,7 +151,7 @@ def test_active_region_image_side_values_normalize_to_match_catalog(tmp_path):
         "2024-01-25T00:00:00,\n"
     )
 
-    builder = DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy(), target="active_region")
+    builder = DatasetBuilder(prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), target="active_region")
     with pytest.warns(UserWarning, match="missing active_region"):
         result = builder.build(index_path, catalog_path)
 
@@ -170,7 +171,7 @@ def test_active_region_missing_image_side_value_matches_nothing(tmp_path):
         "2024-01-23T01:00:00,\n"
     )
 
-    builder = DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy(), target="active_region")
+    builder = DatasetBuilder(prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), target="active_region")
     with pytest.warns(UserWarning, match="missing active_region"):
         result = builder.build(index_path, catalog_path)
 
@@ -189,7 +190,7 @@ def test_active_region_requires_active_region_column(tmp_path):
         "2024-01-23T00:00:00\n"
     )
 
-    builder = DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy(), target="active_region")
+    builder = DatasetBuilder(prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), target="active_region")
 
     with pytest.raises(ValueError) as excinfo:
         builder.build(index_path, catalog_path)
@@ -201,7 +202,7 @@ def test_active_region_requires_active_region_column(tmp_path):
 
 def test_invalid_target_raises():
     with pytest.raises(ValueError) as excinfo:
-        DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy(), target="something_else")
+        DatasetBuilder(prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), target="something_else")
 
     assert "target" in str(excinfo.value)
 
@@ -215,9 +216,9 @@ def test_full_disk_target_explicit_matches_default(tmp_path):
         "2024-01-03T00:00:00\n"
     )
 
-    default_builder = DatasetBuilder(prediction_window=24, strategy=BinaryThresholdStrategy())
+    default_builder = DatasetBuilder(prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"))
     explicit_builder = DatasetBuilder(
-        prediction_window=24, strategy=BinaryThresholdStrategy(), target="full_disk"
+        prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), target="full_disk"
     )
 
     default_result = default_builder.build(index_path, catalog_path)
@@ -246,7 +247,7 @@ def test_active_region_sequence_stronger_flare_from_other_region_ignored(tmp_pat
 
     builder = DatasetBuilder(
         prediction_window=1,
-        strategy=BinaryThresholdStrategy(threshold="X"),
+        reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("X"),
         target="active_region",
         cadence="12min", observation_window="36min", sliding_window="12min",
     )
@@ -268,7 +269,7 @@ def test_active_region_sequence_requires_active_region_column(tmp_path):
 
     builder = DatasetBuilder(
         prediction_window=24,
-        strategy=BinaryThresholdStrategy(),
+        reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
         target="active_region",
         cadence="12min", observation_window="24min", sliding_window="12min",
     )
@@ -293,7 +294,7 @@ def test_a_flare_counts_by_its_start_time(tmp_path):
     index_path = tmp_path / "index.csv"
     index_path.write_text("timestamp\n2024-01-01T08:00:00\n")
 
-    result = DatasetBuilder(prediction_window=1, strategy=BinaryThresholdStrategy()).build(index_path, catalog_path)
+    result = DatasetBuilder(prediction_window=1, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M")).build(index_path, catalog_path)
 
     # start_time (08:30) falls inside [08:00, 09:00), so it counts although
     # peak_time (09:01) is after the window.

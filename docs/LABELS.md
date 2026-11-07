@@ -1,12 +1,15 @@
 # Labels
 
 A label describes the flares in one prediction window. Every label below
-is passed to a dataset class as `strategy`:
+is made by a reducer and a labeler, passed to a dataset class as
+`reducer` and `labeler`:
 
 ```python
 import flare_indexer as fidx
 
-builder = fidx.FullDiskSingleImage("24h", strategy=fidx.BinaryThresholdStrategy("M"))
+builder = fidx.FullDiskSingleImage(
+    "24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"),
+)
 ```
 
 ## One window, every label
@@ -20,25 +23,25 @@ In `examples/data/`, the 24-hour window of the image at
 | M1.4 | 03-01 13:20 | 1.4e-5 | 50.58 |
 | M2.7 | 03-01 23:52 | 2.7e-5 | 86.20 |
 
-This is the label each strategy gives that image:
+This is the label each reducer and labeler give that image:
 
-| Label | Strategy | Value |
-|---|---|---|
-| 0/1: strongest flare ≥ M1.0 | `BinaryThresholdStrategy("M")` | `1` |
-| 0/1: strongest flare ≥ X1.0 | `BinaryThresholdStrategy("X")` | `0` |
-| Peak flux of the strongest flare | `MaxFlareStrategy()` | `2.7e-05` |
-| Peak flux of the weakest flare | `DatasetBuildingPipeline(MinFluxReducer(), RegressionLabeler())` | `3.2e-06` |
-| Mean peak flux | `DatasetBuildingPipeline(MeanFluxReducer(), RegressionLabeler())` | `1.47e-05` |
-| Class of the strongest flare | `DatasetBuildingPipeline(MaxFluxReducer(), MulticlassLabeler())` | `"M"` |
-| Number of flares per class | `DatasetBuildingPipeline(ClassCountReducer(), ClassCountLabeler())` | `{"A": 0, "B": 0, "C": 1, "M": 2, "X": 0}` |
-| Which classes occur (0/1 each) | `DatasetBuildingPipeline(ClassCountReducer(), ClassPresenceLabeler())` | `{"A": 0, "B": 0, "C": 1, "M": 1, "X": 0}` |
-| Cumulative index ΣC + 10ΣM + 100ΣX | `DatasetBuildingPipeline(CumulativeClassIndexReducer(), RegressionLabeler())` | `44.2` (3.2 + 14 + 27) |
-| Cumulative index ≥ 50, as 0/1 | `DatasetBuildingPipeline(CumulativeClassIndexReducer(), NumericThresholdLabeler(50))` | `0` |
-| Largest RXF | `DatasetBuildingPipeline(MaxRelativeFluxReducer(), RegressionLabeler())` | `86.2` |
-| Sum of RXF | `DatasetBuildingPipeline(SumRelativeFluxReducer(), RegressionLabeler())` | `146.8` |
-| Largest RXF ≥ 100, as 0/1 | `DatasetBuildingPipeline(MaxRelativeFluxReducer(), NumericThresholdLabeler(100))` | `0` |
+| Label | Reducer | Labeler | Value |
+|---|---|---|---|
+| 0/1: strongest flare ≥ M1.0 | `MaxFluxReducer()` | `BinaryThresholdLabeler("M")` | `1` |
+| 0/1: strongest flare ≥ X1.0 | `MaxFluxReducer()` | `BinaryThresholdLabeler("X")` | `0` |
+| Peak flux of the strongest flare | `MaxFluxReducer()` | `RegressionLabeler()` | `2.7e-05` |
+| Peak flux of the weakest flare | `MinFluxReducer()` | `RegressionLabeler()` | `3.2e-06` |
+| Mean peak flux | `MeanFluxReducer()` | `RegressionLabeler()` | `1.47e-05` |
+| Class of the strongest flare | `MaxFluxReducer()` | `MulticlassLabeler()` | `"M"` |
+| Number of flares per class | `ClassCountReducer()` | `ClassCountLabeler()` | `{"A": 0, "B": 0, "C": 1, "M": 2, "X": 0}` |
+| Which classes occur (0/1 each) | `ClassCountReducer()` | `ClassPresenceLabeler()` | `{"A": 0, "B": 0, "C": 1, "M": 1, "X": 0}` |
+| Cumulative index ΣC + 10ΣM + 100ΣX | `CumulativeClassIndexReducer()` | `RegressionLabeler()` | `44.2` (3.2 + 14 + 27) |
+| Cumulative index ≥ 50, as 0/1 | `CumulativeClassIndexReducer()` | `NumericThresholdLabeler(50)` | `0` |
+| Largest RXF | `MaxRelativeFluxReducer()` | `RegressionLabeler()` | `86.2` |
+| Sum of RXF | `SumRelativeFluxReducer()` | `RegressionLabeler()` | `146.8` |
+| Largest RXF ≥ 100, as 0/1 | `MaxRelativeFluxReducer()` | `NumericThresholdLabeler(100)` | `0` |
 
-The threshold class can carry a number: `BinaryThresholdStrategy("C4.2")`.
+The threshold class can carry a number: `BinaryThresholdLabeler("C4.2")`.
 
 A window with no flare gives 0, `0.0`, `"NF"` (no flare) or all-zero counts.
 
@@ -51,9 +54,10 @@ A label is made in two steps:
 2. A **labeler** turns that value into the label, for example 1 if the
    value is at least M1.0.
 
-`DatasetBuildingPipeline(reducer, labeler)` joins the two.
-`BinaryThresholdStrategy` and `MaxFlareStrategy` are short forms of the two
-most common pipelines.
+The dataset classes take both as `reducer=` and `labeler=`. To inspect the
+steps for one time outside a dataset class,
+`DatasetBuildingPipeline(reducer, labeler).run_one(...)` returns the
+flares, the reduced value and the label.
 
 | Reducers | Labelers |
 |---|---|
@@ -63,18 +67,20 @@ most common pipelines.
 | `MaxRelativeFluxReducer`, `SumRelativeFluxReducer` | `MulticlassLabeler()`: NF, A, B, C, M or X |
 | | `ClassCountLabeler()`, `ClassPresenceLabeler()`: per-class counts or 0/1 |
 
-Any object with a `label(flares)` method can be passed as `strategy`. It
-receives the window's flares as a list of `FlareEvent` objects
-(`goes_class`, `start_time`, `peak_time`, `end_time`, `active_region`,
-`fl_lon`, `fl_lat`, `rxfi`; the last three are `None` if the catalog has no
-such column) and returns the label:
+Any object with a `reduce(flares)` method can be a reducer, and any object
+with an `assign(value)` method can be a labeler. A reducer receives the
+window's flares as a list of `FlareEvent` objects (`goes_class`,
+`start_time`, `peak_time`, `end_time`, `active_region`, `fl_lon`, `fl_lat`,
+`rxfi`; the last three are `None` if the catalog has no such column):
 
 ```python
 class StrongFlareCount:
-    def label(self, flares):
+    def reduce(self, flares):
         return sum(f.goes_class[0] in "MX" for f in flares)
 
-builder = fidx.FullDiskSingleImage("24h", strategy=StrongFlareCount())
+builder = fidx.FullDiskSingleImage(
+    "24h", reducer=StrongFlareCount(), labeler=fidx.RegressionLabeler(),
+)
 ```
 
 ## Relative X-ray flux (RXF)

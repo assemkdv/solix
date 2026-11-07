@@ -39,24 +39,30 @@ CASES = [
 ]
 
 
+LABELINGS = {
+    "binary": dict(reducer=f.MaxFluxReducer(), labeler=f.BinaryThresholdLabeler("M")),
+    "max": dict(reducer=f.MaxFluxReducer(), labeler=f.RegressionLabeler()),
+}
+
+
 @pytest.mark.parametrize("cls, kwargs, engine_kwargs, index", CASES, ids=lambda v: getattr(v, "__name__", None))
-@pytest.mark.parametrize("strategy", [f.BinaryThresholdStrategy("M"), f.MaxFlareStrategy()], ids=["binary", "max"])
-def test_same_table_as_the_engine(cls, kwargs, engine_kwargs, index, strategy):
-    expected = DatasetBuilder("24h", strategy, **engine_kwargs).build(index, CATALOG)
-    result = cls("24h", strategy, **kwargs).build(index, CATALOG)
+@pytest.mark.parametrize("labeling", list(LABELINGS.values()), ids=list(LABELINGS))
+def test_same_table_as_the_engine(cls, kwargs, engine_kwargs, index, labeling):
+    expected = DatasetBuilder("24h", **labeling, **engine_kwargs).build(index, CATALOG)
+    result = cls("24h", **labeling, **kwargs).build(index, CATALOG)
     pd.testing.assert_frame_equal(result, expected)
 
 
 def test_sequence_classes_return_the_report():
-    result, report = f.FullDiskSequence("24h", f.BinaryThresholdStrategy("M"), **GRID).build(
+    result, report = f.FullDiskSequence("24h", reducer=f.MaxFluxReducer(), labeler=f.BinaryThresholdLabeler("M"), **GRID).build(
         FULL_DISK, CATALOG, return_report=True)
     assert report.emitted_sequences == len(result)
 
 
 def test_options_reach_the_engine():
-    labels = f.FullDiskSingleImage("24h", f.BinaryThresholdStrategy("M"), include_flares=True).build(FULL_DISK, CATALOG)
+    labels = f.FullDiskSingleImage("24h", reducer=f.MaxFluxReducer(), labeler=f.BinaryThresholdLabeler("M"), include_flares=True).build(FULL_DISK, CATALOG)
     assert list(labels.columns) == ["timestamp", "label", "flares"]
-    sequences = f.ActiveRegionSequence("24h", f.MaxFlareStrategy(), include_flares=True, **AR_GRID).build(
+    sequences = f.ActiveRegionSequence("24h", reducer=f.MaxFluxReducer(), labeler=f.RegressionLabeler(), include_flares=True, **AR_GRID).build(
         ACTIVE_REGION, CATALOG)
     assert "flares" in sequences.columns and set(sequences["active_region"].dropna()) == {"13600", "13601"}
 
@@ -72,25 +78,25 @@ def test_options_reach_the_engine():
 ])
 def test_settings_of_another_case_are_refused(cls, kwargs):
     with pytest.raises(TypeError):
-        cls("24h", f.BinaryThresholdStrategy("M"), **kwargs)
+        cls("24h", reducer=f.MaxFluxReducer(), labeler=f.BinaryThresholdLabeler("M"), **kwargs)
 
 
 @pytest.mark.parametrize("cls", [f.FullDiskSequence, f.ActiveRegionSequence])
 def test_sequence_classes_require_the_grid(cls):
     with pytest.raises(TypeError, match="observation_window"):
-        cls("24h", f.BinaryThresholdStrategy("M"), cadence="1h", sliding_window="1h")
+        cls("24h", reducer=f.MaxFluxReducer(), labeler=f.BinaryThresholdLabeler("M"), cadence="1h", sliding_window="1h")
 
 
 @pytest.mark.parametrize("cls, grid", [(f.FullDiskSequence, GRID), (f.ActiveRegionSequence, AR_GRID)])
 def test_relative_flux_labels_stay_single_image_only(cls, grid):
-    pipeline = f.DatasetBuildingPipeline(f.MaxRelativeFluxReducer(), f.RegressionLabeler())
+    labeling = dict(reducer=f.MaxRelativeFluxReducer(), labeler=f.RegressionLabeler())
     with pytest.raises(ValueError, match="single images only"):
-        cls("24h", pipeline, **grid)
-    f.FullDiskSingleImage("24h", pipeline)
-    f.ActiveRegionSingleImage("24h", pipeline)
+        cls("24h", **labeling, **grid)
+    f.FullDiskSingleImage("24h", **labeling)
+    f.ActiveRegionSingleImage("24h", **labeling)
 
 
 @pytest.mark.parametrize("setting", ["include_metadata", "include_flares", "verbose"])
 def test_on_off_settings_must_be_true_or_false(setting):
     with pytest.raises(ValueError, match=f"{setting} must be True or False"):
-        f.FullDiskSingleImage("24h", f.BinaryThresholdStrategy("M"), **{setting: "yes"})
+        f.FullDiskSingleImage("24h", reducer=f.MaxFluxReducer(), labeler=f.BinaryThresholdLabeler("M"), **{setting: "yes"})

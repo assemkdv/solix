@@ -9,8 +9,12 @@ The four kinds of labeled dataset, one class each:
 Each class takes only the settings that apply to its case and runs the
 shared DatasetBuilder engine. All four are used the same way:
 
-    labels = FullDiskSingleImage("24h", BinaryThresholdStrategy("M")).build(
-        "image_index.csv", "flare_catalog.csv")
+    labels = FullDiskSingleImage(
+        "24h", reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
+    ).build("image_index.csv", "flare_catalog.csv")
+
+The reducer turns the flares of one window into one value and the
+labeler turns that value into the label; see reducers.py and labelers.py.
 
 Sequences are built on a time grid: `cadence` is the
 time between images, `observation_window` the time a sequence covers,
@@ -33,8 +37,9 @@ class FullDiskSingleImage(DatasetBuilder):
     def __init__(
         self,
         prediction_window,
-        strategy,
         *,
+        reducer,
+        labeler,
         cadence=None,
         start=None,
         include_metadata=False,
@@ -42,7 +47,7 @@ class FullDiskSingleImage(DatasetBuilder):
         verbose=False,
     ):
         super().__init__(
-            prediction_window, strategy, target="full_disk",
+            prediction_window, reducer=reducer, labeler=labeler, target="full_disk",
             cadence=cadence, start=start,
             include_metadata=include_metadata, include_flares=include_flares, verbose=verbose,
         )
@@ -54,8 +59,9 @@ class FullDiskSequence(DatasetBuilder):
     def __init__(
         self,
         prediction_window,
-        strategy,
         *,
+        reducer,
+        labeler,
         cadence,
         observation_window,
         sliding_window,
@@ -64,7 +70,7 @@ class FullDiskSequence(DatasetBuilder):
         verbose=False,
     ):
         super().__init__(
-            prediction_window, strategy, target="full_disk",
+            prediction_window, reducer=reducer, labeler=labeler, target="full_disk",
             cadence=cadence, observation_window=observation_window, sliding_window=sliding_window, start=start,
             include_flares=include_flares, verbose=verbose,
         )
@@ -80,8 +86,9 @@ class ActiveRegionSingleImage(DatasetBuilder):
     def __init__(
         self,
         prediction_window,
-        strategy,
         *,
+        reducer,
+        labeler,
         cadence=None,
         start=None,
         missing_active_region="negative",
@@ -90,7 +97,7 @@ class ActiveRegionSingleImage(DatasetBuilder):
         verbose=False,
     ):
         super().__init__(
-            prediction_window, strategy, target="active_region",
+            prediction_window, reducer=reducer, labeler=labeler, target="active_region",
             cadence=cadence, start=start,
             missing_active_region=missing_active_region, include_metadata=include_metadata,
             include_flares=include_flares, verbose=verbose,
@@ -103,8 +110,9 @@ class ActiveRegionSequence(DatasetBuilder):
     def __init__(
         self,
         prediction_window,
-        strategy,
         *,
+        reducer,
+        labeler,
         cadence,
         observation_window,
         sliding_window,
@@ -114,7 +122,7 @@ class ActiveRegionSequence(DatasetBuilder):
         verbose=False,
     ):
         super().__init__(
-            prediction_window, strategy, target="active_region",
+            prediction_window, reducer=reducer, labeler=labeler, target="active_region",
             cadence=cadence, observation_window=observation_window, sliding_window=sliding_window, start=start,
             missing_active_region=missing_active_region, include_flares=include_flares, verbose=verbose,
         )

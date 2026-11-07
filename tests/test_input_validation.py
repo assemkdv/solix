@@ -356,6 +356,40 @@ def test_mixed_offsets_across_a_daylight_saving_change_convert_to_utc(tmp_path):
     assert len(matcher.query(pd.Timestamp("2024-03-31 00:00"), "1h")) == 1
 
 
+def test_hour_only_offsets_across_a_daylight_saving_change_convert_to_utc(tmp_path):
+    path = _write(
+        tmp_path, "catalog.csv",
+        CATALOG_HEADER
+        + "2024-03-30 10:30:00+01,2024-03-30 10:40:00+01,2024-03-30 10:50:00+01,C1.0,100\n"
+        + "2024-03-31 10:30:00+02,2024-03-31 10:40:00+02,2024-03-31 10:50:00+02,C2.0,100\n",
+    )
+    assert EventMatcher(path)._catalog["start_time"].tolist() == [
+        pd.Timestamp("2024-03-30 09:30:00"), pd.Timestamp("2024-03-31 08:30:00"),
+    ]
+
+
+def test_hour_only_offset_mixed_with_naive_cells_is_rejected_clearly(tmp_path):
+    path = _write(
+        tmp_path, "catalog.csv",
+        CATALOG_HEADER
+        + "2024-03-30 10:30:00,2024-03-30 10:40:00,2024-03-30 10:50:00,C1.0,100\n"
+        + "2024-03-31 10:30:00+02,2024-03-31 10:40:00+02,2024-03-31 10:50:00+02,C2.0,100\n",
+    )
+    with pytest.raises(ValueError, match=r"column 'start_time' mixes times without a UTC offset"):
+        EventMatcher(path)
+
+
+def test_a_date_without_a_time_is_not_read_as_an_offset(tmp_path, catalog):
+    index = _write(tmp_path, "index.csv", "timestamp\n2024-01-01\n2024-01-02\n")
+    assert _labels(DatasetBuilder(24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M")), index, catalog) == [1, 0]
+
+
+def test_window_edges_keep_nanoseconds(catalog):
+    matcher = EventMatcher(catalog)   # flare starts at 10:00:00
+    assert matcher.query(pd.Timestamp("2024-01-01 10:00:00.000000500"), "1h") == []
+    assert len(matcher.query(pd.Timestamp("2024-01-01 09:00:00.000000500"), "1h")) == 1
+
+
 def test_offset_column_with_missing_cells_keeps_them_missing(tmp_path):
     path = _write(
         tmp_path, "catalog.csv",

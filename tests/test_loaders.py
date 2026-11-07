@@ -242,6 +242,19 @@ def test_adapt_goes_catalog_adds_leading_one_after_june_2002(tmp_path):
     assert regions[:5] == ["9393", "9997", "10001", "11089", "13324"] and pd.isna(regions[5])
 
 
+def test_adapt_goes_catalog_keeps_real_four_digit_regions_after_june_2002(tmp_path):
+    # Regions 9000-9999 were still on the disk after numbering passed 10000.
+    source = _write_source_catalog(
+        tmp_path,
+        _REGION_HEADER
+        + "2002-06-16 10:00:00,2002-06-16 10:10:00,2002-06-16 10:20:00,C1.0,9998.0\n"
+        + "2002-06-16 11:00:00,2002-06-16 11:10:00,2002-06-16 11:20:00,C1.0,8999.0\n",
+    )
+    with pytest.warns(UserWarning, match="1 flare\\(s\\) .* got the leading 1 back"):
+        result = adapt_goes_catalog(source)
+    assert result["active_region"].tolist() == ["9998", "18999"]
+
+
 def test_adapt_goes_catalog_drops_the_copies_the_leading_one_creates(tmp_path):
     source = _write_source_catalog(
         tmp_path,

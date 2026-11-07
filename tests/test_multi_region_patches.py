@@ -53,6 +53,8 @@ def _single(index, catalog, **kwargs):
     ("11160,11161,11162", "11160,11161,11162"),
     (" 11160 , 11161.0,11162 ", "11160,11161,11162"),
     ("11160,11160,11161", "11160,11161"),
+    ("11162,11160,11161", "11160,11161,11162"),
+    ("9999,10001", "9999,10001"),                  # sorted by value, not as text
     ("11160,,11161,", "11160,11161"),
     ("11161,", "11161"),
     (",", None),
@@ -108,3 +110,20 @@ def test_sequences_of_a_multi_region_patch(tmp_path, catalog):
     assert result["active_region"].tolist() == ["11160,11161,11162", "11170"]
     assert result["label"].tolist() == [1, 1]
     assert result["n_instances"].tolist() == [3, 3]
+
+
+def test_the_same_regions_in_another_order_form_one_sequence_group(tmp_path, catalog):
+    lines = ["timestamp,active_region",
+             '2011-02-16 00:00:00,"11160,11161"',
+             '2011-02-16 01:00:00,"11161,11160"',
+             '2011-02-16 02:00:00,"11160,11161"']
+    index = _write(tmp_path / "index.csv", "\n".join(lines) + "\n")
+    builder = ActiveRegionSequence(
+        "24h", reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
+        cadence="1h", observation_window="2h", sliding_window="1h",
+    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        result = builder.build(index, catalog)
+    assert result["active_region"].tolist() == ["11160,11161"] * 2
+    assert result["label"].tolist() == [1, 1]

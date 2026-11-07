@@ -224,7 +224,9 @@ def adapt_goes_catalog(
 
     Four-digit region numbers of flares that start on or after 2002-06-14
     get the leading 1 back (3324 -> 13324): NOAA's numbers passed 9999
-    that day, and many flare lists kept only four digits. If a row then
+    that day, and many flare lists kept only four digits. Regions
+    9000-9999 keep their number: they are real regions still on the disk
+    after that day. If a row then
     equals another row in start_time, peak_time, end_time, class and
     active_region, it is the same flare listed twice and is dropped. A
     warning gives both counts.
@@ -273,9 +275,14 @@ def adapt_goes_catalog(
 
 
 def _restore_five_digit_regions(catalog: pd.DataFrame, path: Path) -> pd.DataFrame:
-    """Add the leading 1 to four-digit regions after 2002-06-14 and drop fixed rows that then equal another row."""
+    """
+    Add the leading 1 to four-digit regions after 2002-06-14 and drop fixed
+    rows that then equal another row. Regions 9000-9999 are left alone:
+    they are real four-digit regions that were still on the disk after
+    numbering passed 10000, not shortened five-digit numbers.
+    """
     def is_four_digit(region):
-        return isinstance(region, str) and region.isdigit() and 1 <= int(region) <= 9999
+        return isinstance(region, str) and region.isdigit() and 1 <= int(region) <= 8999
 
     fixed = catalog["active_region"].map(is_four_digit) & (catalog["start_time"] >= NOAA_FIVE_DIGIT_START)
     if not fixed.any():

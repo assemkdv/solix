@@ -19,8 +19,11 @@ _UNITLESS_NUMBER_TEXT = re.compile(r"^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$
 _INTEGER_REGION_TEXT = re.compile(r"^[+-]?\d+(?:\.0*)?$")
 
 # A date-time text that ends in an explicit UTC offset: "Z", "+00:00",
-# "+0500", "-07:00". Used to tell offset-aware cells from naive ones.
-_OFFSET_SUFFIX = re.compile(r"(?:Z|[+-]\d{2}:?\d{2})$", re.IGNORECASE)
+# "+0500", "-07:00", or hours only after a time ("10:00:00+02"). Used to
+# tell offset-aware cells from naive ones.
+_OFFSET_SUFFIX = re.compile(
+    r"(?:Z|[+-]\d{2}:?\d{2}|\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?\s?[+-]\d{2})$", re.IGNORECASE
+)
 
 
 @dataclass
@@ -93,7 +96,8 @@ def _normalize_active_region(value) -> str | None:
     Text with commas lists several regions, e.g. a HARP patch that covers
     NOAA regions 11160, 11161 and 11162: "11160, 11161.0,11162" becomes
     "11160,11161,11162". Each part is normalized as above; blank parts
-    and repeats are dropped and the order is kept.
+    and repeats are dropped, and the parts are sorted (numbers by value),
+    so the same regions written in another order give the same text.
     """
     if value is None or isinstance(value, bool):
         return None if value is None else str(value)
@@ -107,6 +111,7 @@ def _normalize_active_region(value) -> str | None:
                 normalized = _normalize_active_region(part)
                 if normalized is not None and normalized not in parts:
                     parts.append(normalized)
+            parts.sort(key=lambda part: (0, int(part), "") if part.lstrip("-").isdigit() else (1, 0, part))
             return ",".join(parts) if parts else None
         if _INTEGER_REGION_TEXT.match(text):
             return str(int(text.split(".")[0]))
@@ -439,8 +444,9 @@ class EventMatcher:
         window_end = reference_time + _parse_prediction_window(prediction_window)
 
         sorted_values, sort_positions = self._sorted_starts()
-        reference_time_np = np.datetime64(reference_time)
-        window_end_np = np.datetime64(window_end)
+        # to_datetime64 keeps nanoseconds; np.datetime64(Timestamp) would cut them.
+        reference_time_np = reference_time.to_datetime64()
+        window_end_np = window_end.to_datetime64()
 
         # [reference_time, window_end): include reference_time, exclude window_end.
         lo = np.searchsorted(sorted_values, reference_time_np, side="left")

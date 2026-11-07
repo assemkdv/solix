@@ -21,27 +21,27 @@ machine-learning data loader.
 
 **Contents**
 
-1. [How it works](#how-it-works)
-2. [Installation](#installation)
-3. [Quick start](#quick-start)
-4. [Inputs](#inputs)
-5. [The four dataset classes](#the-four-dataset-classes)
-6. [Parameters](#parameters)
-7. [The prediction window](#the-prediction-window)
-8. [Labels: reducers and labelers](#labels-reducers-and-labelers)
-9. [Output](#output)
-10. [Preparing real data](#preparing-real-data)
-11. [Errors and warnings](#errors-and-warnings)
-12. [Examples](#examples)
-13. [Repository structure](#repository-structure)
-14. [Tests](#tests)
-15. [License](#license)
+1. [How it works](https://github.com/assemkdv/solix#how-it-works)
+2. [Installation](https://github.com/assemkdv/solix#installation)
+3. [Quick start](https://github.com/assemkdv/solix#quick-start)
+4. [Inputs](https://github.com/assemkdv/solix#inputs)
+5. [The four dataset classes](https://github.com/assemkdv/solix#the-four-dataset-classes)
+6. [Parameters](https://github.com/assemkdv/solix#parameters)
+7. [The prediction window](https://github.com/assemkdv/solix#the-prediction-window)
+8. [Labels: reducers and labelers](https://github.com/assemkdv/solix#labels-reducers-and-labelers)
+9. [Output](https://github.com/assemkdv/solix#output)
+10. [Preparing real data](https://github.com/assemkdv/solix#preparing-real-data)
+11. [Errors and warnings](https://github.com/assemkdv/solix#errors-and-warnings)
+12. [Examples](https://github.com/assemkdv/solix#examples)
+13. [Repository structure](https://github.com/assemkdv/solix#repository-structure)
+14. [Tests](https://github.com/assemkdv/solix#tests)
+15. [License](https://github.com/assemkdv/solix#license)
 
 ---
 
 ## How it works
 
-![Architecture of SOLIX](docs/architecture/architecture.png)
+![Architecture of SOLIX](https://raw.githubusercontent.com/assemkdv/solix/main/docs/architecture/architecture.png)
 
 1. **Input.** Two CSV files: an index and a flare catalog. Optional
    helpers in `loaders.py` make them from raw data. The configuration is a
@@ -62,9 +62,17 @@ machine-learning data loader.
 Python 3.10 or newer. Dependencies: pandas (2.0 or newer) and NumPy.
 
 ```bash
+pip install solix
+```
+
+The examples and the sample data are in the
+[GitHub repository](https://github.com/assemkdv/solix). To run them, or the
+tests, install from a clone:
+
+```bash
 git clone https://github.com/assemkdv/solix.git
 cd solix
-pip install .
+pip install -e ".[dev]"
 ```
 
 Optional extras:
@@ -72,10 +80,8 @@ Optional extras:
 | Command | Installs |
 |---|---|
 | `pip install -e ".[dev]"` | pytest, to run the tests |
-| `pip install ".[pytorch-examples]"` | torch, pillow, astropy, for examples 06, 07, 10, 12 (12 needs only torch) |
-| `pip install ".[tensorflow-examples]"` | tensorflow, pillow, astropy, for examples 08, 09, 11 |
-
-The package is not on PyPI yet.
+| `pip install -e ".[pytorch-examples]"` | torch, pillow, astropy, for examples 06, 07, 10, 12 (12 needs only torch) |
+| `pip install -e ".[tensorflow-examples]"` | tensorflow, pillow, astropy, for examples 08, 09, 11 |
 
 ---
 
@@ -93,6 +99,11 @@ labels = dataset.build("examples/data/full_disk_index.csv",
                        "examples/data/flare_catalog.csv")
 print(labels.head(3))
 ```
+
+The two sample files are in
+[`examples/data`](https://github.com/assemkdv/solix/tree/main/examples/data)
+of the repository; run the code from the repository folder, or give the
+paths of your own index and catalog.
 
 ```text
             timestamp  label
@@ -259,7 +270,11 @@ flares in the window  ──reducer──>  one value  ──labeler──>  lab
 The threshold can be a letter (`"C"`, `"M"`, `"X"`) or a full class
 (`"M5.0"`).
 
-### Any reducer with any labeler
+### Pairing a reducer with a labeler
+
+A reducer and a labeler are chosen separately. The labeler must accept
+the reducer's value: the "Use with" column of the labeler table below
+lists the matching reducers.
 
 ```python
 dataset = solix.FullDiskSingleInstance(
@@ -382,17 +397,22 @@ data.
 | `add_relative_flux(catalog_path, xray_flux_path, output_path=None)` | flare catalog + GOES 1–8 Å X-ray flux, one value per minute (`time`, `flux`) | catalog with `background_flux` and `rxfi` columns |
 
 ```python
+# Your own files; the names here are placeholders.
 solix.build_index_from_hmi_filenames("hmi_image_list.txt", "index.csv")
 solix.adapt_goes_catalog("goes_flares.csv", "flare_catalog.csv")
 solix.add_relative_flux("flare_catalog.csv", "xray_flux.csv", "flare_catalog_rxfi.csv")
 ```
 
+A file name that is not an HMI name stops `build_index_from_hmi_filenames`
+with an error; pass `strict=False` to skip such names instead, as example 04
+does with `examples/data/hmi_image_list.txt`.
+
 **rxfi.** The background of a flare is the mean X-ray flux in the 24 hours
 before its start, leaving out flare times and values above the flux at the
 start. `rxfi` = peak flux of the flare's class / background.
 
-More detail: [docs/DATASETS.md](docs/DATASETS.md#preparing-real-data) and
-[examples/real_data/README.md](examples/real_data/README.md).
+More detail: [docs/DATASETS.md](https://github.com/assemkdv/solix/blob/main/docs/DATASETS.md#preparing-real-data) and
+[examples/real_data/README.md](https://github.com/assemkdv/solix/blob/main/examples/real_data/README.md).
 
 ---
 
@@ -464,7 +484,7 @@ solix/
 │   ├── LABELS.md               every label with an example, custom labels, rxfi
 │   └── architecture/           the architecture figure
 ├── .github/workflows/test.yml  runs the tests on Python 3.10–3.13 for every push
-├── setup.cfg, setup.py         package metadata and dependencies
+├── pyproject.toml              package metadata and dependencies
 └── LICENSE                     GPL-3.0-or-later
 ```
 
@@ -477,11 +497,11 @@ pip install -e ".[dev]"
 pytest
 ```
 
-The tests run on Python 3.10, 3.11, 3.12 and 3.13 for every push,
-including tests that run the PyTorch and TensorFlow examples.
+The tests run on Python 3.10, 3.11, 3.12 and 3.13 for every push. The
+PyTorch and TensorFlow examples run in a separate job on Python 3.12.
 
 ---
 
 ## License
 
-GPL-3.0-or-later. See [LICENSE](LICENSE).
+GPL-3.0-or-later. See [LICENSE](https://github.com/assemkdv/solix/blob/main/LICENSE).

@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "solix"
+version = "1.0.0"
+description = "A Python library for solar observation labeling and indexing"
+readme = "README.md"
+authors = [{ name = "Assem Kadirova" }]
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+dependencies = [
+    "pandas>=2.0",
+    "numpy",
+]
+keywords = ["solar flares", "space weather", "machine learning", "dataset labeling", "GOES", "SDO", "HMI"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Astronomy",
+]
+
+[project.urls]
+Source = "https://github.com/assemkdv/solix"
+Issues = "https://github.com/assemkdv/solix/issues"
+
+[project.optional-dependencies]
+dev = ["pytest"]
+pytorch-examples = ["torch", "pillow", "astropy"]
+tensorflow-examples = ["tensorflow", "pillow", "astropy"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

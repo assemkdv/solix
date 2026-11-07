@@ -126,6 +126,7 @@ jobs:
             python examples/06_pytorch_images.py
             python examples/07_pytorch_sequences.py
             python examples/10_pytorch_active_region.py
+            python examples/12_pytorch_npy.py
           else
             python examples/08_tensorflow_images.py
             python examples/09_tensorflow_sequences.py

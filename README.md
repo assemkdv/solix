@@ -71,7 +71,7 @@ Optional extras:
 | Command | Installs |
 |---|---|
 | `pip install -e ".[dev]"` | pytest, to run the tests |
-| `pip install ".[pytorch-examples]"` | torch, pillow, astropy, for examples 06, 07, 10 |
+| `pip install ".[pytorch-examples]"` | torch, pillow, astropy, for examples 06, 07, 10, 12 (12 needs only torch) |
 | `pip install ".[tensorflow-examples]"` | tensorflow, pillow, astropy, for examples 08, 09, 11 |
 
 The package is not on PyPI yet.
@@ -424,6 +424,7 @@ message names the file, the row and the value.
 | `examples/06_pytorch_images.py`, `07_pytorch_sequences.py` | real HMI images in PyTorch |
 | `examples/08_tensorflow_images.py`, `09_tensorflow_sequences.py` | real HMI images in TensorFlow |
 | `examples/10_pytorch_active_region.py`, `11_tensorflow_active_region.py` | real active-region patches in PyTorch and TensorFlow |
+| `examples/12_pytorch_npy.py` | any file type: 100 `.npy` files → index → single and sequence labels → PyTorch `DataLoader` batches |
 
 ```bash
 python examples/01_full_disk.py
@@ -432,7 +433,8 @@ python examples/01_full_disk.py
 Examples 01–05 use the synthetic data in `examples/data/`. Examples 06–09
 need about 10 MB of full-disk images, downloaded once by
 `examples/real_data/fetch_real_data.py`; the active-region patches for 10
-and 11 are in the repository.
+and 11 are in the repository. Example 12 writes its own `.npy` files and
+needs only PyTorch.
 
 ---
 
@@ -451,7 +453,7 @@ flare-indexer/
 │   ├── pipeline.py             DatasetBuildingPipeline: run reducer + labeler step by step
 │   └── loaders.py              helpers that prepare the input files from raw data
 ├── examples/
-│   ├── 01_… to 11_….py         runnable examples (see above)
+│   ├── 01_… to 12_….py         runnable examples (see above)
 │   ├── data/                   synthetic indexes, flare catalog and X-ray flux
 │   └── real_data/              download scripts, image readers, manifests, real flare catalog
 ├── tests/                      automated tests, one file per topic

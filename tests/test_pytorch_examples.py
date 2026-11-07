@@ -1,12 +1,13 @@
 """
-Checks for the real-image PyTorch examples (examples 06, 07 and 10).
+Checks for the PyTorch examples: the real-image examples 06, 07 and 10,
+and example 12, which writes its own .npy files and needs only PyTorch.
 
 The committed provenance files (image manifest, flare catalog) are checked
 always. Labeling is checked from the manifest's timestamps alone, which
 needs neither images nor PyTorch. Running 06 and 07 needs PyTorch, Pillow
 with JPEG 2000 support and the images downloaded by
 examples/real_data/fetch_real_data.py; 10 needs PyTorch, astropy and the
-SHARP patches. Those tests are skipped otherwise.
+SHARP patches; 12 needs only PyTorch. Those tests are skipped otherwise.
 """
 
 import hashlib
@@ -15,6 +16,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -314,3 +316,62 @@ def test_pytorch_active_region_example_runs(tmp_path):
     assert "batch 3: patches [4, 1, 128, 128] torch.float32  regions ['12673', '12675', '12673', '12675']  " \
            "labels [1, 0, 1, 0]" in completed.stdout
     assert "16 patches: 2 positive, 14 negative; all checks passed" in completed.stdout
+
+
+# ── .npy files (example 12): no downloads, PyTorch only ──────────────────
+
+def test_npy_example_runs_and_labels_match_the_catalog(tmp_path):
+    pytest.importorskip("torch")
+    completed = subprocess.run(
+        [sys.executable, str(EXAMPLES / "12_pytorch_npy.py"), "--output", str(tmp_path)],
+        capture_output=True, text=True, timeout=300,
+    )
+    assert completed.returncode == 0, completed.stderr
+    for line in [
+        "Files: 100 .npy files", "Index: 100 instances",
+        "Single instances: 100 labels, 62 positive", "Sequences: 16 sequences of 6 files, 9 positive",
+        "batch 0: values [16, 1]", "batch 6: values [4, 1]  labels [1, 1, 1, 1]",
+        "batch 3: values [4, 6, 1]  labels [1, 1, 1, 1]",
+        "100 files and 16 sequences loaded; all checks passed",
+    ]:
+        assert line in completed.stdout, line
+
+    # The files are named by their time and hold one number each.
+    files = sorted((tmp_path / "12_npy").glob("*.npy"))
+    assert len(files) == 100 and files[0].name == "20240301_000000.npy" and files[-1].name == "20240305_030000.npy"
+    assert all(np.load(f).shape == (1,) for f in files)
+
+    # Every label recomputed from the catalog without flare_indexer: 1 if an
+    # M- or X-class flare starts in [t, t + 24h).
+    index = pd.read_csv(tmp_path / "12_index.csv", parse_dates=["timestamp"])
+    catalog = pd.read_csv(EXAMPLES / "data" / "flare_catalog.csv", parse_dates=["start_time"])
+    strong = catalog[catalog["class"].str[0].isin(["M", "X"])]["start_time"]
+
+    def expected(t):
+        return int(((strong >= t) & (strong < t + pd.Timedelta("24h"))).any())
+
+    labels = fidx.FullDiskSingleInstance("24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M")) \
+        .build(tmp_path / "12_index.csv", EXAMPLES / "data" / "flare_catalog.csv")
+    assert labels["label"].tolist() == [expected(t) for t in index["timestamp"]]
+    assert sum(expected(t) for t in index["timestamp"]) == 62
+    # A sequence is labeled from its last file: 6 files 1 h apart, a new one every 6 h.
+    sequences = fidx.FullDiskSequence(
+        "24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"),
+        cadence="1h", observation_window="6h", sliding_window="6h",
+    ).build(tmp_path / "12_index.csv", EXAMPLES / "data" / "flare_catalog.csv")
+    ends = index["timestamp"][5::6].tolist()
+    assert sequences["sequence_end"].tolist() == ends and len(ends) == 16
+    assert sequences["label"].tolist() == [expected(t) for t in ends]
+    assert sum(expected(t) for t in ends) == 9
+
+
+def test_npy_example_ignores_files_from_an_earlier_run(tmp_path):
+    pytest.importorskip("torch")
+    (tmp_path / "12_npy").mkdir()
+    np.save(tmp_path / "12_npy" / "20230101_000000.npy", np.zeros(1, dtype=np.float32))
+    completed = subprocess.run(
+        [sys.executable, str(EXAMPLES / "12_pytorch_npy.py"), "--output", str(tmp_path)],
+        capture_output=True, text=True, timeout=300,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert "Index: 100 instances" in completed.stdout

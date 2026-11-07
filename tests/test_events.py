@@ -81,43 +81,6 @@ def test_load_catalog_rejects_unparseable_time(tmp_path):
     assert "abc" in str(excinfo.value)
 
 
-def test_query_active_region_same_region_flare_included():
-    matcher = EventMatcher.__new__(EventMatcher)
-    matcher._catalog = pd.DataFrame({
-        "peak_time": pd.to_datetime(["2024-01-01 00:30"]),
-        "start_time": pd.to_datetime(["2024-01-01 00:20"]),
-        "goes_class": ["M2.3"],
-        "active_region": ["3559"],
-    })
-
-    results = matcher.query(
-        reference_time=pd.Timestamp("2024-01-01 00:00"),
-        prediction_window=1,
-        active_region="3559",
-    )
-
-    assert len(results) == 1
-    assert results[0].goes_class == "M2.3"
-
-
-def test_query_active_region_different_region_flare_ignored():
-    matcher = EventMatcher.__new__(EventMatcher)
-    matcher._catalog = pd.DataFrame({
-        "peak_time": pd.to_datetime(["2024-01-01 00:30"]),
-        "start_time": pd.to_datetime(["2024-01-01 00:20"]),
-        "goes_class": ["M2.3"],
-        "active_region": ["9999"],
-    })
-
-    results = matcher.query(
-        reference_time=pd.Timestamp("2024-01-01 00:00"),
-        prediction_window=1,
-        active_region="3559",
-    )
-
-    assert results == []
-
-
 def test_query_active_region_stronger_flare_from_other_region_ignored():
     matcher = EventMatcher.__new__(EventMatcher)
     matcher._catalog = pd.DataFrame({

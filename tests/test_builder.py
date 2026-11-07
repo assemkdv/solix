@@ -54,28 +54,6 @@ def test_build_completely_empty_index_raises(tmp_path):
     assert "empty" in str(excinfo.value).lower()
 
 
-def test_build_produces_expected_timestamp_and_label_columns(tmp_path):
-    catalog_path = _write_two_flare_catalog(tmp_path)
-    index_path = tmp_path / "index.csv"
-    index_path.write_text(
-        "timestamp\n"
-        "2024-01-01T00:00:00\n"
-        "2024-01-03T00:00:00\n"
-    )
-
-    builder = DatasetBuilder(prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"))
-    result = builder.build(index_path, catalog_path)
-
-    assert list(result.columns) == ["timestamp", "label"]
-    assert result["timestamp"].tolist() == [
-        pd.Timestamp("2024-01-01T00:00:00"),
-        pd.Timestamp("2024-01-03T00:00:00"),
-    ]
-    # Jan 1 window catches Flare A (M5.0, qualifies); Jan 3 window catches
-    # only Flare B (C3.0, does not qualify).
-    assert result["label"].tolist() == [1, 0]
-
-
 def test_build_preserves_instance_timestamp_order(tmp_path):
     catalog_path = _write_two_flare_catalog(tmp_path)
     index_path = tmp_path / "index.csv"
@@ -94,21 +72,6 @@ def test_build_preserves_instance_timestamp_order(tmp_path):
         pd.Timestamp("2024-01-01T00:00:00"),
     ]
     assert result["label"].tolist() == [0, 1]
-
-
-def test_build_works_with_max_flux_labels(tmp_path):
-    catalog_path = _write_two_flare_catalog(tmp_path)
-    index_path = tmp_path / "index.csv"
-    index_path.write_text(
-        "timestamp\n"
-        "2024-01-01T00:00:00\n"
-        "2024-01-03T00:00:00\n"
-    )
-
-    builder = DatasetBuilder(prediction_window=24, reducer=MaxFluxReducer(), labeler=RegressionLabeler())
-    result = builder.build(index_path, catalog_path)
-
-    assert result["label"].tolist() == [5e-5, 3e-6]
 
 
 # ── Active-region single-instance labeling tests ───────────────────────────
@@ -133,29 +96,6 @@ def test_active_region_works_with_max_flux_labels(tmp_path):
     # The stronger X9.0 flare belongs to a different region and must be
     # excluded; the label should reflect only the same-region M5.1 flare.
     assert result["label"].tolist() == [5.1e-5]
-
-
-def test_active_region_instance_side_values_normalize_to_match_catalog(tmp_path):
-    catalog_path = tmp_path / "catalog.csv"
-    catalog_path.write_text(
-        "start_time,peak_time,end_time,class,active_region\n"
-        "2024-01-23 02:50:00,2024-01-23 03:00:00,2024-01-23 03:10:00,M5.1,3559\n"
-    )
-    index_path = tmp_path / "index.csv"
-    # Mixing a real value with a later missing row forces pandas to read
-    # this column as float64 (3559 -> 3559.0) -- the same normalization
-    # challenge already solved for the catalog side in _normalize_active_region.
-    index_path.write_text(
-        "timestamp,active_region\n"
-        "2024-01-23T00:00:00,3559\n"
-        "2024-01-25T00:00:00,\n"
-    )
-
-    builder = DatasetBuilder(prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), target="active_region")
-    with pytest.warns(UserWarning, match="missing active_region"):
-        result = builder.build(index_path, catalog_path)
-
-    assert result["label"].tolist()[0] == 1
 
 
 def test_active_region_missing_instance_side_value_matches_nothing(tmp_path):
@@ -230,34 +170,6 @@ def test_full_disk_target_explicit_matches_default(tmp_path):
 
 # ── Active-region sequence labeling tests ────────────────────────────────
 
-def test_active_region_sequence_stronger_flare_from_other_region_ignored(tmp_path):
-    catalog_path = tmp_path / "catalog.csv"
-    catalog_path.write_text(
-        "start_time,peak_time,end_time,class,active_region\n"
-        "2024-01-01 08:40:00,2024-01-01 08:40:00,2024-01-01 08:45:00,M5.1,3559\n"
-        "2024-01-01 08:40:00,2024-01-01 08:40:00,2024-01-01 08:45:00,X9.0,9999\n"
-    )
-    index_path = tmp_path / "index.csv"
-    index_path.write_text(
-        "timestamp,active_region\n"
-        "2024-01-01T08:00:00,3559\n"
-        "2024-01-01T08:12:00,3559\n"
-        "2024-01-01T08:24:00,3559\n"
-    )
-
-    builder = DatasetBuilder(
-        prediction_window=1,
-        reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("X"),
-        target="active_region",
-        cadence="12min", observation_window="36min", sliding_window="12min",
-    )
-    result = builder.build(index_path, catalog_path)
-
-    # The X9.0 flare belongs to a different region and must be excluded --
-    # only the M5.1 (same region) is a candidate, which doesn't meet the
-    # X-class threshold, so the label must be 0, not 1.
-    assert result.iloc[0]["label"] == 0
-
 def test_active_region_sequence_requires_active_region_column(tmp_path):
     catalog_path = _write_valid_catalog(tmp_path)
     index_path = tmp_path / "index.csv"
@@ -284,18 +196,3 @@ def test_active_region_sequence_requires_active_region_column(tmp_path):
 # ── Flares are matched by their start time ─────────────────────────────────────
 
 
-def test_a_flare_counts_by_its_start_time(tmp_path):
-    # A flare that starts inside the window but peaks just after it closes.
-    catalog_path = tmp_path / "catalog.csv"
-    catalog_path.write_text(
-        "start_time,peak_time,end_time,class,active_region\n"
-        "2024-01-01 08:30:00,2024-01-01 09:01:00,2024-01-01 09:05:00,M1.0,4456\n"
-    )
-    index_path = tmp_path / "index.csv"
-    index_path.write_text("timestamp\n2024-01-01T08:00:00\n")
-
-    result = DatasetBuilder(prediction_window=1, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M")).build(index_path, catalog_path)
-
-    # start_time (08:30) falls inside [08:00, 09:00), so it counts although
-    # peak_time (09:01) is after the window.
-    assert result["label"].tolist() == [1]

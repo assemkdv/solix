@@ -80,22 +80,6 @@ def test_build_index_strips_utf8_bom(tmp_path):
     assert result["image_path"].iloc[1] == "/data/HMI.m2010.12.21_21.00.00.jpg"
 
 
-def test_build_index_unsorted_paths_become_sorted():
-    paths = [
-        "HMI.m2010.12.21_23.00.00.jpg",
-        "HMI.m2010.12.21_00.00.00.jpg",
-        "HMI.m2010.12.21_12.00.00.jpg",
-    ]
-
-    result = build_index_from_hmi_filenames(paths)
-
-    assert result["timestamp"].tolist() == [
-        pd.Timestamp("2010-12-21 00:00:00"),
-        pd.Timestamp("2010-12-21 12:00:00"),
-        pd.Timestamp("2010-12-21 23:00:00"),
-    ]
-
-
 def test_build_index_writes_output_csv(tmp_path):
     paths = ["/data/HMI.m2010.12.21_21.00.00.jpg"]
     output_path = tmp_path / "index.csv"

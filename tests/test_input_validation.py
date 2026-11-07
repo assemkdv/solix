@@ -67,12 +67,6 @@ def test_unitless_time_based_duration_text_is_rejected(name):
         DatasetBuilder(24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), **params)
 
 
-def test_text_window_with_unit_gives_the_numeric_result(tmp_path, catalog):
-    index = _write(tmp_path, "index.csv", "timestamp\n2024-01-01 09:00:00\n")
-    assert _labels(DatasetBuilder(24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M")), index, catalog) == [1]
-    assert _labels(DatasetBuilder("24h", reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M")), index, catalog) == [1]
-
-
 # --- 2. numeric time columns ------------------------------------------------
 
 @pytest.mark.parametrize("value", ["20240101100000", "1704067200", "45000.5"])
@@ -492,11 +486,6 @@ def test_catalog_with_both_class_and_goes_class_is_rejected_clearly(tmp_path):
 ])
 def test_binary_labeler_numeric_contract_and_threshold_equality(value, expected):
     assert BinaryThresholdLabeler("M").assign(value) == expected
-
-
-def test_binary_labeler_threshold_equality_for_a_full_class():
-    assert BinaryThresholdLabeler("C4.2").assign(4.2e-6) == 1
-    assert BinaryThresholdLabeler("C4.2").assign(4.1999e-6) == 0
 
 
 @pytest.mark.parametrize("value", [

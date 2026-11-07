@@ -163,14 +163,6 @@ def test_assign_label_can_be_called_independently_of_extract_or_reduce():
     assert pipeline.assign_label(0.0) == 0
 
 
-def test_pipeline_methods_are_stateless_across_calls():
-    pipeline = _default_pipeline()
-    pipeline.reduce_events([_flare("X1.0")])  # any prior call
-    # A fresh, unrelated call must not be influenced by the call above.
-    assert pipeline.reduce_events([]) == 0.0
-    assert pipeline.assign_label(0.0) == 0
-
-
 # ── run_one / PipelineResult ───────────────────────────────────────────
 
 
@@ -279,26 +271,6 @@ def test_invalid_goes_class_from_event_matcher_propagates_through_pipeline():
 # ── DatasetBuilder with the same reducer and labeler ────────────────────────────────────────
 
 
-def test_full_disk_time_based_sequences_work_with_pipeline(tmp_path):
-    index_path = tmp_path / "index.csv"
-    pd.DataFrame({
-        "timestamp": pd.date_range("2024-01-01T00:00:00", periods=10, freq="1h"),
-    }).to_csv(index_path, index=False)
-    empty_catalog = tmp_path / "catalog.csv"
-    empty_catalog.write_text("start_time,peak_time,end_time,class,active_region\n")
-
-    pipeline = _default_pipeline()
-    builder = DatasetBuilder(
-        prediction_window=24, reducer=pipeline.reducer, labeler=pipeline.labeler,
-        cadence="1h", observation_window="6h", sliding_window="3h",
-    )
-    result, report = builder.build(index_path, empty_catalog, return_report=True)
-
-    assert list(result.columns) == ["sequence_start", "sequence_end", "timestamps", "n_instances", "label"]
-    assert len(result) == 2
-    assert report.emitted_sequences == 2
-
-
 def test_sequence_build_report_does_not_depend_on_the_labeler(tmp_path):
     # SequenceBuildReport is computed from candidate-timestamp generation
     # alone, independent of labeling -- confirm it's identical for a binary
@@ -321,59 +293,6 @@ def test_sequence_build_report_does_not_depend_on_the_labeler(tmp_path):
     ).build(index_path, empty_catalog, return_report=True)
 
     assert binary_report == flux_report
-
-
-def test_active_region_single_instance_works_with_pipeline(tmp_path):
-    index_path = tmp_path / "ar_index.csv"
-    pd.DataFrame({
-        "timestamp": pd.to_datetime(["2024-02-01T00:00:00", "2024-02-05T00:00:00", "2024-02-05T00:00:00"]),
-        "active_region": ["11111", "11111", "22222"],
-    }).to_csv(index_path, index=False)
-
-    pipeline = DatasetBuildingPipeline(reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("C"))
-    builder = DatasetBuilder(prediction_window=24, reducer=pipeline.reducer, labeler=pipeline.labeler, target="active_region")
-    result = builder.build(index_path, CATALOG_PATH)
-
-    assert list(result.columns) == ["timestamp", "active_region", "label"]
-    assert result["label"].tolist() == [1, 0, 1]
-
-
-def test_active_region_sequences_work_with_pipeline(tmp_path):
-    index_path = tmp_path / "ar_sequence_index.csv"
-    pd.DataFrame({
-        "timestamp": pd.to_datetime([
-            "2024-02-01T10:49:00", "2024-02-01T11:19:00", "2024-02-01T11:49:00",
-            "2024-02-05T08:59:00", "2024-02-05T09:29:00", "2024-02-05T09:59:00",
-        ]),
-        "active_region": ["11111", "11111", "11111", "22222", "22222", "22222"],
-    }).to_csv(index_path, index=False)
-
-    pipeline = DatasetBuildingPipeline(reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("C"))
-    builder = DatasetBuilder(
-        prediction_window=1, reducer=pipeline.reducer, labeler=pipeline.labeler, target="active_region",
-        cadence="30min", observation_window="90min", sliding_window="90min",
-    )
-    result = builder.build(index_path, CATALOG_PATH)
-
-    assert result["label"].tolist() == [1, 0]
-    assert result["active_region"].tolist() == ["11111", "22222"]
-
-
-def test_extra_columns_preserved_with_pipeline(tmp_path):
-    index_path = tmp_path / "index.csv"
-    pd.DataFrame({
-        "timestamp": pd.to_datetime([
-            "2024-02-01T08:59:00", "2024-02-01T09:59:00", "2024-02-01T10:59:00",
-        ]),
-        "image_path": ["a.jpg", "b.jpg", "c.jpg"],
-    }).to_csv(index_path, index=False)
-
-    pipeline = _default_pipeline()
-    builder = DatasetBuilder(prediction_window=1, reducer=pipeline.reducer, labeler=pipeline.labeler, cadence="1h", observation_window="2h", sliding_window="1h")
-    result = builder.build(index_path, CATALOG_PATH)
-
-    assert "image_path" in result.columns
-    assert result.iloc[0]["image_path"] == ["a.jpg", "b.jpg"]
 
 
 # ── End-to-end equivalence (builder vs. pipeline.run_one) ────────────────

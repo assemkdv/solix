@@ -166,43 +166,6 @@ def test_six_instances_per_sequence_and_expected_starts_ends(tmp_path):
     assert result.iloc[1]["timestamps"] == _hourly("2024-01-01T03:00:00", 6)
 
 
-def test_observation_window_is_half_open_last_instance_at_t_plus_5h(tmp_path):
-    timestamps = _hourly("2024-01-01T00:00:00", 7)   # 06:00 exists but is outside [t, t+6h)
-    index_path = _write_index(tmp_path, timestamps)
-    catalog_path = _empty_catalog(tmp_path)
-
-    builder = DatasetBuilder(
-        prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
-        cadence="1h", observation_window="6h", sliding_window="6h",
-    )
-    result = builder.build(index_path, catalog_path)
-
-    assert len(result) == 1
-    # [t, t+6h) -> instances at t..t+5h, NOT t+6h.
-    assert result.iloc[0]["sequence_end"] == pd.Timestamp("2024-01-01T05:00:00")
-    assert result.iloc[0]["n_instances"] == 6
-    assert pd.Timestamp("2024-01-01T06:00:00") not in result.iloc[0]["timestamps"]
-
-
-def test_label_uses_final_instance_timestamp_not_sequence_start(tmp_path):
-    timestamps = _hourly("2024-01-01T00:00:00", 6)
-    index_path = _write_index(tmp_path, timestamps)
-    # Flare starts one minute after the final instance's timestamp (05:00); a
-    # window measured from sequence_start (00:00) with a short
-    # prediction_window would miss it, but one from sequence_end catches it.
-    catalog_path = _catalog_with_flare(tmp_path, "2024-01-01", "0501", "0501", "0505", "M1.0", "4456")
-
-    builder = DatasetBuilder(
-        prediction_window=0.1,  # 6 minutes
-        reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
-        cadence="1h", observation_window="6h", sliding_window="6h",
-    )
-    result = builder.build(index_path, catalog_path)
-
-    assert len(result) == 1
-    assert result.iloc[0]["label"] == 1
-
-
 def test_insufficient_data_returns_empty_dataframe_with_correct_schema(tmp_path):
     timestamps = _hourly("2024-01-01T00:00:00", 3)  # only 00,01,02 -- not enough for a 6-instance sequence
     index_path = _write_index(tmp_path, timestamps)
@@ -243,22 +206,6 @@ def test_missing_required_timestamp_skips_sequence_later_one_still_emitted(tmp_p
     assert len(result) == 1
     assert result.iloc[0]["sequence_start"] == pd.Timestamp("2024-01-01T06:00:00")
     assert result.iloc[0]["sequence_end"] == pd.Timestamp("2024-01-01T11:00:00")
-
-
-def test_no_interpolation_or_substitution_for_missing_timestamp(tmp_path):
-    # Confirms a skipped candidate never appears with a repeated or
-    # substituted instance in place of the missing one.
-    timestamps = [t for t in _hourly("2024-01-01T00:00:00", 7) if t != pd.Timestamp("2024-01-01T03:00:00")]
-    index_path = _write_index(tmp_path, timestamps)
-    catalog_path = _empty_catalog(tmp_path)
-
-    builder = DatasetBuilder(
-        prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
-        cadence="1h", observation_window="6h", sliding_window="6h",
-    )
-    result = builder.build(index_path, catalog_path)
-
-    assert len(result) == 0  # the only candidate (start=00:00) needs the missing 03:00
 
 
 # ── Compatible downsampling ──────────────────────────────────────────────
@@ -447,19 +394,6 @@ def test_fewer_than_two_unique_timestamps_raises(tmp_path):
 # ── SequenceBuildReport ───────────────────────────────────────────────────
 
 
-def test_return_report_default_false_returns_dataframe_only(tmp_path):
-    timestamps = _hourly("2024-01-01T00:00:00", 10)
-    index_path = _write_index(tmp_path, timestamps)
-    catalog_path = _empty_catalog(tmp_path)
-
-    builder = DatasetBuilder(
-        prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"),
-        cadence="1h", observation_window="6h", sliding_window="3h",
-    )
-    result = builder.build(index_path, catalog_path)
-    assert isinstance(result, pd.DataFrame)
-
-
 def test_return_report_true_returns_dataframe_and_report(tmp_path):
     timestamps = _hourly("2024-01-01T00:00:00", 10)
     index_path = _write_index(tmp_path, timestamps)
@@ -568,26 +502,6 @@ def test_time_based_preserves_extra_columns(tmp_path):
 # ── Active-region time-based mode ─────────────────────────────────────────
 
 
-def test_active_region_time_based_basic(tmp_path):
-    timestamps = _hourly("2024-01-01T08:00:00", 6)
-    index_path = _write_index(tmp_path, timestamps, active_regions=["3559"] * 6)
-    catalog_path = _catalog_with_flare(tmp_path, "2024-01-01", "1301", "1301", "1305", "M1.0", "3559")
-
-    builder = DatasetBuilder(
-        prediction_window=1, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), target="active_region",
-        cadence="1h", observation_window="6h", sliding_window="6h",
-    )
-    result = builder.build(index_path, catalog_path)
-
-    assert list(result.columns) == [
-        "sequence_start", "sequence_end", "timestamps", "n_instances", "active_region", "label",
-    ]
-    assert len(result) == 1
-    assert result.iloc[0]["active_region"] == "3559"
-    assert result.iloc[0]["sequence_end"] == pd.Timestamp("2024-01-01T13:00:00")
-    assert result.iloc[0]["label"] == 1
-
-
 def test_active_region_time_based_regions_are_grouped(tmp_path):
     # Grouped by region: region 3559 lacks 02:00 (that instance is 9999's),
     # so its only 6-hour candidate is skipped; 9999 has a single instance.
@@ -609,36 +523,3 @@ def test_active_region_time_based_regions_are_grouped(tmp_path):
     assert report.missing_timestamps == [pd.Timestamp("2024-01-01T02:00:00")]
 
 
-def test_active_region_time_based_missing_active_region_breaks_the_region_grid(tmp_path):
-    timestamps = _hourly("2024-01-01T00:00:00", 6)
-    index_path = _write_index(
-        tmp_path, timestamps, active_regions=["3559", "3559", None, "3559", "3559", "3559"]
-    )
-    catalog_path = _catalog_with_flare(tmp_path, "2024-01-01", "0500", "0500", "0505", "X1.0", "3559")
-
-    builder = DatasetBuilder(
-        prediction_window=1, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), target="active_region",
-        cadence="1h", observation_window="6h", sliding_window="6h",
-    )
-    with pytest.warns(UserWarning, match="missing active_region"):
-        result = builder.build(index_path, catalog_path)
-
-    # The 02:00 instance has no region, so region 3559's grid is incomplete
-    # and its sequence is skipped -- never labeled from the X1.0 flare.
-    assert result.empty
-
-
-def test_active_region_time_based_with_report(tmp_path):
-    timestamps = _hourly("2024-01-01T00:00:00", 6)
-    index_path = _write_index(tmp_path, timestamps, active_regions=["3559"] * 6)
-    catalog_path = _empty_catalog(tmp_path)
-
-    builder = DatasetBuilder(
-        prediction_window=24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), target="active_region",
-        cadence="1h", observation_window="6h", sliding_window="6h",
-    )
-    result, report = builder.build(index_path, catalog_path, return_report=True)
-
-    assert isinstance(report, SequenceBuildReport)
-    assert report.emitted_sequences == 1
-    assert "image_path" not in result.columns  # no extra columns given

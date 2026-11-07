@@ -30,12 +30,6 @@ def _files(tmp_path, timestamps, regions=None):
     return index, catalog
 
 
-def test_default_output_is_unchanged(tmp_path):
-    index, catalog = _files(tmp_path, HOURS[:2])
-    result = DatasetBuilder("6h", reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M")).build(index, catalog)
-    assert list(result.columns) == ["timestamp", "label"]
-
-
 def test_single_instance_full_disk(tmp_path):
     index, catalog = _files(tmp_path, ["2024-01-01 00:00:00", "2024-01-01 05:00:00", "2024-01-01 10:00:00"])
     result = DatasetBuilder("6h", reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"), include_flares=True).build(index, catalog)

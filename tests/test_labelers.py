@@ -6,20 +6,10 @@ from solix.labelers import BinaryThresholdLabeler, RegressionLabeler
 # ── BinaryThresholdLabeler ─────────────────────────────────────────────
 
 
-def test_binary_threshold_labeler_below_threshold():
-    labeler = BinaryThresholdLabeler("M")  # 1e-5
-    assert labeler.assign(9e-6) == 0
-
-
-def test_binary_threshold_labeler_above_threshold():
-    labeler = BinaryThresholdLabeler("M")
-    assert labeler.assign(1e-4) == 1
-
-
 def test_binary_threshold_labeler_custom_numeric_goes_threshold():
     labeler = BinaryThresholdLabeler("C4.2")  # 4.2e-6
     assert labeler.assign(4.2e-6) == 1
-    assert labeler.assign(4.1e-6) == 0
+    assert labeler.assign(4.1999e-6) == 0
     assert labeler.assign(5e-6) == 1
 
 

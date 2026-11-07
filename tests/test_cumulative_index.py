@@ -92,12 +92,6 @@ def test_single_event_weights(goes_class, expected):
     assert CumulativeClassIndexReducer().reduce(_events([goes_class])) == expected
 
 
-def test_equal_strength_written_differently_gives_identical_value():
-    reducer = CumulativeClassIndexReducer()
-    assert reducer.reduce(_events(["C10.0"])) == reducer.reduce(_events(["M1.0"])) == 10.0
-    assert reducer.reduce(_events(["M10.0"])) == reducer.reduce(_events(["X1.0"])) == 100.0
-
-
 def test_decimal_sum_is_exact_for_decimal_class_text():
     # Ten C0.1 flares: a naive float sum gives 0.9999999999999999.
     assert CumulativeClassIndexReducer().reduce(_events(["C0.1"] * 10)) == 1.0

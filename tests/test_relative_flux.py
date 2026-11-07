@@ -1,7 +1,7 @@
 """
 Relative X-ray flux increase labels (MaxRelativeFluxReducer,
 SumRelativeFluxReducer): rxfi = peak flux / background flux, read from the
-catalog's rxfi column (Hong, Ji, Pandey, Aydin, DaWaK 2023).
+catalog's rxfi column.
 """
 
 import pandas as pd

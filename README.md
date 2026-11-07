@@ -296,8 +296,8 @@ dataset = solix.FullDiskSingleInstance(
 | `MaxRelativeFluxReducer` | largest `rxfi` | 0.0 |
 | `SumRelativeFluxReducer` | sum of `rxfi` | 0.0 |
 
-The two relative-flux reducers need the `rxfi` column and work for single
-instances only.
+The cumulative index and the two relative-flux reducers work for single
+instances only; the relative-flux reducers also need the `rxfi` column.
 
 **Labelers** (value → label):
 

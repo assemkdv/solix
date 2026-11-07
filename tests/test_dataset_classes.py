@@ -88,8 +88,11 @@ def test_sequence_classes_require_the_grid(cls):
 
 
 @pytest.mark.parametrize("cls, grid", [(f.FullDiskSequence, GRID), (f.ActiveRegionSequence, AR_GRID)])
-def test_relative_flux_labels_stay_single_instance_only(cls, grid):
-    labeling = dict(reducer=f.MaxRelativeFluxReducer(), labeler=f.RegressionLabeler())
+@pytest.mark.parametrize("reducer", [
+    f.MaxRelativeFluxReducer, f.SumRelativeFluxReducer, f.CumulativeClassIndexReducer,
+])
+def test_index_labels_stay_single_instance_only(cls, grid, reducer):
+    labeling = dict(reducer=reducer(), labeler=f.RegressionLabeler())
     with pytest.raises(ValueError, match="single instances only"):
         cls("24h", **labeling, **grid)
     f.FullDiskSingleInstance("24h", **labeling)

@@ -63,7 +63,7 @@ flares, the reduced value and the label.
 |---|---|
 | `MaxFluxReducer`, `MinFluxReducer`, `MeanFluxReducer` | `BinaryThresholdLabeler(class)`: 0/1 against a GOES class |
 | `ClassCountReducer` | `NumericThresholdLabeler(number)`: 0/1 against a number |
-| `CumulativeClassIndexReducer` | `RegressionLabeler()`: the value itself |
+| `CumulativeClassIndexReducer` (single instances only) | `RegressionLabeler()`: the value itself |
 | `MaxRelativeFluxReducer`, `SumRelativeFluxReducer` | `MulticlassLabeler()`: one-hot NF, A, B, C, M, X |
 | | `ClassCountLabeler()`, `ClassPresenceLabeler()`: per-class counts or 0/1 |
 

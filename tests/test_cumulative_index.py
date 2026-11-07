@@ -1,11 +1,7 @@
 """
 Cumulative normalized GOES subclass index (CumulativeClassIndexReducer)
-and its numeric threshold labeler (NumericThresholdLabeler).
-
-Reference: Hong, Ji, Pandey, Aydin, "Beyond Traditional Flare
-Forecasting: A Data-driven Labeling Approach for High-fidelity
-Predictions", DaWaK 2023, Sec. 2.2:  sum(C) + 10*sum(M) + 100*sum(X).
-A and B flares contribute 0.
+and its numeric threshold labeler (NumericThresholdLabeler):
+sum(C) + 10*sum(M) + 100*sum(X). A and B flares contribute 0.
 """
 
 import math

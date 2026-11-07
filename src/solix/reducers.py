@@ -111,10 +111,11 @@ class CumulativeClassIndexReducer:
 
     The sum is formed in decimal arithmetic and rounded to a float once,
     so equal values written differently (C10.0 and M1.0) give the same
-    result. Returns 0.0 for an empty window.
+    result. Returns 0.0 for an empty window. Single instances only.
     """
 
     WEIGHTS = {"C": 1, "M": 10, "X": 100}
+    single_instance_only = True
 
     def reduce(self, events: list[FlareEvent]) -> float:
         total = Decimal(0)

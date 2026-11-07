@@ -89,6 +89,11 @@ def _normalize_active_region(value) -> str | None:
     lost. Non-numeric text ("AR13700", "13700.5") is kept as written,
     with surrounding whitespace removed. Missing values (NaN, None, blank
     text) become None.
+
+    Text with commas lists several regions, e.g. a HARP patch that covers
+    NOAA regions 11160, 11161 and 11162: "11160, 11161.0,11162" becomes
+    "11160,11161,11162". Each part is normalized as above; blank parts
+    and repeats are dropped and the order is kept.
     """
     if value is None or isinstance(value, bool):
         return None if value is None else str(value)
@@ -96,6 +101,13 @@ def _normalize_active_region(value) -> str | None:
         text = value.strip()
         if not text:
             return None
+        if "," in text:
+            parts = []
+            for part in text.split(","):
+                normalized = _normalize_active_region(part)
+                if normalized is not None and normalized not in parts:
+                    parts.append(normalized)
+            return ",".join(parts) if parts else None
         if _INTEGER_REGION_TEXT.match(text):
             return str(int(text.split(".")[0]))
         return text
@@ -109,6 +121,11 @@ def _normalize_active_region(value) -> str | None:
             return str(int(as_float))
         return str(value)
     return _normalize_active_region(str(value))
+
+
+def _shares_region(normalized: str | None, wanted: set) -> bool:
+    """True if a normalized region (one region or a comma-separated list) has a region in wanted."""
+    return normalized is not None and not wanted.isdisjoint(normalized.split(","))
 
 
 def _none_for_missing(values: pd.Series) -> pd.Series:
@@ -391,7 +408,10 @@ class EventMatcher:
         never match, and flares from any other active region are excluded
         regardless of strength. The value is normalized like the catalog
         side (13700, 13700.0, "13700" and "13700.0" all mean "13700"); a
-        blank or missing value is an error, not full-disk matching. If
+        blank or missing value is an error, not full-disk matching.
+        Several regions can be given as comma-separated text, e.g.
+        "11160,11161,11162" for a HARP patch that covers three NOAA
+        regions: a flare in any of them is returned. If
         active_region is None (the default), matching is full-disk: any
         flare in the window counts.
 
@@ -430,8 +450,11 @@ class EventMatcher:
         candidates = self._catalog.iloc[candidate_positions]
 
         if active_region is not None:
-            normalized_catalog_ar = candidates["active_region"].apply(_normalize_active_region)
-            candidates = candidates[normalized_catalog_ar.to_numpy() == active_region]
+            wanted = set(active_region.split(","))
+            in_region = candidates["active_region"].apply(
+                lambda value: _shares_region(_normalize_active_region(value), wanted)
+            )
+            candidates = candidates[in_region.to_numpy(dtype=bool)]
 
         return [
             FlareEvent(

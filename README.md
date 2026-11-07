@@ -116,7 +116,7 @@ one time.
 | Column | Required | Meaning |
 |---|---|---|
 | `timestamp` | always | observation time of the instance |
-| `active_region` | active-region classes | NOAA region number of the instance |
+| `active_region` | active-region classes | NOAA region number of the instance; several numbers with commas (`"11160,11161,11162"`) for a patch that covers several regions |
 | any other, e.g. `image_path` | no | kept in the output on request |
 
 ```text
@@ -233,6 +233,7 @@ counts if it **starts** in
 - `t` is the instance time, or the time of the **last** instance of a
   sequence.
 - For active-region classes, only flares with the same `active_region`
+  count. If an instance lists several regions, the flares of all of them
   count.
 - A flare that started before `t` does not count, even if it is still in
   progress.

@@ -11,7 +11,7 @@ package never opens the files.
 | Column | Needed |
 |---|---|
 | `timestamp` | always: the instance's observation time |
-| `active_region` | for the two active-region classes: the NOAA region of the instance |
+| `active_region` | for the two active-region classes: the NOAA region of the instance, or several regions with commas (see below) |
 | anything else, e.g. `image_path` | optional; kept in the output (see below) |
 
 **Flare catalog**: one row per flare.
@@ -152,6 +152,10 @@ labels = builder.build("active_region_index.csv", "flare_catalog.csv")
 ```
 
 - Only the flares of an instance's own region count.
+- One instance can cover several NOAA regions, e.g. a HARP patch that
+  lists more than one. Write them in one cell with commas, quoted in the
+  CSV (`"11160,11161,11162"`); the flares of all of them count, and the
+  output keeps the list in `active_region`.
 - Several regions can share a timestamp, so the result always has an
   `active_region` column.
 - `ActiveRegionSequence` takes the same settings as `FullDiskSequence` and

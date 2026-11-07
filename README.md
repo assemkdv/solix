@@ -431,6 +431,9 @@ message names the file, the row and the value.
 | relative-flux reducer without an `rxfi` column | `ValueError` |
 | active-region instance without a region | warning (`"negative"`), dropped (`"drop"`) or `ValueError` (`"error"`) |
 | flares without a region, in active-region mode | warning: they can never match an instance |
+| a DataFrame given to `build()` instead of a file path | `TypeError`: save it with `to_csv` first |
+| `MaxFluxReducer` instead of `MaxFluxReducer()` | `TypeError`: add the parentheses |
+| no flare of the catalog can fall in any window of the index | warning: every label would be 0 (check the periods and the date format) |
 
 ---
 

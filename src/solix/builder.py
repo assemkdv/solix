@@ -209,6 +209,12 @@ class DatasetBuilder:
         verbose=False,
     ):
         parsed_prediction_window = _parse_prediction_window(prediction_window)
+        for role, component in (("reducer", reducer), ("labeler", labeler)):
+            if isinstance(component, type):
+                raise TypeError(
+                    f"{role}={component.__name__} is a class; pass an object of it: "
+                    f"{role}={component.__name__}(...) (add the parentheses)."
+                )
         if not callable(getattr(reducer, "reduce", None)):
             raise TypeError(
                 f"reducer={reducer!r} must have a reduce(flares) method, like MaxFluxReducer()."
@@ -337,6 +343,13 @@ class DatasetBuilder:
                 "(when observation_window and sliding_window are given)."
             )
 
+        for name, value, example in (("index_path", index_path, "index.csv"),
+                                     ("event_catalog_path", event_catalog_path, "flare_catalog.csv")):
+            if isinstance(value, pd.DataFrame):
+                raise TypeError(
+                    f"build() takes the path of a CSV file as {name}, not a DataFrame. "
+                    f"Save the table first, e.g. df.to_csv('{example}', index=False), and pass '{example}'."
+                )
         index_path = Path(index_path)
 
         try:
@@ -367,6 +380,7 @@ class DatasetBuilder:
         matcher = EventMatcher(event_catalog_path, columns=catalog_columns)
         self._check_required_catalog_column(matcher, event_catalog_path)
         self._warn_catalog_missing_start_time(matcher, event_catalog_path)
+        self._warn_no_time_overlap(index_df, index_path, matcher, event_catalog_path)
         if self.target == "active_region":
             self._warn_catalog_missing_active_region(matcher, event_catalog_path)
 
@@ -531,6 +545,28 @@ class DatasetBuilder:
 
     def _sequence_reserved(self) -> tuple:
         return _SEQUENCE_OUTPUT_COLUMNS + (("flares",) if self.include_flares else ())
+
+    def _warn_no_time_overlap(self, index_df: pd.DataFrame, index_path, matcher: EventMatcher, catalog_path) -> None:
+        """
+        If no flare of the catalog can fall in any prediction window, every
+        label says "no flare". That usually means the two files cover
+        different periods, or dates were read in another order than meant
+        (e.g. day/month), so the build warns.
+        """
+        starts = matcher._catalog["start_time"].dropna()
+        if starts.empty or index_df.empty:
+            return
+        first = index_df["timestamp"].min()
+        last = index_df["timestamp"].max() + self._window
+        if starts.max() < first or starts.min() >= last:
+            warnings.warn(
+                f"No flare in the catalog at {catalog_path} (start times {starts.min()} to {starts.max()}) "
+                f"can fall in a prediction window of the index at {index_path} (instances {first} to "
+                f"{index_df['timestamp'].max()}), so every label will say 'no flare'. Check that both "
+                "files cover the same period and that their dates are read as intended (year-month-day).",
+                UserWarning,
+                stacklevel=3,
+            )
 
     def _warn_catalog_missing_start_time(self, matcher: EventMatcher, path) -> None:
         """

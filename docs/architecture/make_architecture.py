@@ -116,7 +116,7 @@ box(54, 23.2, 38, 9, ("white", GREEN[1]), lw=0.9)
 text(73, 30.4, "Labeler   value → label", size=7.5, weight="bold")
 text(73, 26.1, "BinaryThreshold  NumericThreshold\nRegression  Multiclass\n"
      "ClassCount  ClassPresence", size=6, family=MONO)
-text(50, 20.9, "any reducer can be paired with any labeler; user-defined reducers and labelers are supported",
+text(50, 20.9, "a reducer and a labeler are chosen separately; user-defined reducers and labelers are supported",
      size=6.4, style="italic", color="#2d5f34")
 arrow(46, 27.7, 54, 27.7)
 

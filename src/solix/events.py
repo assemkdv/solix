@@ -353,6 +353,11 @@ class EventMatcher:
 
     def __init__(self, catalog_path: str | Path, columns=None):
         # columns: optional {your column name: package column name}.
+        if isinstance(catalog_path, pd.DataFrame):
+            raise TypeError(
+                "EventMatcher takes the path of a CSV file, not a DataFrame. Save the table first, "
+                "e.g. df.to_csv('flare_catalog.csv', index=False), and pass 'flare_catalog.csv'."
+            )
         self._catalog = self._load_catalog(catalog_path, columns)
 
     def _load_catalog(self, path: str | Path, columns=None) -> pd.DataFrame:

@@ -14,6 +14,11 @@ class PipelineResult:
 
 
 def _require_method(component: object, method_name: str, role: str) -> None:
+    if isinstance(component, type):
+        raise TypeError(
+            f"{role}={component.__name__} is a class; pass an object of it: "
+            f"{role}={component.__name__}(...) (add the parentheses)."
+        )
     method = getattr(component, method_name, None)
     if method is None or not callable(method):
         raise TypeError(

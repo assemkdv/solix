@@ -11,6 +11,7 @@ import pytest
 
 from solix import (
     BinaryThresholdLabeler,
+    DatasetBuildingPipeline,
     EventMatcher,
     MaxFluxReducer,
     adapt_goes_catalog,
@@ -571,3 +572,40 @@ def test_yes_no_settings_must_be_true_or_false(tmp_path, value):
         with pytest.raises(ValueError, match=f"{name} must be True or False"):
             build_index_from_hmi_filenames(["HMI.m2010.12.21_21.00.00.jpg"], **{name: value})
 
+
+
+# --- beginner mistakes -----------------------------------------------------
+
+def test_build_rejects_a_dataframe_with_a_clear_message(tmp_path, catalog):
+    builder = DatasetBuilder(24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"))
+    index = pd.DataFrame({"timestamp": [T0]})
+    with pytest.raises(TypeError, match=r"path of a CSV file as index_path, not a DataFrame.*to_csv"):
+        builder.build(index, catalog)
+    with pytest.raises(TypeError, match=r"path of a CSV file, not a DataFrame"):
+        EventMatcher(pd.read_csv(catalog))
+
+
+@pytest.mark.parametrize("role", ["reducer", "labeler"])
+def test_a_class_instead_of_an_object_is_rejected_clearly(role):
+    kwargs = {"reducer": MaxFluxReducer(), "labeler": BinaryThresholdLabeler("M")}
+    kwargs[role] = type(kwargs[role])
+    with pytest.raises(TypeError, match=r"is a class; pass an object of it.*add the parentheses"):
+        DatasetBuilder(24, **kwargs)
+    with pytest.raises(TypeError, match=r"is a class; pass an object of it"):
+        DatasetBuildingPipeline(**kwargs)
+
+
+def test_index_and_catalog_without_any_overlap_warn(tmp_path, catalog):
+    # The catalog's flare starts 2024-01-01 10:00; this index is a year later.
+    index = _write(tmp_path, "index.csv", "timestamp\n2025-01-01 09:00:00\n")
+    builder = DatasetBuilder(24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"))
+    with pytest.warns(UserWarning, match=r"No flare in the catalog .* every label will say 'no flare'"):
+        assert _labels(builder, index, catalog) == [0]
+
+
+def test_index_and_catalog_that_overlap_do_not_warn(tmp_path, catalog):
+    index = _write(tmp_path, "index.csv", "timestamp\n2023-12-31 11:00:00\n")   # window reaches the flare
+    builder = DatasetBuilder(24, reducer=MaxFluxReducer(), labeler=BinaryThresholdLabeler("M"))
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        assert _labels(builder, index, catalog) == [1]

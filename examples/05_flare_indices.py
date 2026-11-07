@@ -1,5 +1,5 @@
 """
-Example 5 -- the four flare indices of Hong, Ji, Pandey, Aydin (DaWaK 2023).
+Example 5 -- four flare indices: GC max, GC sum, RXF max and RXF sum.
 
 For the flares in the prediction window of each instance:
 

@@ -1,8 +1,8 @@
 import pandas as pd
 import pytest
 
-import flare_indexer as f
-from flare_indexer.builder import DatasetBuilder
+import solix as f
+from solix.builder import DatasetBuilder
 
 
 def events(classes):

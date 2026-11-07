@@ -3,9 +3,9 @@ import warnings
 import pandas as pd
 import pytest
 
-from flare_indexer import EventMatcher
-from flare_indexer.builder import DatasetBuilder
-from flare_indexer import MaxFluxReducer, BinaryThresholdLabeler, RegressionLabeler
+from solix import EventMatcher
+from solix.builder import DatasetBuilder
+from solix import MaxFluxReducer, BinaryThresholdLabeler, RegressionLabeler
 
 
 def _write(path, text):

@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from flare_indexer.loaders import HMIIndexReport, adapt_goes_catalog, build_index_from_hmi_filenames
+from solix.loaders import HMIIndexReport, adapt_goes_catalog, build_index_from_hmi_filenames
 
 # ── build_index_from_hmi_filenames ────────────────────────────────────
 
@@ -374,7 +374,7 @@ def test_adapt_goes_catalog_writes_output_csv(tmp_path):
 
 def test_adapt_goes_catalog_output_is_directly_loadable_by_event_matcher(tmp_path):
     # EventMatcher accepts the adapter's output as-is.
-    from flare_indexer.events import EventMatcher
+    from solix.events import EventMatcher
 
     source = _write_source_catalog(
         tmp_path,

@@ -16,46 +16,46 @@ Run:  python examples/05_flare_indices.py
 """
 from pathlib import Path
 
-import flare_indexer as fidx
+import solix
 
 DATA = Path(__file__).parent / "data"
 OUTPUT = Path(__file__).parent / "output"
 
 INDICES = {
-    "gc_max": fidx.MaxFluxReducer(),
-    "gc_sum": fidx.CumulativeClassIndexReducer(),
-    "rxf_max": fidx.MaxRelativeFluxReducer(),
-    "rxf_sum": fidx.SumRelativeFluxReducer(),
+    "gc_max": solix.MaxFluxReducer(),
+    "gc_sum": solix.CumulativeClassIndexReducer(),
+    "rxf_max": solix.MaxRelativeFluxReducer(),
+    "rxf_sum": solix.SumRelativeFluxReducer(),
 }
 
 
 def events(classes):
-    return [fidx.FlareEvent(peak_time=None, goes_class=c, start_time=None, active_region=None) for c in classes]
+    return [solix.FlareEvent(peak_time=None, goes_class=c, start_time=None, active_region=None) for c in classes]
 
 
 def main():
     # One prediction window with seven flares: (1.5 + 2.1) * 10 + (2.6 + 1.4 + 2.8 + 4.2 + 1.5) = 48.5.
     classes = ["M1.5", "C2.6", "C1.4", "M2.1", "C2.8", "C4.2", "C1.5"]
-    reducer = fidx.CumulativeClassIndexReducer()
+    reducer = solix.CumulativeClassIndexReducer()
     index = reducer.reduce(events(classes))
     print("window:", ", ".join(classes))
     print("cumulative index:", index)
     for threshold in (10, 20, 50):
-        print(f"label (index >= {threshold}): {fidx.NumericThresholdLabeler(threshold).assign(index)}")
+        print(f"label (index >= {threshold}): {solix.NumericThresholdLabeler(threshold).assign(index)}")
     print("empty window:", reducer.reduce([]))
     print("A/B-only window:", reducer.reduce(events(["B5.0", "A1.2"])))
 
     OUTPUT.mkdir(exist_ok=True)
-    catalog = fidx.add_relative_flux(DATA / "flare_catalog.csv", DATA / "xray_flux.csv",
+    catalog = solix.add_relative_flux(DATA / "flare_catalog.csv", DATA / "xray_flux.csv",
                                      output_path=OUTPUT / "05_flare_catalog_rxfi.csv")
     print("\nflares with background flux and RXF:")
     print(catalog[["start_time", "class", "background_flux", "rxfi"]].to_string(index=False, float_format="%.3g"))
 
     table = None
     for name, index_reducer in INDICES.items():
-        labels = fidx.FullDiskSingleInstance(
+        labels = solix.FullDiskSingleInstance(
             prediction_window="24h",
-            reducer=index_reducer, labeler=fidx.RegressionLabeler(),
+            reducer=index_reducer, labeler=solix.RegressionLabeler(),
         ).build(DATA / "full_disk_index.csv", OUTPUT / "05_flare_catalog_rxfi.csv")
         table = labels[["timestamp"]].copy() if table is None else table
         table[name] = labels["label"]

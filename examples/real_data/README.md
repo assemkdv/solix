@@ -1,6 +1,6 @@
 # Real-data PyTorch and TensorFlow examples (06-11)
 
-Six examples label real SDO/HMI data with `flare_indexer` and load it with
+Six examples label real SDO/HMI data with SOLIX and load it with
 a deep-learning framework. Examples 06-09 use full-disk images; 10-11 use
 active-region patches. Framework code lives only in these scripts, not in
 the package. PyTorch, TensorFlow, Pillow and astropy are optional; the base
@@ -28,7 +28,7 @@ Results:
 - 10 and 11: 16 patches, 2 positive, 14 negative.
 
 Each example recomputes every label from the catalog without
-`flare_indexer` and stops if any label differs.
+SOLIX and stops if any label differs.
 
 ## Data
 

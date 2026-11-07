@@ -8,7 +8,7 @@ or stronger flare starts in [t_end, t_end + 24h), else 0.
 
 The grid uses the images' full-precision observation times (DATE_OBS,
 e.g. 00:59:49.9), starting at the first image. Five grid points in this
-data have no image, and flare_indexer skips every sequence that needs one
+data have no image, and SOLIX skips every sequence that needs one
 of them; no nearby image is used in its place and no time is rounded:
 - 04:59:49.9, 05:59:49.9 and 07:59:49.9: the images for those hours were
   observed 0.1 s later (04:59:50.0, ...). They stay in the index and are
@@ -21,7 +21,7 @@ labeled 0.
 
 Steps
 1. Index from the manifest (same as example 6).
-2. Sequences and labels: flare_indexer.FullDiskSequence on a time grid.
+2. Sequences and labels: solix.FullDiskSequence on a time grid.
 3. CSV round trip: the list-valued columns (timestamps, image_path) are
    written as JSON lists and parsed back, and the reloaded table must equal
    the original.
@@ -30,7 +30,7 @@ Steps
    yielding [B, T, C, H, W] = [B, 3, 1, 256, 256].
 5. Checks: order and spacing of every sequence, header time of every
    image, and the label of every sequence recomputed from the catalog
-   without flare_indexer.
+   without SOLIX.
 
 Setup:  pip install ".[pytorch-examples]"           # torch, pillow, astropy
         python examples/real_data/fetch_real_data.py     # downloads about 10 MB once
@@ -45,7 +45,7 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader, Dataset
 
-import flare_indexer as fidx
+import solix
 
 EXAMPLES = Path(__file__).resolve().parent
 sys.path.insert(0, str(EXAMPLES / "real_data"))
@@ -65,7 +65,7 @@ class FlareSequenceDataset(Dataset):
     One labeled sequence per item: (images [T, C, H, W], label), oldest
     image first.
 
-    sequences is the table built by flare_indexer, one row per sequence
+    sequences is the table built by SOLIX, one row per sequence
     with lists of timestamps and image paths and one label; image_root is
     the folder the image paths are relative to.
     """
@@ -106,10 +106,10 @@ def main(argv=None):
           f"{provenance['query_end']}; covers every [t, t+{PREDICTION_WINDOW}) window")
 
     # 2. Sequences and labels.
-    builder = fidx.FullDiskSequence(
+    builder = solix.FullDiskSequence(
         prediction_window=PREDICTION_WINDOW,
-        reducer=fidx.MaxFluxReducer(),               # the strongest flare in the window
-        labeler=fidx.BinaryThresholdLabeler("M"),    # 1 if any flare >= M1.0 in the window
+        reducer=solix.MaxFluxReducer(),              # the strongest flare in the window
+        labeler=solix.BinaryThresholdLabeler("M"),   # 1 if any flare >= M1.0 in the window
         cadence=CADENCE,
         observation_window=OBSERVATION_WINDOW,
         sliding_window=SLIDING_WINDOW,

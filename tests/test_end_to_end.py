@@ -3,9 +3,9 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from flare_indexer.builder import DatasetBuilder
-from flare_indexer.events import EventMatcher
-from flare_indexer import MaxFluxReducer, BinaryThresholdLabeler, RegressionLabeler
+from solix.builder import DatasetBuilder
+from solix.events import EventMatcher
+from solix import MaxFluxReducer, BinaryThresholdLabeler, RegressionLabeler
 
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"

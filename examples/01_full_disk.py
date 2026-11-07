@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pandas as pd
 
-import flare_indexer as fidx
+import solix
 
 DATA = Path(__file__).parent / "data"
 OUTPUT = Path(__file__).parent / "output"
@@ -20,17 +20,17 @@ OUTPUT = Path(__file__).parent / "output"
 def main():
     OUTPUT.mkdir(exist_ok=True)
 
-    builder = fidx.FullDiskSingleInstance(
+    builder = solix.FullDiskSingleInstance(
         prediction_window="24h",                     # a number means hours: 24 is the same
-        reducer=fidx.MaxFluxReducer(),               # the strongest flare in the window
-        labeler=fidx.BinaryThresholdLabeler("M"),    # 1 if a flare >= M1.0 starts in the window, else 0
+        reducer=solix.MaxFluxReducer(),              # the strongest flare in the window
+        labeler=solix.BinaryThresholdLabeler("M"),   # 1 if a flare >= M1.0 starts in the window, else 0
         include_metadata=True,                       # keep image_path in the output
     )
     labels = builder.build(DATA / "full_disk_index.csv", DATA / "flare_catalog.csv")
 
     # A second builder gives the strongest flare's flux instead of 0/1.
-    flux = fidx.FullDiskSingleInstance(
-        prediction_window="24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.RegressionLabeler(),
+    flux = solix.FullDiskSingleInstance(
+        prediction_window="24h", reducer=solix.MaxFluxReducer(), labeler=solix.RegressionLabeler(),
     ).build(DATA / "full_disk_index.csv", DATA / "flare_catalog.csv")
     labels["max_flux"] = flux["label"]
 

@@ -64,7 +64,7 @@ jobs:
           python -m venv "$RUNNER_TEMP/wheel-env"
           "$RUNNER_TEMP/wheel-env/bin/pip" install dist/*.whl
           cd "$RUNNER_TEMP"
-          "$RUNNER_TEMP/wheel-env/bin/python" -c "import flare_indexer, sys; print(flare_indexer.__file__); assert 'site-packages' in flare_indexer.__file__; assert 'MulticlassLabeler' in flare_indexer.__all__"
+          "$RUNNER_TEMP/wheel-env/bin/python" -c "import solix, sys; print(solix.__file__); assert 'site-packages' in solix.__file__; assert 'MulticlassLabeler' in solix.__all__"
 
   # Real-image PyTorch / TensorFlow examples, run against the built wheel
   # (not an editable install) with the pinned images replayed from
@@ -99,7 +99,7 @@ jobs:
           # too, so the TensorFlow examples are compared with the PyTorch ones.
           pip install torch --index-url https://download.pytorch.org/whl/cpu
           pip install "${wheel}[${{ matrix.framework }}-examples]" pytest
-          python -c "import flare_indexer; assert 'site-packages' in flare_indexer.__file__, flare_indexer.__file__"
+          python -c "import solix; assert 'site-packages' in solix.__file__, solix.__file__"
 
       - name: Restore the image cache
         uses: actions/cache@v4

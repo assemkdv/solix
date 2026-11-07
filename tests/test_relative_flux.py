@@ -7,7 +7,7 @@ catalog's rxfi column (Hong, Ji, Pandey, Aydin, DaWaK 2023).
 import pandas as pd
 import pytest
 
-from flare_indexer import (
+from solix import (
     EventMatcher,
     FlareEvent,
     MaxRelativeFluxReducer,
@@ -16,7 +16,7 @@ from flare_indexer import (
     SumRelativeFluxReducer,
     adapt_goes_catalog,
 )
-from flare_indexer.builder import DatasetBuilder
+from solix.builder import DatasetBuilder
 
 CATALOG = (
     "start_time,peak_time,end_time,class,active_region,rxfi\n"
@@ -139,8 +139,8 @@ def test_adapt_goes_catalog_carries_rxfi(tmp_path):
 
 # ── add_relative_flux: background flux and rxfi from 1-minute X-ray flux ──
 
-from flare_indexer import add_relative_flux  # noqa: E402
-from flare_indexer import MaxFluxReducer, BinaryThresholdLabeler
+from solix import add_relative_flux  # noqa: E402
+from solix import MaxFluxReducer, BinaryThresholdLabeler
 
 FLARE = "2024-01-02 00:00:00,2024-01-02 00:05:00,2024-01-02 00:10:00,{cls},100\n"
 HEADER = "start_time,peak_time,end_time,class,active_region\n"

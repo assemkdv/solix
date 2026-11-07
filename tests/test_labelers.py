@@ -1,6 +1,6 @@
 import pytest
 
-from flare_indexer.labelers import BinaryThresholdLabeler, RegressionLabeler
+from solix.labelers import BinaryThresholdLabeler, RegressionLabeler
 
 
 # ── BinaryThresholdLabeler ─────────────────────────────────────────────

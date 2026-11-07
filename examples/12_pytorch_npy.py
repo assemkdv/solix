@@ -1,7 +1,7 @@
 """
 Example 12 -- any file type: .npy files, labeled and loaded with PyTorch.
 
-flare_indexer never opens your files. It only needs their times, so the
+SOLIX never opens your files. It only needs their times, so the
 same steps work for images, .npy arrays or anything else. Here each
 instance is a .npy file that holds one random number.
 
@@ -36,7 +36,7 @@ try:
 except ImportError:
     sys.exit("This example needs PyTorch: pip install torch")
 
-import flare_indexer as fidx
+import solix
 
 EXAMPLES = Path(__file__).resolve().parent
 CATALOG = EXAMPLES / "data" / "flare_catalog.csv"
@@ -64,7 +64,7 @@ def write_npy_files(folder: Path) -> dict:
 
 
 def build_index(folder: Path, root: Path, index_path: Path) -> pd.DataFrame:
-    """The index flare_indexer reads: the time of each file, from its name, and its path."""
+    """The index SOLIX reads: the time of each file, from its name, and its path."""
     files = sorted(folder.glob("*.npy"))
     index = pd.DataFrame({
         "timestamp": pd.to_datetime([f.stem for f in files], format=NAME_FORMAT),
@@ -119,19 +119,19 @@ def main(argv=None):
     print(index.head(3).to_string(index=False))
 
     # 3. Labels, the same way for one file or a sequence of files.
-    labels = fidx.FullDiskSingleInstance(
+    labels = solix.FullDiskSingleInstance(
         prediction_window="24h",                     # flares that start in [t, t + 24h)
-        reducer=fidx.MaxFluxReducer(),               # the strongest of them
-        labeler=fidx.BinaryThresholdLabeler("M"),    # 1 if it is M1.0 or stronger, else 0
+        reducer=solix.MaxFluxReducer(),              # the strongest of them
+        labeler=solix.BinaryThresholdLabeler("M"),   # 1 if it is M1.0 or stronger, else 0
         include_metadata=True,                       # keep file_path
     ).build(index_path, CATALOG)
     print(f"\nSingle instances: {len(labels)} labels, {int(labels['label'].sum())} positive")
     print(labels.head(3).to_string(index=False))
 
-    sequences = fidx.FullDiskSequence(
+    sequences = solix.FullDiskSequence(
         prediction_window="24h",
-        reducer=fidx.MaxFluxReducer(),
-        labeler=fidx.BinaryThresholdLabeler("M"),
+        reducer=solix.MaxFluxReducer(),
+        labeler=solix.BinaryThresholdLabeler("M"),
         cadence="1h",                 # time between the files of a sequence
         observation_window="6h",      # one sequence covers 6 h: 6 files
         sliding_window="6h",          # a new sequence every 6 h

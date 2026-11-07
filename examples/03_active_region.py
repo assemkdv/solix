@@ -17,7 +17,7 @@ Run:  python examples/03_active_region.py
 import warnings
 from pathlib import Path
 
-import flare_indexer as fidx
+import solix
 
 DATA = Path(__file__).parent / "data"
 INDEX = DATA / "active_region_index.csv"
@@ -26,8 +26,8 @@ OUTPUT = Path(__file__).parent / "output"
 
 
 def build(**kwargs):
-    return fidx.ActiveRegionSingleInstance(
-        prediction_window=24, reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"),
+    return solix.ActiveRegionSingleInstance(
+        prediction_window=24, reducer=solix.MaxFluxReducer(), labeler=solix.BinaryThresholdLabeler("M"),
         include_metadata=True, **kwargs,
     ).build(INDEX, CATALOG)
 
@@ -63,8 +63,8 @@ def main():
     print("   unknown instance never joins a region's sequence (it is dropped here).")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        sequences, report = fidx.ActiveRegionSequence(
-            prediction_window=24, reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"),
+        sequences, report = solix.ActiveRegionSequence(
+            prediction_window=24, reducer=solix.MaxFluxReducer(), labeler=solix.BinaryThresholdLabeler("M"),
             missing_active_region="drop",
             cadence="6h", observation_window="12h", sliding_window="6h",
         ).build(INDEX, CATALOG, return_report=True)

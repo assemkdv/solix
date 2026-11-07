@@ -10,7 +10,7 @@ This script only acquires data; it does no labeling. It writes:
                                from the JP2's own FITS header, and the
                                file's SHA-256.
 - hek_swpc_flares.csv          the raw HEK query result (SWPC GOES flare list).
-- flare_catalog.csv            the same flares in flare_indexer's catalog schema.
+- flare_catalog.csv            the same flares in SOLIX's catalog schema.
 - catalog_provenance.json      the HEK query and the interval it covered.
 
 Three modes:
@@ -71,7 +71,7 @@ MAX_OFFSET = pd.Timedelta("60s")
 CATALOG_START = pd.Timestamp("2017-09-01 00:00:00")
 CATALOG_END = pd.Timestamp("2017-09-06 00:00:00")
 
-USER_AGENT = "flare-indexer-examples"
+USER_AGENT = "solix-examples"
 
 # Columns read from the image's own header; replay may rewrite these.
 HEADER_COLUMNS = (

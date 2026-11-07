@@ -1,6 +1,7 @@
-# flare-indexer
+# SOLIX
 
-flare-indexer builds labeled datasets for solar flare prediction.
+SOLIX (Solar Observation Labeling and IndeXing) builds labeled datasets
+for solar flare prediction.
 
 You give it two tables: an index of your observations and a GOES flare
 catalog. Each row of the index is one **instance**: a point in time and
@@ -40,7 +41,7 @@ machine-learning data loader.
 
 ## How it works
 
-![Architecture of flare-indexer](docs/architecture/architecture.png)
+![Architecture of SOLIX](docs/architecture/architecture.png)
 
 1. **Input.** Two CSV files: an index and a flare catalog. Optional
    helpers in `loaders.py` make them from raw data. The configuration is a
@@ -61,8 +62,8 @@ machine-learning data loader.
 Python 3.10 or newer. Dependencies: pandas (2.0 or newer) and NumPy.
 
 ```bash
-git clone https://github.com/assemkdv/flare-indexer.git
-cd flare-indexer
+git clone https://github.com/assemkdv/solix.git
+cd solix
 pip install .
 ```
 
@@ -81,12 +82,12 @@ The package is not on PyPI yet.
 ## Quick start
 
 ```python
-import flare_indexer as fidx
+import solix
 
-dataset = fidx.FullDiskSingleInstance(
+dataset = solix.FullDiskSingleInstance(
     prediction_window="24h",                     # flares that start in [t, t + 24h)
-    reducer=fidx.MaxFluxReducer(),               # the strongest of them
-    labeler=fidx.BinaryThresholdLabeler("M"),    # 1 if it is M1.0 or stronger, else 0
+    reducer=solix.MaxFluxReducer(),              # the strongest of them
+    labeler=solix.BinaryThresholdLabeler("M"),   # 1 if it is M1.0 or stronger, else 0
 )
 labels = dataset.build("examples/data/full_disk_index.csv",
                        "examples/data/flare_catalog.csv")
@@ -260,10 +261,10 @@ The threshold can be a letter (`"C"`, `"M"`, `"X"`) or a full class
 ### Any reducer with any labeler
 
 ```python
-dataset = fidx.FullDiskSingleInstance(
+dataset = solix.FullDiskSingleInstance(
     "24h",
-    reducer=fidx.CumulativeClassIndexReducer(),
-    labeler=fidx.NumericThresholdLabeler(10),
+    reducer=solix.CumulativeClassIndexReducer(),
+    labeler=solix.NumericThresholdLabeler(10),
 )
 ```
 
@@ -303,7 +304,7 @@ class StrongestClassLetter:
     def reduce(self, flares):
         if not flares:
             return "none"
-        flux = fidx.FluxConverter()
+        flux = solix.FluxConverter()
         strongest = max(flares, key=lambda f: flux.to_flux(f.goes_class))
         return strongest.goes_class[0]
 
@@ -311,7 +312,7 @@ class AsIs:
     def assign(self, value):
         return value
 
-dataset = fidx.FullDiskSingleInstance("24h", reducer=StrongestClassLetter(), labeler=AsIs())
+dataset = solix.FullDiskSingleInstance("24h", reducer=StrongestClassLetter(), labeler=AsIs())
 ```
 
 ### GOES classes
@@ -359,7 +360,7 @@ SequenceBuildReport)`. The report counts the candidate, emitted and skipped
 sequences and lists the missing times that caused the skips.
 
 ```python
-dataset = fidx.FullDiskSequence("24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.RegressionLabeler(),
+dataset = solix.FullDiskSequence("24h", reducer=solix.MaxFluxReducer(), labeler=solix.RegressionLabeler(),
                                 cadence="1h", observation_window="3h", sliding_window="1h")
 labels, report = dataset.build("examples/data/full_disk_index.csv",
                                "examples/data/flare_catalog.csv", return_report=True)
@@ -380,9 +381,9 @@ data.
 | `add_relative_flux(catalog_path, xray_flux_path, output_path=None)` | flare catalog + GOES 1–8 Å X-ray flux, one value per minute (`time`, `flux`) | catalog with `background_flux` and `rxfi` columns |
 
 ```python
-fidx.build_index_from_hmi_filenames("hmi_image_list.txt", "index.csv")
-fidx.adapt_goes_catalog("goes_flares.csv", "flare_catalog.csv")
-fidx.add_relative_flux("flare_catalog.csv", "xray_flux.csv", "flare_catalog_rxfi.csv")
+solix.build_index_from_hmi_filenames("hmi_image_list.txt", "index.csv")
+solix.adapt_goes_catalog("goes_flares.csv", "flare_catalog.csv")
+solix.add_relative_flux("flare_catalog.csv", "xray_flux.csv", "flare_catalog_rxfi.csv")
 ```
 
 **rxfi.** The background of a flare is the mean X-ray flux in the 24 hours
@@ -441,9 +442,9 @@ needs only PyTorch.
 ## Repository structure
 
 ```text
-flare-indexer/
-├── src/flare_indexer/          the package
-│   ├── __init__.py             public names (import flare_indexer as fidx)
+solix/
+├── src/solix/                  the package
+│   ├── __init__.py             public names (import solix)
 │   ├── datasets.py             the four dataset classes
 │   ├── builder.py              DatasetBuilder: validates inputs, makes samples, collects labels
 │   ├── events.py               reads and checks the flare catalog; EventMatcher finds the flares in a window

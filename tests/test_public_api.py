@@ -1,4 +1,4 @@
-import flare_indexer as fidx
+import solix
 
 
 def test_public_names_are_accessible():
@@ -35,15 +35,15 @@ def test_public_names_are_accessible():
         "HMIIndexReport",
     }
 
-    assert set(fidx.__all__) == expected
+    assert set(solix.__all__) == expected
     for name in expected:
-        assert hasattr(fidx, name)
+        assert hasattr(solix, name)
 
 
 def test_engine_is_not_public():
-    assert not hasattr(fidx, "DatasetBuilder")
+    assert not hasattr(solix, "DatasetBuilder")
 
 
 def test_top_level_classes_are_usable():
-    builder = fidx.FullDiskSingleInstance(prediction_window=24, reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"))
+    builder = solix.FullDiskSingleInstance(prediction_window=24, reducer=solix.MaxFluxReducer(), labeler=solix.BinaryThresholdLabeler("M"))
     assert builder.prediction_window == 24

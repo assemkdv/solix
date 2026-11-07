@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-PACKAGE = Path(__file__).resolve().parent.parent / "src" / "flare_indexer"
+PACKAGE = Path(__file__).resolve().parent.parent / "src" / "solix"
 
 ALLOWED = {
     "goes_class": set(),
@@ -38,11 +38,11 @@ def _internal_imports(module: str) -> set[str]:
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom) and node.level == 1 and node.module:
             found.add(node.module.split(".")[0])
-        elif isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("flare_indexer."):
+        elif isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("solix."):
             found.add(node.module.split(".")[1])
         elif isinstance(node, ast.Import):
             for alias in node.names:
-                if alias.name.startswith("flare_indexer."):
+                if alias.name.startswith("solix."):
                     found.add(alias.name.split(".")[1])
     return found
 

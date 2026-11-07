@@ -19,7 +19,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
-from flare_indexer.builder import DatasetBuilder
+from solix.builder import DatasetBuilder
 
 REPO = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO / "examples"
@@ -145,11 +145,11 @@ def test_tensorflow_and_pytorch_loaders_yield_the_same_samples(tmp_path):
     torch_sequences = _load("07_pytorch_sequences.py")
     tf_sequences = _load("09_tensorflow_sequences.py")
     real = tf_images.real
-    import flare_indexer as fidx
+    import solix
 
     index_path = tmp_path / "index.csv"
     real.build_image_index(index_path)
-    options = dict(prediction_window="24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"), target="full_disk")
+    options = dict(prediction_window="24h", reducer=solix.MaxFluxReducer(), labeler=solix.BinaryThresholdLabeler("M"), target="full_disk")
     labels = DatasetBuilder(include_metadata=True, **options).build(index_path, real.CATALOG)
     sequences = DatasetBuilder(cadence="1h", observation_window="3h", sliding_window="1h", **options) \
         .build(index_path, real.CATALOG)
@@ -178,12 +178,12 @@ def test_tensorflow_datasets_train_with_model_fit(tmp_path):
     tf_images = _load("08_tensorflow_images.py")
     tf_sequences = _load("09_tensorflow_sequences.py")
     real = tf_images.real
-    import flare_indexer as fidx
+    import solix
     from tensorflow import keras
 
     index_path = tmp_path / "index.csv"
     real.build_image_index(index_path)
-    options = dict(prediction_window="24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"), target="full_disk")
+    options = dict(prediction_window="24h", reducer=solix.MaxFluxReducer(), labeler=solix.BinaryThresholdLabeler("M"), target="full_disk")
     labels = DatasetBuilder(include_metadata=True, **options).build(index_path, real.CATALOG)
     sequences = DatasetBuilder(cadence="1h", observation_window="3h", sliding_window="1h", **options) \
         .build(index_path, real.CATALOG)
@@ -224,11 +224,11 @@ def test_tensorflow_and_pytorch_active_region_loaders_yield_the_same_patches(tmp
     torch_example = _load("10_pytorch_active_region.py")
     tf_example = _load("11_tensorflow_active_region.py")
     real = tf_example.real
-    import flare_indexer as fidx
+    import solix
 
     index_path = tmp_path / "patch_index.csv"
     real.build_patch_index(index_path)
-    labels = fidx.ActiveRegionSingleInstance("24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"), include_metadata=True) \
+    labels = solix.ActiveRegionSingleInstance("24h", reducer=solix.MaxFluxReducer(), labeler=solix.BinaryThresholdLabeler("M"), include_metadata=True) \
         .build(index_path, real.CATALOG)
     torch_dataset = torch_example.FlareDataset(labels, real.REAL_DATA)
     tf_dataset = tf_example.FlareDataset(labels, real.REAL_DATA, batch_size=4)

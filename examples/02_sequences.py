@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pandas as pd
 
-import flare_indexer as fidx
+import solix
 
 DATA = Path(__file__).parent / "data"
 INDEX = DATA / "full_disk_index.csv"
@@ -26,8 +26,8 @@ COLUMNS = ["sequence_start", "sequence_end", "n_instances", "label"]
 
 def main():
     print("6 instances every 2h (12h observation window), new sequence every 6h")
-    sequences, report = fidx.FullDiskSequence(
-        "24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"),
+    sequences, report = solix.FullDiskSequence(
+        "24h", reducer=solix.MaxFluxReducer(), labeler=solix.BinaryThresholdLabeler("M"),
         cadence="2h", observation_window="12h", sliding_window="6h",
     ).build(INDEX, CATALOG, return_report=True)
     with pd.option_context("display.width", 120):

@@ -7,8 +7,8 @@ import pandas as pd
 import pytest
 
 
-from flare_indexer.builder import DatasetBuilder
-from flare_indexer import MaxFluxReducer, BinaryThresholdLabeler, RegressionLabeler
+from solix.builder import DatasetBuilder
+from solix import MaxFluxReducer, BinaryThresholdLabeler, RegressionLabeler
 
 CATALOG = (
     "start_time,peak_time,end_time,class,active_region\n"

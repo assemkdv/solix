@@ -6,9 +6,9 @@ and the strongest flare's flux (MaxFluxReducer + RegressionLabeler).
 
 import pandas as pd
 
-from flare_indexer.events import FlareEvent
-from flare_indexer.labelers import BinaryThresholdLabeler, RegressionLabeler
-from flare_indexer.reducers import MaxFluxReducer
+from solix.events import FlareEvent
+from solix.labelers import BinaryThresholdLabeler, RegressionLabeler
+from solix.reducers import MaxFluxReducer
 
 
 def _flare(goes_class: str) -> FlareEvent:

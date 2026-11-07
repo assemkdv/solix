@@ -9,15 +9,15 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from flare_indexer import (
+from solix import (
     BinaryThresholdLabeler,
     EventMatcher,
     MaxFluxReducer,
     adapt_goes_catalog,
     build_index_from_hmi_filenames,
 )
-from flare_indexer.events import _normalize_active_region, _parse_prediction_window
-from flare_indexer.builder import DatasetBuilder
+from solix.events import _normalize_active_region, _parse_prediction_window
+from solix.builder import DatasetBuilder
 
 CATALOG_HEADER = "start_time,peak_time,end_time,class,active_region\n"
 FLARE_ROW = "2024-01-01 10:00:00,2024-01-01 10:10:00,2024-01-01 10:30:00,M1.0,100\n"
@@ -379,7 +379,7 @@ def test_offset_column_with_missing_cells_keeps_them_missing(tmp_path):
 
 
 def test_offset_normalization_is_not_a_time_scale_correction():
-    from flare_indexer.events import _to_naive_utc
+    from solix.events import _to_naive_utc
     # A naive value is kept exactly as written: no TAI-to-UTC (leap-second) shift.
     naive = pd.Timestamp("2024-01-01 10:00:37")
     assert _to_naive_utc(naive) is naive

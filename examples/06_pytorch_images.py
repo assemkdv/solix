@@ -7,12 +7,12 @@ in [t, t + 24h), where t is the image's own observation time?"
 Steps
 1. Index: built from examples/real_data/image_manifest.csv, which
    fetch_real_data.py wrote from each downloaded file's header (DATE_OBS).
-2. Labels: flare_indexer.FullDiskSingleInstance with every labeling choice explicit.
+2. Labels: solix.FullDiskSingleInstance with every labeling choice explicit.
 3. Loading: FlareDataset, a torch Dataset that gives one (image, label)
    per row of the label table, and a DataLoader that yields image batches
    shaped [B, C, H, W] = [B, 1, 256, 256].
 4. Checks: header time vs. index time for every loaded image, and every
-   label recomputed from the catalog without flare_indexer (one positive
+   label recomputed from the catalog without SOLIX (one positive
    and one negative are printed with their flares).
 
 Data: 10 SDO/HMI magnetograms requested hourly on 2017-09-03 (9 available)
@@ -32,7 +32,7 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader, Dataset
 
-import flare_indexer as fidx
+import solix
 
 EXAMPLES = Path(__file__).resolve().parent
 sys.path.insert(0, str(EXAMPLES / "real_data"))
@@ -48,7 +48,7 @@ class FlareDataset(Dataset):
     """
     One labeled image per item: (image [C, H, W], label).
 
-    labels is the table built by flare_indexer, one row per image with
+    labels is the table built by SOLIX, one row per image with
     timestamp, image_path and label; image_root is the folder the image
     paths are relative to.
     """
@@ -84,10 +84,10 @@ def main(argv=None):
           f"{provenance['query_end']}; covers every [t, t+{PREDICTION_WINDOW}) window")
 
     # 2. Labels.
-    builder = fidx.FullDiskSingleInstance(
+    builder = solix.FullDiskSingleInstance(
         prediction_window=PREDICTION_WINDOW,
-        reducer=fidx.MaxFluxReducer(),               # the strongest flare in the window
-        labeler=fidx.BinaryThresholdLabeler("M"),    # 1 if any flare >= M1.0 in the window
+        reducer=solix.MaxFluxReducer(),              # the strongest flare in the window
+        labeler=solix.BinaryThresholdLabeler("M"),   # 1 if any flare >= M1.0 in the window
         include_metadata=True,                       # keep image_path
     )
     labels = builder.build(index_path, real.CATALOG)
@@ -112,7 +112,7 @@ def main(argv=None):
         seen += batch_labels.tolist()
     assert seen == labels["label"].tolist(), "DataLoader order or labels differ from the label table"
 
-    # 4. Independent label check: no flare_indexer, just the catalog rows.
+    # 4. Independent label check: no SOLIX, just the catalog rows.
     #    The reference time is the full-precision DATE_OBS parsed straight
     #    from the manifest, which must equal the label table's timestamp.
     catalog = real.load_catalog()

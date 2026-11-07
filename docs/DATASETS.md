@@ -89,8 +89,8 @@ name (see [LABELS.md](LABELS.md)), then its own settings by name:
 ## Single instances
 
 ```python
-builder = fidx.FullDiskSingleInstance(
-    "24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"),
+builder = solix.FullDiskSingleInstance(
+    "24h", reducer=solix.MaxFluxReducer(), labeler=solix.BinaryThresholdLabeler("M"),
 )
 labels = builder.build("index.csv", "flare_catalog.csv")
 ```
@@ -105,8 +105,8 @@ of the time between the instances.
 ## Sequences
 
 ```python
-builder = fidx.FullDiskSequence(
-    "24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"),
+builder = solix.FullDiskSequence(
+    "24h", reducer=solix.MaxFluxReducer(), labeler=solix.BinaryThresholdLabeler("M"),
     cadence="1h",              # time between instances in a sequence
     observation_window="3h",   # time one sequence covers: 3 instances
     sliding_window="1h",       # a new sequence starts every hour
@@ -139,8 +139,8 @@ sequences = builder.build("index.csv", "flare_catalog.csv")
 ## Active regions
 
 ```python
-builder = fidx.ActiveRegionSingleInstance(
-    "24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"),
+builder = solix.ActiveRegionSingleInstance(
+    "24h", reducer=solix.MaxFluxReducer(), labeler=solix.BinaryThresholdLabeler("M"),
 )
 labels = builder.build("active_region_index.csv", "flare_catalog.csv")
 ```
@@ -187,10 +187,10 @@ Result: 118 rows; label 0: 41, label 1: 77
 ## Preparing real data
 
 ```python
-index = fidx.build_index_from_hmi_filenames(
+index = solix.build_index_from_hmi_filenames(
     "hmi_image_list.txt", output_path="index.csv",
     strict=False)  # skip lines that are not HMI images
-catalog = fidx.adapt_goes_catalog(
+catalog = solix.adapt_goes_catalog(
     "goes_flares.csv", output_path="flare_catalog.csv")
 ```
 

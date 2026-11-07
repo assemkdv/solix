@@ -3,12 +3,12 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from flare_indexer.builder import DatasetBuilder
-from flare_indexer.events import EventMatcher, FlareEvent
-from flare_indexer.goes_class import InvalidGOESClassError
-from flare_indexer.labelers import BinaryThresholdLabeler, RegressionLabeler
-from flare_indexer.pipeline import DatasetBuildingPipeline, PipelineResult
-from flare_indexer.reducers import MaxFluxReducer
+from solix.builder import DatasetBuilder
+from solix.events import EventMatcher, FlareEvent
+from solix.goes_class import InvalidGOESClassError
+from solix.labelers import BinaryThresholdLabeler, RegressionLabeler
+from solix.pipeline import DatasetBuildingPipeline, PipelineResult
+from solix.reducers import MaxFluxReducer
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 CATALOG_PATH = FIXTURES_DIR / "catalog.csv"

@@ -1,10 +1,10 @@
 import pandas as pd
 import pytest
 
-from flare_indexer import EventMatcher, FluxConverter, InvalidGOESClassError, adapt_goes_catalog
-from flare_indexer.goes_class import parse_goes_class
-from flare_indexer.builder import DatasetBuilder
-from flare_indexer import MaxFluxReducer, BinaryThresholdLabeler
+from solix import EventMatcher, FluxConverter, InvalidGOESClassError, adapt_goes_catalog
+from solix.goes_class import parse_goes_class
+from solix.builder import DatasetBuilder
+from solix import MaxFluxReducer, BinaryThresholdLabeler
 
 
 @pytest.mark.parametrize("value, expected", [

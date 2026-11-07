@@ -10,12 +10,12 @@ Steps
 1. Index: built from examples/real_data/sharp_manifest.csv, which
    fetch_sharp_patches.py wrote from each patch's own header (DATE-OBS and
    NOAA_AR).
-2. Labels: flare_indexer.ActiveRegionSingleInstance.
+2. Labels: solix.ActiveRegionSingleInstance.
 3. Loading: FlareDataset, a torch Dataset that gives one (patch, label) per
    row of the label table, and a DataLoader that yields batches shaped
    [B, C, H, W] = [B, 1, 128, 128].
 4. Checks: header time vs. index time for every patch, and every label
-   recomputed from the catalog, region by region, without flare_indexer.
+   recomputed from the catalog, region by region, without SOLIX.
 
 Data: SDO/HMI SHARP magnetograms (hmi.sharp_cea_720s) of HARP 7115 =
 NOAA 12673 and HARP 7120 = NOAA 12675, recorded hourly from 00:00 to 09:00
@@ -35,7 +35,7 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader, Dataset
 
-import flare_indexer as fidx
+import solix
 
 EXAMPLES = Path(__file__).resolve().parent
 sys.path.insert(0, str(EXAMPLES / "real_data"))
@@ -51,7 +51,7 @@ class FlareDataset(Dataset):
     """
     One labeled active-region patch per item: (patch [C, H, W], label).
 
-    labels is the table built by flare_indexer, one row per patch with
+    labels is the table built by SOLIX, one row per patch with
     timestamp, active_region, image_path and label; image_root is the
     folder the image paths are relative to.
     """
@@ -88,10 +88,10 @@ def main(argv=None):
           f"{provenance['query_end']}; covers every [t, t+{PREDICTION_WINDOW}) window")
 
     # 2. Labels: only each patch's own region's flares count.
-    builder = fidx.ActiveRegionSingleInstance(
+    builder = solix.ActiveRegionSingleInstance(
         prediction_window=PREDICTION_WINDOW,
-        reducer=fidx.MaxFluxReducer(),               # the strongest flare in the window
-        labeler=fidx.BinaryThresholdLabeler("M"),    # 1 if a flare >= M1.0 from this region starts in the window
+        reducer=solix.MaxFluxReducer(),              # the strongest flare in the window
+        labeler=solix.BinaryThresholdLabeler("M"),   # 1 if a flare >= M1.0 from this region starts in the window
         include_metadata=True,                       # keep image_path
         include_flares=True,                         # show which flares made each label
     )
@@ -116,7 +116,7 @@ def main(argv=None):
         seen += batch_labels.tolist()
     assert seen == labels["label"].tolist(), "DataLoader order or labels differ from the label table"
 
-    # 4. Independent label check, region by region: no flare_indexer, just the catalog rows.
+    # 4. Independent label check, region by region: no SOLIX, just the catalog rows.
     catalog = real.load_catalog()
     for _, row in labels.iterrows():
         expected, _ = real.independent_m_label(catalog, row["timestamp"], PREDICTION_WINDOW, row["active_region"])

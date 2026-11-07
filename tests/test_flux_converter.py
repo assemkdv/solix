@@ -1,6 +1,6 @@
 import math
 import pytest
-from flare_indexer.goes_class import FluxConverter
+from solix.goes_class import FluxConverter
 
 # ── FluxConverter tests ────────────────────────────────────────────────
 
@@ -36,7 +36,7 @@ def test_equivalent_class_text_gives_identical_flux(text, equivalent):
 
 
 def test_binary_m_threshold_at_c10_and_adjacent_floats():
-    from flare_indexer import BinaryThresholdLabeler
+    from solix import BinaryThresholdLabeler
 
     converter = FluxConverter()
     labeler = BinaryThresholdLabeler("M")

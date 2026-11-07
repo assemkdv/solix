@@ -5,13 +5,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import flare_indexer as fidx
-from flare_indexer.goes_class import FluxConverter
-from flare_indexer.events import FlareEvent
-from flare_indexer.builder import DatasetBuilder
+import solix
+from solix.goes_class import FluxConverter
+from solix.events import FlareEvent
+from solix.builder import DatasetBuilder
 
 flux = FluxConverter().to_flux
-labeler = fidx.MulticlassLabeler()
+labeler = solix.MulticlassLabeler()
 
 BOUNDARIES = {"A": 1e-8, "B": 1e-7, "C": 1e-6, "M": 1e-5, "X": 1e-4}
 
@@ -22,7 +22,7 @@ def _event(goes_class):
 
 
 def _multiclass_pipeline():
-    return fidx.DatasetBuildingPipeline(reducer=fidx.MaxFluxReducer(), labeler=fidx.MulticlassLabeler())
+    return solix.DatasetBuildingPipeline(reducer=solix.MaxFluxReducer(), labeler=solix.MulticlassLabeler())
 
 
 def _label(pipeline, events):
@@ -32,7 +32,7 @@ def _label(pipeline, events):
 # ── assign() ─────────────────────────────────────────────────────────────
 
 def test_classes_attribute_lists_labels_in_flux_order():
-    assert fidx.MulticlassLabeler.CLASSES == ("NF", "A", "B", "C", "M", "X")
+    assert solix.MulticlassLabeler.CLASSES == ("NF", "A", "B", "C", "M", "X")
 
 
 @pytest.mark.parametrize("value", [0.0, 0, -0.0, np.float64(0.0)])
@@ -94,16 +94,16 @@ def test_class_boundaries_from_text_are_exactly_the_boundaries():
     flux("C10.0"), flux("C9.99"), flux("M1.0"), flux("M10.0"), 0.0,
 ])
 def test_binary_m_threshold_agrees_with_multiclass(value):
-    binary = fidx.BinaryThresholdLabeler("M").assign(value)
+    binary = solix.BinaryThresholdLabeler("M").assign(value)
     assert binary == int(labeler.assign(value) in ("M", "X"))
 
 
 def test_binary_and_multiclass_agree_on_c10_through_the_pipeline():
     events = [_event("C10.0")]
-    strongest = fidx.MaxFluxReducer().reduce(events)
-    assert fidx.BinaryThresholdLabeler("M").assign(strongest) == 1
+    strongest = solix.MaxFluxReducer().reduce(events)
+    assert solix.BinaryThresholdLabeler("M").assign(strongest) == 1
     assert _label(_multiclass_pipeline(), events) == "M"
-    assert fidx.RegressionLabeler().assign(strongest) == fidx.MaxFluxReducer().reduce([_event("M1.0")]) == 1e-5
+    assert solix.RegressionLabeler().assign(strongest) == solix.MaxFluxReducer().reduce([_event("M1.0")]) == 1e-5
 
 
 def test_m10_and_x1_are_both_x_numerically_not_by_text():
@@ -191,8 +191,8 @@ def test_single_instance_full_disk(catalog, full_disk_index):
 
 def test_multiclass_agrees_with_binary_and_regression_on_the_same_windows(catalog, full_disk_index):
     multiclass = _builder(_multiclass_pipeline()).build(full_disk_index, catalog)["label"]
-    binary = _builder(reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M")).build(full_disk_index, catalog)["label"]
-    regression = _builder(reducer=fidx.MaxFluxReducer(), labeler=fidx.RegressionLabeler()).build(full_disk_index, catalog)["label"]
+    binary = _builder(reducer=solix.MaxFluxReducer(), labeler=solix.BinaryThresholdLabeler("M")).build(full_disk_index, catalog)["label"]
+    regression = _builder(reducer=solix.MaxFluxReducer(), labeler=solix.RegressionLabeler()).build(full_disk_index, catalog)["label"]
 
     # Multiclass M/X matches the binary M threshold on every window.
     assert binary.tolist() == [1, 0, 0, 0, 0, 0, 1, 0]

@@ -1,7 +1,7 @@
 include tests/fixtures/*.csv tests/fixtures/*.md
 recursive-include examples *.py *.csv *.txt *.json *.md
 recursive-include docs *.py *.pdf *.svg *.md
-prune src/flare_indexer.egg-info
+prune src/solix.egg-info
 # Never ship generated example outputs, the downloaded image cache,
 # partial downloads or byte code.
 prune examples/output

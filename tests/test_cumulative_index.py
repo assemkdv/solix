@@ -14,7 +14,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from flare_indexer import (
+from solix import (
     CumulativeClassIndexReducer,
     DatasetBuildingPipeline,
     EventMatcher,
@@ -23,7 +23,7 @@ from flare_indexer import (
     NumericThresholdLabeler,
     RegressionLabeler,
 )
-from flare_indexer.builder import DatasetBuilder
+from solix.builder import DatasetBuilder
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 

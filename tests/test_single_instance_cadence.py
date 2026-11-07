@@ -6,7 +6,7 @@ start + 2 * cadence, ... and labels them like any single instance.
 import pandas as pd
 import pytest
 
-import flare_indexer as f
+import solix as f
 
 CATALOG = (
     "start_time,peak_time,end_time,class,active_region\n"

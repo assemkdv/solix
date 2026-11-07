@@ -1,9 +1,9 @@
 import pandas as pd
 import pytest
 
-from flare_indexer.events import FlareEvent
-from flare_indexer.goes_class import InvalidGOESClassError
-from flare_indexer.reducers import MaxFluxReducer
+from solix.events import FlareEvent
+from solix.goes_class import InvalidGOESClassError
+from solix.reducers import MaxFluxReducer
 
 
 def _flare(goes_class: str) -> FlareEvent:

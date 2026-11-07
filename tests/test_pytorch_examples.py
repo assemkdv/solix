@@ -20,8 +20,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import flare_indexer as fidx
-from flare_indexer.builder import DatasetBuilder
+import solix
+from solix.builder import DatasetBuilder
 
 REPO = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO / "examples"
@@ -46,7 +46,7 @@ EXPECTED_SEQUENCE_ENDS = {"2017-09-03 02:59:49.900": 0, "2017-09-03 03:59:49.900
 
 def _builder(**sequence):
     return DatasetBuilder(
-        prediction_window="24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"), target="full_disk",
+        prediction_window="24h", reducer=solix.MaxFluxReducer(), labeler=solix.BinaryThresholdLabeler("M"), target="full_disk",
         include_metadata=not sequence, **sequence,
     )
 
@@ -273,7 +273,7 @@ def test_patch_labels_count_only_each_regions_own_flares(tmp_path):
         manifest = pd.read_csv(real.SHARP_MANIFEST)
         pd.DataFrame({"timestamp": manifest["timestamp"], "active_region": manifest["noaa_ar"],
                       "image_path": manifest["image_path"]}).to_csv(index_path, index=False)
-    labels = fidx.ActiveRegionSingleInstance("24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M")).build(index_path, real.CATALOG)
+    labels = solix.ActiveRegionSingleInstance("24h", reducer=solix.MaxFluxReducer(), labeler=solix.BinaryThresholdLabeler("M")).build(index_path, real.CATALOG)
     got = {(t, r): label for t, r, label in zip(labels["timestamp"], labels["active_region"], labels["label"])}
     assert {key: value for key, value in got.items() if value} == EXPECTED_PATCH_LABELS
     assert len(got) == 16
@@ -341,7 +341,7 @@ def test_npy_example_runs_and_labels_match_the_catalog(tmp_path):
     assert len(files) == 100 and files[0].name == "20240301_000000.npy" and files[-1].name == "20240305_030000.npy"
     assert all(np.load(f).shape == (1,) for f in files)
 
-    # Every label recomputed from the catalog without flare_indexer: 1 if an
+    # Every label recomputed from the catalog without SOLIX: 1 if an
     # M- or X-class flare starts in [t, t + 24h).
     index = pd.read_csv(tmp_path / "12_index.csv", parse_dates=["timestamp"])
     catalog = pd.read_csv(EXAMPLES / "data" / "flare_catalog.csv", parse_dates=["start_time"])
@@ -350,13 +350,13 @@ def test_npy_example_runs_and_labels_match_the_catalog(tmp_path):
     def expected(t):
         return int(((strong >= t) & (strong < t + pd.Timedelta("24h"))).any())
 
-    labels = fidx.FullDiskSingleInstance("24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M")) \
+    labels = solix.FullDiskSingleInstance("24h", reducer=solix.MaxFluxReducer(), labeler=solix.BinaryThresholdLabeler("M")) \
         .build(tmp_path / "12_index.csv", EXAMPLES / "data" / "flare_catalog.csv")
     assert labels["label"].tolist() == [expected(t) for t in index["timestamp"]]
     assert sum(expected(t) for t in index["timestamp"]) == 62
     # A sequence is labeled from its last file: 6 files 1 h apart, a new one every 6 h.
-    sequences = fidx.FullDiskSequence(
-        "24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"),
+    sequences = solix.FullDiskSequence(
+        "24h", reducer=solix.MaxFluxReducer(), labeler=solix.BinaryThresholdLabeler("M"),
         cadence="1h", observation_window="6h", sliding_window="6h",
     ).build(tmp_path / "12_index.csv", EXAMPLES / "data" / "flare_catalog.csv")
     ends = index["timestamp"][5::6].tolist()

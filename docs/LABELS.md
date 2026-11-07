@@ -5,10 +5,10 @@ is made by a reducer and a labeler, passed to a dataset class as
 `reducer` and `labeler`:
 
 ```python
-import flare_indexer as fidx
+import solix
 
-builder = fidx.FullDiskSingleInstance(
-    "24h", reducer=fidx.MaxFluxReducer(), labeler=fidx.BinaryThresholdLabeler("M"),
+builder = solix.FullDiskSingleInstance(
+    "24h", reducer=solix.MaxFluxReducer(), labeler=solix.BinaryThresholdLabeler("M"),
 )
 ```
 
@@ -78,8 +78,8 @@ class StrongFlareCount:
     def reduce(self, flares):
         return sum(f.goes_class[0] in "MX" for f in flares)
 
-builder = fidx.FullDiskSingleInstance(
-    "24h", reducer=StrongFlareCount(), labeler=fidx.RegressionLabeler(),
+builder = solix.FullDiskSingleInstance(
+    "24h", reducer=StrongFlareCount(), labeler=solix.RegressionLabeler(),
 )
 ```
 
@@ -94,7 +94,7 @@ from GOES 1–8 Å X-ray flux, a CSV with the columns `time, flux` and one
 value per minute:
 
 ```python
-fidx.add_relative_flux("flare_catalog.csv", "xray_flux.csv",
+solix.add_relative_flux("flare_catalog.csv", "xray_flux.csv",
                        output_path="flare_catalog_rxfi.csv")
 ```
 

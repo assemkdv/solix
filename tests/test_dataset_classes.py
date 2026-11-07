@@ -9,8 +9,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-import flare_indexer as f
-from flare_indexer.builder import DatasetBuilder
+import solix as f
+from solix.builder import DatasetBuilder
 
 DATA = Path(__file__).resolve().parent.parent / "examples" / "data"
 FULL_DISK = DATA / "full_disk_index.csv"

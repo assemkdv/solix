@@ -15,7 +15,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from flare_indexer import FluxConverter, adapt_goes_catalog
+from solix import FluxConverter, adapt_goes_catalog
 
 DATA_DIR = Path(__file__).parent
 

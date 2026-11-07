@@ -11,7 +11,7 @@ in [t, t + 24h), where t is the image's full-precision observation time
 Steps
 1. Index from examples/real_data/image_manifest.csv (timestamps are
    the full-precision DATE_OBS read from each file's header).
-2. Labels: flare_indexer.FullDiskSingleInstance with every labeling choice explicit.
+2. Labels: solix.FullDiskSingleInstance with every labeling choice explicit.
 3. Loading: FlareDataset, a keras.utils.PyDataset (TensorFlow's
    counterpart of a torch Dataset). Keras asks it for whole batches, so
    each item is (images, labels) for one batch, with images in
@@ -19,7 +19,7 @@ Steps
    be passed straight to model.fit.
 4. Checks: header time vs. index time for every loaded image, batch shapes,
    order of image paths, timestamps and labels against the label table, and
-   every label recomputed from the catalog without flare_indexer.
+   every label recomputed from the catalog without SOLIX.
 
 Setup:  pip install ".[tensorflow-examples]"        # TensorFlow needs Python <= 3.13
         python examples/real_data/fetch_real_data.py     # downloads about 10 MB once
@@ -39,7 +39,7 @@ import pandas as pd
 import tensorflow as tf
 from tensorflow import keras
 
-import flare_indexer as fidx
+import solix
 
 EXAMPLES = Path(__file__).resolve().parent
 sys.path.insert(0, str(EXAMPLES / "real_data"))
@@ -56,7 +56,7 @@ class FlareDataset(keras.utils.PyDataset):
     """
     One batch of labeled images per item: (images [B, H, W, C], labels [B]).
 
-    labels is the table built by flare_indexer, one row per image with
+    labels is the table built by SOLIX, one row per image with
     timestamp, image_path and label; image_root is the folder the image
     paths are relative to.
     """
@@ -96,10 +96,10 @@ def main(argv=None):
           f"{provenance['query_end']}; covers every [t, t+{PREDICTION_WINDOW}) window")
 
     # 2. Labels.
-    builder = fidx.FullDiskSingleInstance(
+    builder = solix.FullDiskSingleInstance(
         prediction_window=PREDICTION_WINDOW,
-        reducer=fidx.MaxFluxReducer(),               # the strongest flare in the window
-        labeler=fidx.BinaryThresholdLabeler("M"),    # 1 if any flare >= M1.0 in the window
+        reducer=solix.MaxFluxReducer(),              # the strongest flare in the window
+        labeler=solix.BinaryThresholdLabeler("M"),   # 1 if any flare >= M1.0 in the window
         include_metadata=True,                       # keep image_path
     )
     labels = builder.build(index_path, real.CATALOG)
@@ -124,7 +124,7 @@ def main(argv=None):
         seen += batch_labels.tolist()
     assert seen == labels["label"].tolist(), "dataset order or labels differ from the label table"
 
-    # 4. Independent label check: no flare_indexer, just the catalog rows.
+    # 4. Independent label check: no SOLIX, just the catalog rows.
     catalog = real.load_catalog()
     date_obs = real.date_obs_times()
     for _, row in labels.iterrows():

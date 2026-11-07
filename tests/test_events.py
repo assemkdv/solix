@@ -1,6 +1,6 @@
 import pandas as pd
 import pytest
-from flare_indexer.events import EventMatcher
+from solix.events import EventMatcher
 
 
 def test_query_normalizes_missing_active_region_to_none():

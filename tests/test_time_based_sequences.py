@@ -1,8 +1,8 @@
 import pandas as pd
 import pytest
 
-from flare_indexer.builder import DatasetBuilder, SequenceBuildReport
-from flare_indexer import MaxFluxReducer, BinaryThresholdLabeler, RegressionLabeler
+from solix.builder import DatasetBuilder, SequenceBuildReport
+from solix import MaxFluxReducer, BinaryThresholdLabeler, RegressionLabeler
 
 
 

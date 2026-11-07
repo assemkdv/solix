@@ -16,7 +16,7 @@ why: images 0.1 s off the grid, a missing hour, and an image at
 
 Steps
 1. Index from the manifest (same as examples 6, 7 and 8).
-2. Sequences and labels: flare_indexer.FullDiskSequence on a time grid.
+2. Sequences and labels: solix.FullDiskSequence on a time grid.
 3. CSV round trip of the list-valued columns (timestamps, image_path).
 4. Loading: FlareSequenceDataset, a keras.utils.PyDataset that gives one
    batch of (images, labels) per item, oldest image first, as
@@ -24,7 +24,7 @@ Steps
    model.fit.
 5. Checks: order and spacing of every sequence, header time of every
    image, batch shapes, order of paths and labels against the sequence
-   table, and every label recomputed from the catalog without flare_indexer.
+   table, and every label recomputed from the catalog without SOLIX.
 
 Setup:  pip install ".[tensorflow-examples]"        # TensorFlow needs Python <= 3.13
         python examples/real_data/fetch_real_data.py     # downloads about 10 MB once
@@ -44,7 +44,7 @@ import pandas as pd
 import tensorflow as tf
 from tensorflow import keras
 
-import flare_indexer as fidx
+import solix
 
 EXAMPLES = Path(__file__).resolve().parent
 sys.path.insert(0, str(EXAMPLES / "real_data"))
@@ -66,7 +66,7 @@ class FlareSequenceDataset(keras.utils.PyDataset):
     One batch of labeled sequences per item: (images [B, T, H, W, C],
     labels [B]), oldest image first.
 
-    sequences is the table built by flare_indexer, one row per sequence
+    sequences is the table built by SOLIX, one row per sequence
     with lists of timestamps and image paths and one label; image_root is
     the folder the image paths are relative to.
     """
@@ -110,10 +110,10 @@ def main(argv=None):
           f"{provenance['query_end']}; covers every [t, t+{PREDICTION_WINDOW}) window")
 
     # 2. Sequences and labels.
-    builder = fidx.FullDiskSequence(
+    builder = solix.FullDiskSequence(
         prediction_window=PREDICTION_WINDOW,
-        reducer=fidx.MaxFluxReducer(),               # the strongest flare in the window
-        labeler=fidx.BinaryThresholdLabeler("M"),    # 1 if any flare >= M1.0 in the window
+        reducer=solix.MaxFluxReducer(),              # the strongest flare in the window
+        labeler=solix.BinaryThresholdLabeler("M"),   # 1 if any flare >= M1.0 in the window
         cadence=CADENCE,
         observation_window=OBSERVATION_WINDOW,
         sliding_window=SLIDING_WINDOW,

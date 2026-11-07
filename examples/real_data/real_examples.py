@@ -2,7 +2,7 @@
 Helpers shared by the real-image examples (06, 07, 10 with PyTorch; 08,
 09, 11 with TensorFlow): turning the download manifests into indexes,
 checking catalog coverage, saving sequence tables with list-valued columns,
-and an independent label check that does not use flare_indexer.
+and an independent label check that does not use SOLIX.
 """
 
 import hashlib
@@ -49,7 +49,7 @@ def require_optional_dependencies(images: str = "jp2"):
 
 def build_image_index(output_path: Path) -> pd.DataFrame:
     """
-    Write the index flare_indexer reads: one row per available image,
+    Write the index SOLIX reads: one row per available image,
     timestamp = full-precision DATE_OBS from the image's own header
     (recorded in the manifest, never rounded), image_path = path relative to examples/real_data.
     Requests recorded as missing are left out. Exits if a file is absent or
@@ -128,7 +128,7 @@ def check_catalog_coverage(reference_times, prediction_window) -> dict:
 
 def flares_in_window(catalog: pd.DataFrame, t: pd.Timestamp, prediction_window) -> pd.DataFrame:
     """
-    Independent of flare_indexer: catalog rows whose start_time is in
+    Independent of SOLIX: catalog rows whose start_time is in
     [t, t + prediction_window), the package's window rule.
     """
     end = t + pd.Timedelta(prediction_window)
@@ -139,7 +139,7 @@ _EXPONENT = {"A": -8, "B": -7, "C": -6, "M": -5, "X": -4}
 
 
 def _at_least_m1(goes_class: str) -> bool:
-    """Exact decimal check, written separately from flare_indexer: "C10.0" counts as M1.0."""
+    """Exact decimal check, written separately from solix: "C10.0" counts as M1.0."""
     text = goes_class.strip().upper()
     multiplier = Decimal(text[1:] or "1")
     return multiplier.scaleb(_EXPONENT[text[0]]) >= Decimal("1e-5")

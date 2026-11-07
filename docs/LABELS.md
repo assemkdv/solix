@@ -32,7 +32,7 @@ This is the label each reducer and labeler give that instance:
 | Peak flux of the strongest flare | `MaxFluxReducer()` | `RegressionLabeler()` | `2.7e-05` |
 | Peak flux of the weakest flare | `MinFluxReducer()` | `RegressionLabeler()` | `3.2e-06` |
 | Mean peak flux | `MeanFluxReducer()` | `RegressionLabeler()` | `1.47e-05` |
-| Class of the strongest flare | `MaxFluxReducer()` | `MulticlassLabeler()` | `"M"` |
+| Class of the strongest flare, one-hot | `MaxFluxReducer()` | `MulticlassLabeler()` | `{"NF": 0, "A": 0, "B": 0, "C": 0, "M": 1, "X": 0}` |
 | Number of flares per class | `ClassCountReducer()` | `ClassCountLabeler()` | `{"A": 0, "B": 0, "C": 1, "M": 2, "X": 0}` |
 | Which classes occur (0/1 each) | `ClassCountReducer()` | `ClassPresenceLabeler()` | `{"A": 0, "B": 0, "C": 1, "M": 1, "X": 0}` |
 | Cumulative index ΣC + 10ΣM + 100ΣX | `CumulativeClassIndexReducer()` | `RegressionLabeler()` | `44.2` (3.2 + 14 + 27) |
@@ -43,7 +43,7 @@ This is the label each reducer and labeler give that instance:
 
 The threshold class can carry a number: `BinaryThresholdLabeler("C4.2")`.
 
-A window with no flare gives 0, `0.0`, `"NF"` (no flare) or all-zero counts.
+A window with no flare gives 0, `0.0`, NF = 1 in the one-hot label (no flare) or all-zero counts.
 
 ## How a label is made
 
@@ -64,7 +64,7 @@ flares, the reduced value and the label.
 | `MaxFluxReducer`, `MinFluxReducer`, `MeanFluxReducer` | `BinaryThresholdLabeler(class)`: 0/1 against a GOES class |
 | `ClassCountReducer` | `NumericThresholdLabeler(number)`: 0/1 against a number |
 | `CumulativeClassIndexReducer` | `RegressionLabeler()`: the value itself |
-| `MaxRelativeFluxReducer`, `SumRelativeFluxReducer` | `MulticlassLabeler()`: NF, A, B, C, M or X |
+| `MaxRelativeFluxReducer`, `SumRelativeFluxReducer` | `MulticlassLabeler()`: one-hot NF, A, B, C, M, X |
 | | `ClassCountLabeler()`, `ClassPresenceLabeler()`: per-class counts or 0/1 |
 
 Any object with a `reduce(flares)` method can be a reducer, and any object

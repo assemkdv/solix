@@ -110,13 +110,15 @@ class RegressionLabeler:
 
 class MulticlassLabeler:
     """
-    Maps a reduced flux value (W/m^2) to a GOES class letter:
-    "NF", "A", "B", "C", "M" or "X".
+    Maps a reduced flux value (W/m^2) to a one-hot class label: a dict
+    with the keys "NF", "A", "B", "C", "M" and "X" (in that order), where
+    the flux's class is 1 and every other class is 0. An M2.4 flux gives
+    {"NF": 0, "A": 0, "B": 0, "C": 0, "M": 1, "X": 0}.
 
     Intended for the output of MaxFluxReducer, so the label describes the
     single representative flux the reducer selected (the strongest flare
     in the window) -- not which classes occurred or how many flares there
-    were. A window with one X1.0 flare and ten C flares is labeled "X".
+    were. A window with one X1.0 flare and ten C flares is labeled X.
 
     Classes are decided numerically by the lower boundary of each class
     (FluxConverter.FLUX_MAP): A >= 1e-8, B >= 1e-7, C >= 1e-6, M >= 1e-5,
@@ -126,7 +128,7 @@ class MulticlassLabeler:
     returns exactly the boundary for equivalent class text, so "C10.0" and
     "M1.0" are both "M", and "M10.0" and "X1.0" both "X".
 
-    Exactly 0.0 -- MaxFluxReducer's value for an empty window -- is "NF"
+    Exactly 0.0 -- MaxFluxReducer's value for an empty window -- is NF
     (no flare). Any other input that is not a GOES class flux is rejected:
     - a positive flux below the A-class boundary (e.g. from "A0.5") raises
       ValueError: the GOES scale has no letter for it, and it is a flare,
@@ -138,7 +140,12 @@ class MulticlassLabeler:
 
     CLASSES = ("NF",) + FluxConverter.CLASS_LETTERS
 
-    def assign(self, reduced_flux) -> str:
+    def assign(self, reduced_flux) -> dict[str, int]:
+        hot = self._class_of(reduced_flux)
+        return {name: int(name == hot) for name in self.CLASSES}
+
+    @staticmethod
+    def _class_of(reduced_flux) -> str:
         if isinstance(reduced_flux, bool) or not isinstance(reduced_flux, numbers.Real):
             raise TypeError(
                 "MulticlassLabeler.assign expects a flux number in W/m^2 (e.g. the output of "

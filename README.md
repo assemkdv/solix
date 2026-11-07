@@ -306,7 +306,7 @@ instances only.
 | `BinaryThresholdLabeler("M")` | 1 if value ≥ the class flux, else 0 | flux reducers |
 | `NumericThresholdLabeler(10)` | 1 if value ≥ the number, else 0 | cumulative index, rxfi |
 | `RegressionLabeler()` | the value itself | any number |
-| `MulticlassLabeler()` | `"NF"`, `"A"`, `"B"`, `"C"`, `"M"` or `"X"` | `MaxFluxReducer` |
+| `MulticlassLabeler()` | one-hot class: `{"NF": 0, "A": 0, "B": 0, "C": 0, "M": 1, "X": 0}` | `MaxFluxReducer` |
 | `ClassCountLabeler()` | counts per class | `ClassCountReducer` |
 | `ClassPresenceLabeler()` | 0/1 per class | `ClassCountReducer` |
 

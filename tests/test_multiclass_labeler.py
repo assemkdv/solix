@@ -25,8 +25,23 @@ def _multiclass_pipeline():
     return solix.DatasetBuildingPipeline(reducer=solix.MaxFluxReducer(), labeler=solix.MulticlassLabeler())
 
 
+def _hot(label):
+    """The class whose slot is 1 in a one-hot label."""
+    assert list(label) == list(solix.MulticlassLabeler.CLASSES)
+    assert sorted(label.values()) == [0, 0, 0, 0, 0, 1]
+    return next(name for name, bit in label.items() if bit == 1)
+
+
+def class_of(value):
+    return _hot(labeler.assign(value))
+
+
 def _label(pipeline, events):
-    return pipeline.assign_label(pipeline.reduce_events(events))
+    return _hot(pipeline.assign_label(pipeline.reduce_events(events)))
+
+
+def _letters(column):
+    return [_hot(label) for label in column]
 
 
 # ── assign() ─────────────────────────────────────────────────────────────
@@ -35,9 +50,19 @@ def test_classes_attribute_lists_labels_in_flux_order():
     assert solix.MulticlassLabeler.CLASSES == ("NF", "A", "B", "C", "M", "X")
 
 
+def test_label_is_one_hot():
+    assert labeler.assign(flux("M2.4")) == {"NF": 0, "A": 0, "B": 0, "C": 0, "M": 1, "X": 0}
+    assert labeler.assign(0.0) == {"NF": 1, "A": 0, "B": 0, "C": 0, "M": 0, "X": 0}
+    assert list(labeler.assign(flux("X1.0"))) == ["NF", "A", "B", "C", "M", "X"]
+
+
+def test_one_hot_values_are_plain_ints():
+    assert all(type(bit) is int for bit in labeler.assign(flux("C1.0")).values())
+
+
 @pytest.mark.parametrize("value", [0.0, 0, -0.0, np.float64(0.0)])
 def test_zero_flux_is_no_flare(value):
-    assert labeler.assign(value) == "NF"
+    assert class_of(value) == "NF"
 
 
 def test_no_events_through_the_pipeline_is_no_flare():
@@ -52,7 +77,7 @@ def test_no_events_through_the_pipeline_is_no_flare():
     ("X1.0", "X"), ("X9.3", "X"), ("X28", "X"),
 ])
 def test_each_class(goes_class, expected):
-    assert labeler.assign(flux(goes_class)) == expected
+    assert class_of(flux(goes_class)) == expected
 
 
 LOWER_CLASS = {"A": None, "B": "A", "C": "B", "M": "C", "X": "M"}
@@ -63,14 +88,14 @@ def test_adjacent_floats_around_every_boundary(letter, boundary):
     """Exact boundaries: one representable float below stays in the lower class."""
     above = math.nextafter(boundary, math.inf)
     below = math.nextafter(boundary, 0.0)
-    assert labeler.assign(boundary) == labeler.assign(above) == letter
+    assert class_of(boundary) == class_of(above) == letter
     if LOWER_CLASS[letter] is None:
         with pytest.raises(ValueError, match="below the A-class boundary"):
-            labeler.assign(below)
+            class_of(below)
     else:
-        assert labeler.assign(below) == LOWER_CLASS[letter]
-        assert labeler.assign(boundary * (1 - 5e-10)) == LOWER_CLASS[letter]
-        assert labeler.assign(boundary * (1 - 1e-6)) == LOWER_CLASS[letter]
+        assert class_of(below) == LOWER_CLASS[letter]
+        assert class_of(boundary * (1 - 5e-10)) == LOWER_CLASS[letter]
+        assert class_of(boundary * (1 - 1e-6)) == LOWER_CLASS[letter]
 
 
 @pytest.mark.parametrize("lower, upper", [
@@ -79,14 +104,14 @@ def test_adjacent_floats_around_every_boundary(letter, boundary):
 ])
 def test_equivalent_class_text_gives_identical_flux_and_label(lower, upper):
     assert flux(lower) == flux(upper)          # identical floats, not approximately equal
-    assert labeler.assign(flux(lower)) == labeler.assign(flux(upper))
+    assert class_of(flux(lower)) == class_of(flux(upper))
 
 
 def test_class_boundaries_from_text_are_exactly_the_boundaries():
     for letter, boundary in BOUNDARIES.items():
         assert flux(f"{letter}1.0") == boundary
-    assert flux("C10.0") == 1e-05 and labeler.assign(flux("C10.0")) == "M"
-    assert flux("C9.99") < 1e-05 and labeler.assign(flux("C9.99")) == "C"
+    assert flux("C10.0") == 1e-05 and class_of(flux("C10.0")) == "M"
+    assert flux("C9.99") < 1e-05 and class_of(flux("C9.99")) == "C"
 
 
 @pytest.mark.parametrize("value", [
@@ -95,7 +120,7 @@ def test_class_boundaries_from_text_are_exactly_the_boundaries():
 ])
 def test_binary_m_threshold_agrees_with_multiclass(value):
     binary = solix.BinaryThresholdLabeler("M").assign(value)
-    assert binary == int(labeler.assign(value) in ("M", "X"))
+    assert binary == int(class_of(value) in ("M", "X"))
 
 
 def test_binary_and_multiclass_agree_on_c10_through_the_pipeline():
@@ -108,9 +133,9 @@ def test_binary_and_multiclass_agree_on_c10_through_the_pipeline():
 
 def test_m10_and_x1_are_both_x_numerically_not_by_text():
     assert flux("M10.0") == flux("X1.0") == 1e-4
-    assert labeler.assign(flux("M10.0")) == labeler.assign(flux("X1.0")) == "X"
+    assert class_of(flux("M10.0")) == class_of(flux("X1.0")) == "X"
     # Text ordering would put "M10.0" before "M9.0" and both before "X1.0".
-    assert labeler.assign(flux("M9.0")) == "M"
+    assert class_of(flux("M9.0")) == "M"
     assert _label(_multiclass_pipeline(), [_event("M9.0"), _event("M10.0")]) == "X"
 
 
@@ -121,31 +146,31 @@ def test_label_reflects_the_strongest_flare_not_every_class_present():
 
 @pytest.mark.parametrize("value", [np.float64(2.3e-5), np.float32(2.3e-5), Fraction(23, 1_000_000)])
 def test_numeric_types_are_accepted(value):
-    assert labeler.assign(value) == "M"
+    assert class_of(value) == "M"
 
 
 @pytest.mark.parametrize("value", [5e-9, flux("A0.5"), math.nextafter(1e-8, 0), 1e-300])
 def test_positive_flux_below_a_class_is_rejected_not_no_flare(value):
     with pytest.raises(ValueError, match="below the A-class boundary"):
-        labeler.assign(value)
+        class_of(value)
 
 
 @pytest.mark.parametrize("value", [-1e-6, -1e-300, float("-inf")])
 def test_negative_flux_is_rejected(value):
     with pytest.raises(ValueError):
-        labeler.assign(value)
+        class_of(value)
 
 
 @pytest.mark.parametrize("value", [float("nan"), float("inf"), np.nan])
 def test_non_finite_flux_is_rejected(value):
     with pytest.raises(ValueError, match="non-finite|negative"):
-        labeler.assign(value)
+        class_of(value)
 
 
 @pytest.mark.parametrize("value", ["M2.0", "1e-5", None, True, False, [1e-5], np.bool_(True), complex(1e-5, 0)])
 def test_non_numeric_input_is_rejected(value):
     with pytest.raises(TypeError, match="expects a flux number"):
-        labeler.assign(value)
+        class_of(value)
 
 
 # ── End to end through DatasetBuilder ────────────────────────────────────
@@ -185,7 +210,7 @@ def full_disk_index(tmp_path):
 def test_single_instance_full_disk(catalog, full_disk_index):
     labels = _builder(_multiclass_pipeline(), include_metadata=True).build(full_disk_index, catalog)
     # Windows [t, t+12h): day 1 00h holds C3.0 and M10.0 -> X; day 2 00h holds B2.0 and A4.0 -> B.
-    assert labels["label"].tolist() == ["X", "NF", "B", "NF", "C", "NF", "X", "NF"]
+    assert _letters(labels["label"]) == ["X", "NF", "B", "NF", "C", "NF", "X", "NF"]
     assert labels["image_path"].tolist() == [f"img{i}.jpg" for i in range(8)]
 
 
@@ -197,8 +222,8 @@ def test_multiclass_agrees_with_binary_and_regression_on_the_same_windows(catalo
     # Multiclass M/X matches the binary M threshold on every window.
     assert binary.tolist() == [1, 0, 0, 0, 0, 0, 1, 0]
     assert regression.tolist() == pytest.approx([1e-4, 0.0, 2e-7, 0.0, 9.9e-6, 0.0, 1e-4, 0.0])
-    assert [int(c in ("M", "X")) for c in multiclass] == binary.tolist()
-    assert [labeler.assign(f) for f in regression] == multiclass.tolist()
+    assert [int(c in ("M", "X")) for c in _letters(multiclass)] == binary.tolist()
+    assert [class_of(f) for f in regression] == _letters(multiclass)
 
 def test_time_based_sequences_use_the_final_instance(catalog, full_disk_index):
     sequences, report = _builder(
@@ -207,7 +232,7 @@ def test_time_based_sequences_use_the_final_instance(catalog, full_disk_index):
     assert report.emitted_sequences == 7
     expected = dict(zip(pd.date_range("2024-01-01 12:00", periods=7, freq="12h"),
                         ["NF", "B", "NF", "C", "NF", "X", "NF"]))
-    assert dict(zip(sequences["sequence_end"], sequences["label"])) == expected
+    assert dict(zip(sequences["sequence_end"], _letters(sequences["label"]))) == expected
 
 
 @pytest.fixture
@@ -224,7 +249,7 @@ def ar_index(tmp_path):
 
 def test_active_region_single_instance_isolates_regions(catalog, ar_index):
     labels = _builder(_multiclass_pipeline(), target="active_region", include_metadata=True).build(ar_index, catalog)
-    got = {(str(t.date()), r): label for t, r, label in zip(labels["timestamp"], labels["active_region"], labels["label"])}
+    got = {(str(t.date()), r): _hot(label) for t, r, label in zip(labels["timestamp"], labels["active_region"], labels["label"])}
     assert got == {
         ("2024-01-01", "100"): "C", ("2024-01-01", "200"): "X",   # full disk would say X for both
         ("2024-01-02", "100"): "B", ("2024-01-02", "200"): "A",
@@ -232,7 +257,7 @@ def test_active_region_single_instance_isolates_regions(catalog, ar_index):
         ("2024-01-04", "100"): "NF", ("2024-01-04", "200"): "X",
     }
     full_disk = _builder(_multiclass_pipeline()).build(ar_index, catalog)
-    assert full_disk["label"].iloc[0] == full_disk["label"].iloc[1] == "X"
+    assert _hot(full_disk["label"].iloc[0]) == _hot(full_disk["label"].iloc[1]) == "X"
 
 
 def test_active_region_time_based_sequences_isolate_regions(catalog, ar_index):
@@ -240,7 +265,7 @@ def test_active_region_time_based_sequences_isolate_regions(catalog, ar_index):
         _multiclass_pipeline(), target="active_region",
         cadence="24h", observation_window="48h", sliding_window="24h",
     ).build(ar_index, catalog)
-    got = {(str(end.date()), region): label
+    got = {(str(end.date()), region): _hot(label)
            for end, region, label in zip(sequences["sequence_end"], sequences["active_region"], sequences["label"])}
     assert got == {
         ("2024-01-02", "100"): "B", ("2024-01-02", "200"): "A",

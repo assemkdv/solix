@@ -892,16 +892,27 @@ def _format_duration(value: pd.Timedelta) -> str:
 
 
 def _label_summary(labels: pd.Series) -> str:
-    """Counts for 0/1 or class labels, the range for numbers, nothing for dicts."""
+    """Counts for 0/1, class or one-hot labels, the range for numbers, nothing for other dicts."""
     values = labels.dropna()
     if values.empty:
         return ""
+    if values.map(_is_one_hot).all():
+        values = values.map(lambda v: next(name for name, bit in v.items() if bit == 1))
     if values.map(lambda v: isinstance(v, (dict, list))).any():
         return ""
     if values.map(lambda v: isinstance(v, str)).all() or set(values.unique()) <= {0, 1}:
         counts = values.value_counts()
         return ", ".join(f"label {key}: {int(count):,}" for key, count in sorted(counts.items(), key=lambda kv: str(kv[0])))
     return f"values from {values.min():g} to {values.max():g}"
+
+
+_ONE_HOT_CLASSES = ("NF", "A", "B", "C", "M", "X")   # MulticlassLabeler.CLASSES
+
+
+def _is_one_hot(value) -> bool:
+    """A MulticlassLabeler label: NF, A, B, C, M and X as keys, exactly one of them 1."""
+    return (isinstance(value, dict) and tuple(value) == _ONE_HOT_CLASSES
+            and sorted(value.values()) == [0] * (len(value) - 1) + [1])
 
 
 def _extra_columns(index_df: pd.DataFrame, excluded: tuple, reserved: tuple, path: Path) -> list:

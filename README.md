@@ -41,7 +41,7 @@ machine-learning data loader.
 
 ## How it works
 
-![Architecture of SOLIX](https://raw.githubusercontent.com/assemkdv/solix/main/docs/architecture/architecture.png)
+![Architecture of SOLIX](docs/architecture/architecture.png)
 
 1. **Input.** Two CSV files: an index and a flare catalog. Optional
    helpers in `loaders.py` make them from raw data. The configuration is a
